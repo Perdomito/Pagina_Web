@@ -1,86 +1,58 @@
 // ============================================
 // MIDDLEWARE DE AUTENTICACIÓN
 // ============================================
-// Este middleware verifica que el usuario esté autenticado
-// Se usa en las rutas protegidas
-
-/*
 const jwt = require('jsonwebtoken');
 
-// Middleware para verificar token JWT
-exports.verifyToken = (req, res, next) => {
-  try {
-    // Obtener token del header Authorization
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+// Verificar token JWT
+const verificarToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
 
-    if (!token) {
-      return res.status(401).json({ 
-        message: 'Token no proporcionado' 
-      });
+  if (!token) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+};
+
+// Verificar rol específico
+const verificarRol = (rolesPermitidos) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'No autenticado' });
     }
 
-    // Verificar token
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-      if (err) {
-        return res.status(403).json({ 
-          message: 'Token inválido o expirado' 
-        });
-      }
+    if (!rolesPermitidos.includes(req.user.rol)) {
+      return res.status(403).json({ error: 'No tiene permisos para esta acción' });
+    }
 
-      // Guardar datos del usuario en req
+    next();
+  };
+};
+
+// Middleware opcional (no falla si no hay token)
+const verificarTokenOpcional = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
-      next();
-    });
-
-  } catch (error) {
-    console.error('Error en verifyToken:', error);
-    res.status(500).json({ 
-      message: 'Error al verificar autenticación' 
-    });
+    } catch (error) {
+      // Token inválido, pero continuamos sin usuario
+    }
   }
+
+  next();
 };
 
-// Middleware para verificar rol de administrador
-exports.isAdmin = (req, res, next) => {
-  if (req.user && req.user.rol === 'admin') {
-    next();
-  } else {
-    res.status(403).json({ 
-      message: 'Acceso denegado. Se requieren permisos de administrador' 
-    });
-  }
+module.exports = {
+  verificarToken,
+  verificarRol,
+  verificarTokenOpcional
 };
-
-// Middleware para verificar rol de pastor
-exports.isPastor = (req, res, next) => {
-  if (req.user && (req.user.rol === 'pastor' || req.user.rol === 'admin')) {
-    next();
-  } else {
-    res.status(403).json({ 
-      message: 'Acceso denegado. Se requieren permisos de pastor' 
-    });
-  }
-};
-
-module.exports = exports;
-*/
-
-// ============================================
-// USO DE ESTE MIDDLEWARE:
-// ============================================
-// En las rutas, importar y usar así:
-//
-// const { verifyToken, isAdmin } = require('../middleware/auth');
-//
-// router.get('/ruta-protegida', verifyToken, (req, res) => {
-//   // Solo usuarios autenticados pueden acceder
-//   res.json({ user: req.user });
-// });
-//
-// router.post('/solo-admin', verifyToken, isAdmin, (req, res) => {
-//   // Solo administradores pueden acceder
-//   res.json({ message: 'Eres admin' });
-// });
-
-module.exports = {};

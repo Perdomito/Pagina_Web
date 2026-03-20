@@ -23,15 +23,16 @@ export default function Login() {
     }
 
     setLoading(true);
-    const result = await login(email, password);
-    setLoading(false);
-
-    if (result.success) {
+    
+    try {
+      await login(email, password);
       toast.success('¡Bienvenido!');
       navigate("/home");
-    } else {
-      setError(result.message);
-      toast.error(result.message);
+    } catch (error) {
+      setError(error.message || 'Error al iniciar sesión');
+      toast.error(error.message || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
     }
   };
 

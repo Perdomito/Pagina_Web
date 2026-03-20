@@ -1,69 +1,60 @@
 // ============================================
-// CONTROLADOR DE MIEMBROS
+// MIEMBROS CONTROLLER
 // ============================================
-// Maneja todas las operaciones CRUD de miembros
+const MiembrosService = require('../services/MiembrosService');
 
-/*
-const db = require('../config/database');
-
-// GET - Obtener todos los miembros
 exports.getAll = async (req, res) => {
   try {
-    const [miembros] = await db.query('SELECT * FROM miembros WHERE activo = TRUE');
+    const miembros = await MiembrosService.getAll(req.query);
     res.json(miembros);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener miembros' });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// GET - Obtener un miembro por ID
 exports.getById = async (req, res) => {
   try {
-    const [miembros] = await db.query('SELECT * FROM miembros WHERE id = ?', [req.params.id]);
-    if (miembros.length === 0) {
-      return res.status(404).json({ message: 'Miembro no encontrado' });
-    }
-    res.json(miembros[0]);
+    const miembro = await MiembrosService.getById(req.params.id);
+    res.json(miembro);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener miembro' });
+    res.status(404).json({ error: error.message });
   }
 };
 
-// POST - Crear nuevo miembro
 exports.create = async (req, res) => {
   try {
-    const { nombre, identidad, pais, ciudad, edad, ... } = req.body;
-    const [result] = await db.query(
-      'INSERT INTO miembros (nombre, identidad, pais, ...) VALUES (?, ?, ?, ...)',
-      [nombre, identidad, pais, ...]
-    );
-    res.status(201).json({ message: 'Miembro creado', id: result.insertId });
+    const miembro = await MiembrosService.create(req.body);
+    res.status(201).json(miembro);
   } catch (error) {
-    res.status(500).json({ message: 'Error al crear miembro' });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// PUT - Actualizar miembro
 exports.update = async (req, res) => {
   try {
-    const [result] = await db.query('UPDATE miembros SET ... WHERE id = ?', [..., req.params.id]);
-    res.json({ message: 'Miembro actualizado' });
+    const miembro = await MiembrosService.update(req.params.id, req.body);
+    res.json(miembro);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar miembro' });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// DELETE - Eliminar miembro (soft delete)
 exports.delete = async (req, res) => {
   try {
-    await db.query('UPDATE miembros SET activo = FALSE WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Miembro eliminado' });
+    const resultado = await MiembrosService.delete(req.params.id);
+    res.json(resultado);
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar miembro' });
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.getEstadisticas = async (req, res) => {
+  try {
+    const stats = await MiembrosService.getEstadisticas(req.query.pais_id);
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
 module.exports = exports;
-*/
-
-module.exports = {};

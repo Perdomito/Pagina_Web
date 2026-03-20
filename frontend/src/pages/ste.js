@@ -67,22 +67,24 @@ const cargarDatosIniciales = async () => {
   try {
     setCargandoDatos(true);
     
-    // Cargar continentes desde la BD
-    const continentesData = await administracionService.getAllContinentes();
-    
-    // Cargar países desde la API
     const paisesData = await administracionService.getAllPaises();
     
-    // Agrupar países por continente
-    const continentesConPaises = continentesData.map(cont => ({
-      id: cont.id,
-      nombre: cont.nombre,
-      paises: paisesData.filter(p => p.continente === cont.nombre)
-    }));
+    const continentesAgrupados = paisesData.reduce((acc, pais) => {
+      const cont = acc.find(c => c.nombre === pais.continente);
+      if (cont) {
+        cont.paises.push({ id: pais.id, nombre: pais.nombre });
+      } else {
+        acc.push({
+          id: acc.length + 1,
+          nombre: pais.continente,
+          paises: [{ id: pais.id, nombre: pais.nombre }]
+        });
+      }
+      return acc;
+    }, []);
     
-    setContinentes(continentesConPaises);
+    setContinentes(continentesAgrupados);
     
-    // Cargar miembros COMPROMETIDOS
     const miembrosData = await miembrosService.getAll({ tipo_miembro: 'Comprometido' });
     setMisioneros(miembrosData.map(m => ({ id: m.id, nombre: m.nombre })));
     
@@ -93,6 +95,7 @@ const cargarDatosIniciales = async () => {
     setCargandoDatos(false);
   }
 };
+
 // ============================================
 // ✅ GUARDAR DATOS EN LA API
 // ============================================
@@ -494,38 +497,23 @@ const guardarTodosLosDatos = async () => {
     }));
   };
   
-const agregarContinente = async () => {
-  if (!nuevoNombreContinente.trim()) {
-    toast.error("El nombre del continente es requerido");
-    return;
-  }
-  
-  try {
-    setCargandoDatos(true);
+  const agregarContinente = () => {
+    if (!nuevoNombreContinente.trim()) {
+      toast.error("Ingrese un nombre");
+      return;
+    }
     
-    // Crear continente en la BD
-    const nuevoContinente = await administracionService.crearContinente({
-      nombre: nuevoNombreContinente.trim()
-    });
-
-    // Actualizar lista local
-    setContinentes(prev => [...prev, { 
-      id: nuevoContinente.id, 
-      nombre: nuevoContinente.nombre, 
-      paises: [] 
-    }]);
+    const nuevoContinente = {
+      id: Date.now(),
+      nombre: nuevoNombreContinente.trim().toUpperCase(),
+      paises: []
+    };
     
-    setNuevoNombreContinente("");
+    setContinentes([...continentes, nuevoContinente]);
     setMostrandoPromptContinente(false);
-    toast.success("✅ Continente guardado en la base de datos");
-    
-  } catch (error) {
-    console.error('Error:', error);
-    toast.error(error.response?.data?.error || 'Error al crear continente');
-  } finally {
-    setCargandoDatos(false);
-  }
-};
+    setNuevoNombreContinente("");
+    toast.success("✅ Continente agregado");
+  };
   
   const eliminarContinente = (id) => {
     if (!window.confirm("¿Eliminar este continente?")) return;
@@ -533,59 +521,30 @@ const agregarContinente = async () => {
     toast.success("Continente eliminado");
   };
   
-const agregarPais = async () => {
-  if (!nuevoNombrePais.trim()) {
-    toast.error("El nombre del país es requerido");
-    return;
-  }
-  
-  if (!continenteParaPais) {
-    toast.error("Selecciona un continente primero");
-    return;
-  }
-  
-  try {
-    setCargandoDatos(true);
-    
-    // Verificar si el país ya existe
-    const continente = continentes.find(c => c.id === continenteParaPais);
-    const yaExiste = continente?.paises.some(p => p.nombre.toLowerCase() === nuevoNombrePais.trim().toLowerCase());
-    
-    if (yaExiste) {
-      toast.error("Este país ya existe en este continente");
+  const agregarPais = () => {
+    if (!nuevoNombrePais.trim()) {
+      toast.error("Ingrese un nombre");
       return;
     }
     
-    // Crear país en la BD
-const nuevoPais = await administracionService.crearPais({
-      nombre: nuevoNombrePais.trim(),
-      continente: continente.nombre,
-      codigo_iso: '', // Opcional
-      activo: true
-    });
-    
-    // Actualizar estado local
-    setContinentes(prev => {
-      const nuevos = [...prev];
-      const cont = nuevos.find(c => c.id === continenteParaPais);
-      if (cont) {
-        cont.paises.push({ id: nuevoPais.id, nombre: nuevoPais.nombre });
+    setContinentes(continentes.map(cont => {
+      if (cont.id === continenteParaPais) {
+        return {
+          ...cont,
+          paises: [
+            ...cont.paises,
+            { id: Date.now(), nombre: nuevoNombrePais.trim() }
+          ]
+        };
       }
-      return nuevos;
-    });
+      return cont;
+    }));
     
-    setNuevoNombrePais("");
     setMostrandoPromptPais(false);
+    setNuevoNombrePais("");
     setContinenteParaPais(null);
-    toast.success("País creado exitosamente en la base de datos");
-    
-  } catch (error) {
-    console.error('Error al crear país:', error);
-    toast.error('Error al crear país: ' + (error.response?.data?.error || error.message));
-  } finally {
-    setCargandoDatos(false);
-  }
-};
+    toast.success("✅ País agregado");
+  };
   
   const eliminarPais = (continenteId, paisId) => {
     if (!window.confirm("¿Eliminar este país?")) return;
@@ -844,36 +803,16 @@ const nuevoPais = await administracionService.crearPais({
           border-color: #0E5A61;
           box-shadow: 0 0 0 4px rgba(14,90,97,0.1);
         }
-.btn-prompt-aceptar {
-          background: linear-gradient(135deg, #0E5A61 0%, #15777F 100%);
+        .btn-prompt-aceptar {
+          background: #2196F3;
           color: white;
-          border: none;
           padding: 12px 28px;
-          border-radius: 10px;
-          cursor: pointer;
-          font-weight: 700;
+          border: none;
+          border-radius: 8px;
           font-size: 15px;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 12px rgba(14, 90, 97, 0.3);
-        }
-        .btn-prompt-aceptar:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(14, 90, 97, 0.4);
-        }
-        .btn-prompt-cancelar {
-          background: #6c757d;
-          color: white;
-          border: none;
-          padding: 12px 28px;
-          border-radius: 10px;
-          cursor: pointer;
           font-weight: 600;
-          font-size: 15px;
-          transition: all 0.3s ease;
-        }
-        .btn-prompt-cancelar:hover {
-          background: #5a6268;
-          transform: translateY(-1px);
+          cursor: pointer;
+          transition: all 0.3s;
         }
         .btn-prompt-aceptar:hover {
           background: #1976D2;
@@ -920,46 +859,25 @@ const nuevoPais = await administracionService.crearPais({
         boxShadow: "0 8px 24px rgba(14,90,97,0.2)"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-        <button 
+          <button 
             onClick={() => navigate("/home")}
-            style={{ 
-              background: "rgba(255,255,255,0.2)", 
-              border: "none", 
-              borderRadius: "8px", 
-              padding: "10px 15px", 
-              color: "white", 
-              cursor: "pointer", 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "8px" 
-            }}
-            className="no-print"
+            className="btn-secondary no-print"
+            style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "transparent" }}
           >
-            <FaArrowLeft /> Volver
+            <FaArrowLeft /> Inicio
           </button>
-
           <h1 style={{ color: "white", margin: 0, fontSize: "28px" }}>
             <FaBook style={{ marginRight: "10px" }} />
             Estudios Bíblicos {añoActual}
           </h1>
-<div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "10px" }}>
             {mesSeleccionado && (
-              <>
-                <button
-                  onClick={() => setMostrandoEstadisticas(true)}
-                  className="btn-success no-print"
-                >
-                  <FaChartLine /> Estadísticas
-                </button>
-                <button
-                  onClick={guardarTodosLosDatos}
-                  className="btn-primary no-print"
-                  disabled={cargandoDatos}
-                  style={{ background: "#4CAF50", borderColor: "#4CAF50" }}
-                >
-                  <FaSave /> {cargandoDatos ? 'Guardando...' : 'Guardar'}
-                </button>
-              </>
+              <button
+                onClick={() => setMostrandoEstadisticas(true)}
+                className="btn-success no-print"
+              >
+                <FaChartLine /> Estadísticas
+              </button>
             )}
             <button onClick={() => window.print()} className="btn-secondary no-print" style={{ background: "white", color: "#0E5A61", borderColor: "white" }}>
               <FaPrint /> Imprimir

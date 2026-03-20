@@ -1,11 +1,6 @@
 // ============================================
 // SERVER.JS - SERVIDOR PRINCIPAL DEL BACKEND
 // ============================================
-// Este archivo es el punto de entrada del servidor Express.
-// Por ahora está comentado porque la app funciona sin backend.
-// Descomentar cuando esté lista la base de datos.
-
-/* 
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -24,30 +19,40 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ============================================
-// RUTAS - IMPORTAR CUANDO ESTÉN LISTAS
+// IMPORTAR RUTAS
 // ============================================
-// const authRoutes = require('./routes/auth');
-// const miembrosRoutes = require('./routes/miembros');
-// const contactosRoutes = require('./routes/contactos');
-// const reportesRoutes = require('./routes/reportes');
-// const estudiosRoutes = require('./routes/estudios');
-// const administracionRoutes = require('./routes/administracion');
+const authRoutes = require('./routes/auth');
+const miembrosRoutes = require('./routes/miembros');
+const contactosRoutes = require('./routes/contactos');
+const reportesRoutes = require('./routes/reportes');
+const estudiosRoutes = require('./routes/estudios');
+const administracionRoutes = require('./routes/administracion');
 
 // ============================================
 // USAR LAS RUTAS
 // ============================================
-// app.use('/api/auth', authRoutes);
-// app.use('/api/miembros', miembrosRoutes);
-// app.use('/api/contactos', contactosRoutes);
-// app.use('/api/reportes', reportesRoutes);
-// app.use('/api/estudios', estudiosRoutes);
-// app.use('/api/administracion', administracionRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/miembros', miembrosRoutes);
+app.use('/api/contactos', contactosRoutes);
+app.use('/api/reportes', reportesRoutes);
+app.use('/api/estudios', estudiosRoutes);
+app.use('/api/administracion', administracionRoutes);
 
 // Ruta de prueba
 app.get('/api', (req, res) => {
   res.json({ 
     message: 'API de Iglesia Emanuel funcionando',
-    version: '1.0.0'
+    version: '2.0.0',
+    status: 'Production Ready'
+  });
+});
+
+// Ruta de health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
@@ -61,10 +66,10 @@ app.use((req, res) => {
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('❌ Error:', err.stack);
   res.status(500).json({ 
     error: 'Error interno del servidor',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Ha ocurrido un error'
   });
 });
 
@@ -72,20 +77,14 @@ app.use((err, req, res, next) => {
 // INICIAR SERVIDOR
 // ============================================
 app.listen(PORT, () => {
+  console.log('==========================================');
+  console.log('🚀 SERVIDOR IGLESIA EMANUEL');
+  console.log('==========================================');
   console.log(`✅ Servidor corriendo en puerto ${PORT}`);
   console.log(`📍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 API disponible en: http://localhost:${PORT}/api`);
+  console.log(`🔐 Health check: http://localhost:${PORT}/api/health`);
+  console.log('==========================================');
 });
-*/
 
-// ============================================
-// PARA ACTIVAR EL SERVIDOR:
-// ============================================
-// 1. Instalar dependencias: npm install
-// 2. Configurar .env con las credenciales de la base de datos
-// 3. Descomentar todo el código de arriba
-// 4. Ejecutar: npm run dev (para desarrollo) o npm start (para producción)
-
-console.log('⚠️  El backend está desactivado.');
-console.log('📝 La aplicación funciona con datos mock en el frontend.');
-console.log('💡 Para activar el backend, seguir las instrucciones en este archivo.');
+module.exports = app;
