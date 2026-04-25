@@ -154,6 +154,73 @@ class EstudiosService {
       nuevosEstudiantes
     };
   }
+
+  // Obtener datos para reporte
+  async getReporteCompleto(pais_id, mes, anio, tipo = 'mensual') {
+    try {
+// 1. Estudiantes que tomaron estudio en este mes
+      const estudiantesActuales = await query(`
+        SELECT COUNT(DISTINCT contacto_id) as total
+        FROM estudios_biblicos
+        WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
+      `, [pais_id, mes, anio]);
+
+      // 2. Evangelismo (online = virtual, presencial)
+      const evangelismo = await query(`
+        SELECT 
+          tipo,
+          SUM(horas) as total_horas
+        FROM evangelismo
+        WHERE pais_id = $1 AND mes = $2 AND anio = $3
+        GROUP BY tipo
+      `, [pais_id, mes, anio]);
+
+      // 3. Número de estudios realizados
+      const numeroEstudios = await query(`
+        SELECT COUNT(*) as total
+        FROM estudios_biblicos
+        WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
+      `, [pais_id, mes, anio]);
+
+      // 4. Nuevos contactos y dijeron que sí
+      const nuevosEstudiantes = await query(`
+        SELECT 
+          SUM(nuevos_contactos) as total_contactos,
+          SUM(dijeron_si) as total_dijeron_si
+        FROM nuevos_estudiantes
+        WHERE pais_id = $1 AND mes = $2 AND anio = $3
+      `, [pais_id, mes, anio]);
+
+      // 5. Contactos que tomaron estudio (contactos con al menos 1 estudio)
+      const contactosEstudian = await query(`
+        SELECT COUNT(DISTINCT contacto_id) as total
+        FROM estudios_biblicos
+        WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
+      `, [pais_id, mes, anio]);
+
+      // Procesar resultados
+      const evangelismoVirtual = evangelismo.rows.find(e => e.tipo === 'Virtual')?.total_horas || 0;
+      const evangelismoPresencial = evangelismo.rows.find(e => e.tipo === 'Presencial')?.total_horas || 0;
+
+      return {
+        estudiantesActuales: parseInt(estudiantesActuales.rows[0]?.total || 0),
+        evangelismoOnline: parseFloat(evangelismoVirtual),
+        evangelismoPresencial: parseFloat(evangelismoPresencial),
+        numeroEstudios: parseInt(numeroEstudios.rows[0]?.total || 0),
+        nuevosContactos: parseInt(nuevosEstudiantes.rows[0]?.total_contactos || 0),
+        contactosEstudian: parseInt(contactosEstudian.rows[0]?.total || 0),
+        // Datos futuros (dejar en 0 por ahora)
+        hastRomanos4: 0,
+        terminadoRomanos8: 0,
+        terminado4Leyes: 0,
+        probabilidadMiembro: 0,
+        ovejasPotenciales: 0
+      };
+    } catch (error) {
+      console.error('Error al generar reporte:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new EstudiosService();

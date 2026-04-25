@@ -82,9 +82,9 @@ const cargarDatosIniciales = async () => {
     
     setContinentes(continentesConPaises);
     
-    // Cargar miembros COMPROMETIDOS
+// Cargar miembros COMPROMETIDOS (sin filtro de país todavía)
     const miembrosData = await miembrosService.getAll({ tipo_miembro: 'Comprometido' });
-    setMisioneros(miembrosData.map(m => ({ id: m.id, nombre: m.nombre })));
+    setMisioneros(miembrosData); 
     
   } catch (error) {
     console.error('Error al cargar datos iniciales:', error);
@@ -202,74 +202,176 @@ const guardarTodosLosDatos = async () => {
     return `${continenteId}-${paisId}-${mes}`;
   };
   
-  useEffect(() => {
+useEffect(() => {
     if (continenteSeleccionado && paisSeleccionado && mesSeleccionado) {
       const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
       
+      // SOLO inicializar datosEstudios si no existe
       if (!datosEstudios[clave]) {
-        const nuevosDatos = {};
-        misioneros.forEach(m => {
-          nuevosDatos[m.id] = {
-            estudios: {},
-            evangelismo: { online: 0, virtual: 0 }
-          };
-        });
-        
         setDatosEstudios(prev => ({
           ...prev,
-          [clave]: nuevosDatos
+          [clave]: (() => {
+            const nuevosDatos = {};
+            misioneros.forEach(m => {
+              nuevosDatos[m.id] = {
+                estudios: {},
+                evangelismo: { online: 0, virtual: 0 }
+              };
+            });
+            return nuevosDatos;
+          })()
         }));
       }
       
-      if (!estudiantes[clave]) {
-        setEstudiantes(prev => ({
-          ...prev,
-          [clave]: {}
-        }));
-      }
-      
-      if (!evangelismoData[clave]) {
-        const nuevosEvangelismo = {};
-        misioneros.forEach(m => {
-          nuevosEvangelismo[m.id] = {
-            virtual: {},
-            presencial: {}
-          };
-        });
-        
-        setEvangelismoData(prev => ({
-          ...prev,
-          [clave]: nuevosEvangelismo
-        }));
-      }
-      
-      if (!estudiantesQueDigeronSi[clave]) {
-        const nuevosData = {};
-        misioneros.forEach(m => {
-          nuevosData[m.id] = {};
-        });
-        
-        setEstudiantesQueDigeronSi(prev => ({
-          ...prev,
-          [clave]: nuevosData
-        }));
-      }
-      
-      if (!nuevosContactos[clave]) {
-        const nuevosData = {};
-        misioneros.forEach(m => {
-          nuevosData[m.id] = {};
-        });
-        
-        setNuevosContactos(prev => ({
-          ...prev,
-          [clave]: nuevosData
-        }));
-      }
+      // NO inicializar otros estados aquí - dejar que el useEffect de carga los llene desde BD
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continenteSeleccionado, paisSeleccionado, mesSeleccionado]);
-  
+  }, [continenteSeleccionado, paisSeleccionado, mesSeleccionado, misioneros]);
+  // Cargar contactos desde la BD cuando se selecciona un país
+  useEffect(() => {
+    const cargarContactosDelPais = async () => {
+      if (!paisSeleccionado) return;
+      
+      try {
+        const contactosData = await contactosService.getAll({ pais_id: paisSeleccionado });
+        
+        // Convertir contactos a formato de estudiantes agrupados por misionero
+        const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+        const estudiantesPorMisionero = {};
+        
+        contactosData.forEach(contacto => {
+          const misioneroId = contacto.miembro_responsable_id;
+          if (!estudiantesPorMisionero[misioneroId]) {
+            estudiantesPorMisionero[misioneroId] = [];
+          }
+          
+          estudiantesPorMisionero[misioneroId].push({
+            id: contacto.id,
+            numero: contacto.id,
+            nombre: contacto.nombre,
+            pais: contacto.pais_nombre,
+            estudios: {}
+          });
+        });
+        
+        setEstudiantes(prev => ({
+          ...prev,
+          [clave]: estudiantesPorMisionero
+        }));
+        
+      } catch (error) {
+        console.error('Error al cargar contactos:', error);
+      }
+    };
+    
+    cargarContactosDelPais();
+  }, [paisSeleccionado, continenteSeleccionado, mesSeleccionado]);
+  // Cargar datos guardados desde la BD
+  useEffect(() => {
+    const cargarDatosGuardados = async () => {
+      if (!paisSeleccionado || !mesSeleccionado) return;
+
+
+      
+try {
+        const pais = continentes.find(c => c.id === continenteSeleccionado)?.paises.find(p => p.id === paisSeleccionado);
+        if (!pais) return;
+        
+        const resumen = await estudiosService.getResumenCompleto(pais.id, mesSeleccionado, añoActual);
+        
+        console.log('Datos cargados:', resumen);
+        
+        const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+        
+        // Procesar evangelismo
+        if (resumen.evangelismo && resumen.evangelismo.length > 0) {
+          const evangelismoData = {};
+          resumen.evangelismo.forEach(ev => {
+            if (!evangelismoData[ev.miembro_id]) {
+              evangelismoData[ev.miembro_id] = { virtual: {}, presencial: {} };
+            }
+            const tipoKey = ev.tipo.toLowerCase();
+            evangelismoData[ev.miembro_id][tipoKey][ev.dia] = {
+              horas: ev.horas,
+              donde: ev.donde
+            };
+          });
+          
+          setEvangelismoData(prev => ({
+            ...prev,
+            [clave]: evangelismoData
+          }));
+        }
+        
+        // Procesar nuevos estudiantes
+        if (resumen.nuevosEstudiantes && resumen.nuevosEstudiantes.length > 0) {
+          const dijeronSiData = {};
+          const contactosData = {};
+          
+          resumen.nuevosEstudiantes.forEach(ne => {
+            if (!dijeronSiData[ne.miembro_id]) {
+              dijeronSiData[ne.miembro_id] = {};
+              contactosData[ne.miembro_id] = {};
+            }
+            dijeronSiData[ne.miembro_id][ne.dia] = ne.dijeron_si;
+            contactosData[ne.miembro_id][ne.dia] = ne.nuevos_contactos;
+          });
+          
+          setEstudiantesQueDigeronSi(prev => ({
+            ...prev,
+            [clave]: dijeronSiData
+          }));
+          
+          setNuevosContactos(prev => ({
+            ...prev,
+            [clave]: contactosData
+          }));
+        }
+        
+        // Procesar estudios (horas por estudiante por día)
+        if (resumen.estudios && resumen.estudios.length > 0) {
+          const estudiantesPorMisionero = {};
+          
+          resumen.estudios.forEach(est => {
+            const misioneroId = est.miembro_responsable_id;
+            if (!estudiantesPorMisionero[misioneroId]) {
+              estudiantesPorMisionero[misioneroId] = [];
+            }
+            
+            // Buscar si el estudiante ya existe
+            let estudiante = estudiantesPorMisionero[misioneroId].find(e => e.id === est.contacto_id);
+            if (!estudiante) {
+              estudiante = {
+                id: est.contacto_id,
+                numero: est.contacto_id,
+                nombre: est.contacto_nombre,
+                pais: '',
+                estudios: {}
+              };
+              estudiantesPorMisionero[misioneroId].push(estudiante);
+            }
+            
+            // Agregar datos del día
+            estudiante.estudios[est.dia] = {
+              capitulo: est.capitulo,
+              horas: est.horas
+            };
+          });
+          
+          setEstudiantes(prev => ({
+            ...prev,
+            [clave]: estudiantesPorMisionero
+          }));
+        }
+        
+      } catch (error) {
+        console.error('Error al cargar datos guardados:', error);
+      }
+    };
+    
+    cargarDatosGuardados();
+}, [paisSeleccionado, mesSeleccionado, continenteSeleccionado, continentes, añoActual, misioneros]);
+
   const obtenerEstudiantesActuales = (misioneroId = null) => {
     if (!continenteSeleccionado || !paisSeleccionado || !mesSeleccionado) return [];
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
@@ -354,7 +456,7 @@ const guardarTodosLosDatos = async () => {
     return total;
   };
   
-  const actualizarEvangelismo = (misioneroId, tipo, dia, campo, valor) => {
+const actualizarEvangelismo = (misioneroId, tipo, dia, campo, valor) => {
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
     
     setEvangelismoData(prev => ({
@@ -373,37 +475,81 @@ const guardarTodosLosDatos = async () => {
         }
       }
     }));
+    
+    // Autoguardar en BD
+    const datosActuales = obtenerEvangelismoActual(misioneroId);
+    const donde = campo === 'donde' ? valor : (datosActuales[tipo]?.[dia]?.donde || '');
+    const horas = campo === 'horas' ? valor : (datosActuales[tipo]?.[dia]?.horas || 0);
+    
+    if (horas > 0 || donde) {
+      estudiosService.guardarEvangelismo({
+        miembro_id: misioneroId,
+        pais_id: paisSeleccionado,
+        mes: mesSeleccionado,
+        anio: añoActual,
+        dia: parseInt(dia),
+        tipo: tipo === 'virtual' ? 'Virtual' : 'Presencial',
+        donde: donde,
+        horas: parseFloat(horas || 0)
+      }).catch(err => console.error('Error autoguardando:', err));
+    }
   };
   
-  const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
-    const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-    
-    setEstudiantesQueDigeronSi(prev => ({
-      ...prev,
-      [clave]: {
-        ...prev[clave],
-        [misioneroId]: {
-          ...prev[clave]?.[misioneroId],
-          [dia]: parseInt(cantidad) || 0
-        }
-      }
-    }));
-  };
+const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
+  const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
   
-  const actualizarContactos = (misioneroId, dia, cantidad) => {
-    const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-    
-    setNuevosContactos(prev => ({
-      ...prev,
-      [clave]: {
-        ...prev[clave],
-        [misioneroId]: {
-          ...prev[clave]?.[misioneroId],
-          [dia]: parseInt(cantidad) || 0
-        }
+  setEstudiantesQueDigeronSi(prev => ({
+    ...prev,
+    [clave]: {
+      ...prev[clave],
+      [misioneroId]: {
+        ...prev[clave]?.[misioneroId],
+        [dia]: parseInt(cantidad) || 0
       }
-    }));
-  };
+    }
+  }));
+  
+  // Autoguardar en BD
+  const contactosCantidad = nuevosContactos[clave]?.[misioneroId]?.[dia] || 0;
+  
+  estudiosService.guardarNuevosEstudiantes({
+    miembro_id: misioneroId,
+    pais_id: paisSeleccionado,
+    mes: mesSeleccionado,
+    anio: añoActual,
+    dia: parseInt(dia),
+    dijeron_si: parseInt(cantidad || 0),
+    nuevos_contactos: parseInt(contactosCantidad || 0)
+  }).catch(err => console.error('Error autoguardando:', err));
+};
+  
+const actualizarContactos = (misioneroId, dia, cantidad) => {
+  const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+  
+  setNuevosContactos(prev => ({
+    ...prev,
+    [clave]: {
+      ...prev[clave],
+      [misioneroId]: {
+        ...prev[clave]?.[misioneroId],
+        [dia]: parseInt(cantidad) || 0
+      }
+    }
+  }));
+  
+  // Autoguardar en BD
+  const dijeronSiCantidad = estudiantesQueDigeronSi[clave]?.[misioneroId]?.[dia] || 0;
+  
+  estudiosService.guardarNuevosEstudiantes({
+    miembro_id: misioneroId,
+    pais_id: paisSeleccionado,
+    mes: mesSeleccionado,
+    anio: añoActual,
+    dia: parseInt(dia),
+    dijeron_si: parseInt(dijeronSiCantidad || 0),
+    nuevos_contactos: parseInt(cantidad || 0)
+  }).catch(err => console.error('Error autoguardando:', err));
+};
   
   const agregarEstudiante = () => {
     if (!nuevoEstudiante.nombre || !misioneroSeleccionado) {
@@ -468,31 +614,57 @@ const guardarTodosLosDatos = async () => {
     }));
   };
   
-  const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valor) => {
-    const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-    
-    setEstudiantes(prev => ({
-      ...prev,
-      [clave]: {
-        ...prev[clave],
-        [misioneroId]: prev[clave][misioneroId].map(est => {
-          if (est.id === estudianteId) {
-            return {
-              ...est,
-              estudios: {
-                ...est.estudios,
-                [dia]: {
-                  ...est.estudios?.[dia],
-                  [campo]: valor
-                }
+const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valor) => {
+  const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+  
+  // Obtener datos actuales ANTES de actualizar
+  const estudianteActual = estudiantes[clave]?.[misioneroId]?.find(e => e.id === estudianteId);
+  const capituloActual = campo === 'capitulo' ? valor : (estudianteActual?.estudios?.[dia]?.capitulo || '');
+  const horasActual = campo === 'horas' ? valor : (estudianteActual?.estudios?.[dia]?.horas || 0);
+  
+  setEstudiantes(prev => ({
+    ...prev,
+    [clave]: {
+      ...prev[clave],
+      [misioneroId]: prev[clave][misioneroId].map(est => {
+        if (est.id === estudianteId) {
+          return {
+            ...est,
+            estudios: {
+              ...est.estudios,
+              [dia]: {
+                ...est.estudios?.[dia],
+                [campo]: valor
               }
-            };
-          }
-          return est;
-        })
-      }
-    }));
-  };
+            }
+          };
+        }
+        return est;
+      })
+    }
+  }));
+  
+  console.log('🔥 INTENTANDO GUARDAR:', {
+    contacto_id: estudianteId,
+    dia: dia,
+    capitulo: capituloActual,
+    horas: horasActual
+  });
+
+  // Autoguardar en BD (guarda tanto capítulo como horas)
+  if (horasActual > 0 || capituloActual) {
+    estudiosService.guardarEstudio({
+      contacto_id: estudianteId,
+      miembro_responsable_id: misioneroId,
+      pais_id: paisSeleccionado,
+      mes: mesSeleccionado,
+      anio: añoActual,
+      dia: parseInt(dia),
+      capitulo: capituloActual,
+      horas: parseFloat(horasActual || 0)
+    }).catch(err => console.error('Error autoguardando:', err));
+  }
+};
   
 const agregarContinente = async () => {
   if (!nuevoNombreContinente.trim()) {
@@ -527,10 +699,17 @@ const agregarContinente = async () => {
   }
 };
   
-  const eliminarContinente = (id) => {
+const eliminarContinente = async (id) => {
     if (!window.confirm("¿Eliminar este continente?")) return;
-    setContinentes(continentes.filter(c => c.id !== id));
-    toast.success("Continente eliminado");
+    
+    try {
+      await administracionService.eliminarContinente(id);
+      setContinentes(continentes.filter(c => c.id !== id));
+      toast.success("✅ Continente eliminado de la BD");
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(error.response?.data?.error || 'Error al eliminar continente');
+    }
   };
   
 const agregarPais = async () => {
@@ -587,20 +766,27 @@ const nuevoPais = await administracionService.crearPais({
   }
 };
   
-  const eliminarPais = (continenteId, paisId) => {
+const eliminarPais = async (continenteId, paisId) => {
     if (!window.confirm("¿Eliminar este país?")) return;
     
-    setContinentes(continentes.map(cont => {
-      if (cont.id === continenteId) {
-        return {
-          ...cont,
-          paises: cont.paises.filter(p => p.id !== paisId)
-        };
-      }
-      return cont;
-    }));
-    
-    toast.success("País eliminado");
+    try {
+      await administracionService.eliminarPais(paisId);
+      
+      setContinentes(continentes.map(cont => {
+        if (cont.id === continenteId) {
+          return {
+            ...cont,
+            paises: cont.paises.filter(p => p.id !== paisId)
+          };
+        }
+        return cont;
+      }));
+      
+      toast.success("✅ País eliminado de la BD");
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(error.response?.data?.error || 'Error al eliminar país');
+    }
   };
   
   const agregarMisionero = () => {
@@ -921,7 +1107,22 @@ const nuevoPais = await administracionService.crearPais({
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
         <button 
-            onClick={() => navigate("/home")}
+           // onClick={() => navigate("/home")}
+
+            onClick={() => {
+            if (misioneroSeleccionado) {
+              setMisioneroSeleccionado(null);
+              setVistaActual("resumen");
+            } else if (mesSeleccionado) {
+              setMesSeleccionado(null);
+            } else if (paisSeleccionado) {
+              setPaisSeleccionado(null);
+            } else if (continenteSeleccionado) {
+              setContinenteSeleccionado(null);
+            } else {
+              navigate("/home");
+            }
+          }} 
             style={{ 
               background: "rgba(255,255,255,0.2)", 
               border: "none", 
@@ -951,14 +1152,7 @@ const nuevoPais = await administracionService.crearPais({
                 >
                   <FaChartLine /> Estadísticas
                 </button>
-                <button
-                  onClick={guardarTodosLosDatos}
-                  className="btn-primary no-print"
-                  disabled={cargandoDatos}
-                  style={{ background: "#4CAF50", borderColor: "#4CAF50" }}
-                >
-                  <FaSave /> {cargandoDatos ? 'Guardando...' : 'Guardar'}
-                </button>
+
               </>
             )}
             <button onClick={() => window.print()} className="btn-secondary no-print" style={{ background: "white", color: "#0E5A61", borderColor: "white" }}>
@@ -1199,7 +1393,7 @@ const nuevoPais = await administracionService.crearPais({
                     </tr>
                   </thead>
                   <tbody>
-                    {misioneros.map(misionero => (
+              {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => (
                       <tr key={misionero.id}>
                         <td style={{ textAlign: "left", fontWeight: "700", background: "#f8f9fa", fontSize: "14px" }}>
                           {misionero.nombre}
@@ -1266,7 +1460,7 @@ const nuevoPais = await administracionService.crearPais({
 
               <div className="no-print" style={{ marginTop: "20px" }}>
                 <button
-                  onClick={() => setMostrandoModalMisionero(true)}
+                  onClick={() => navigate("/miembros")}
                   className="btn-add-new"
                 >
                   <FaPlus size={18} /> Añadir Misionero
@@ -1285,7 +1479,7 @@ const nuevoPais = await administracionService.crearPais({
                   </tr>
                 </thead>
                 <tbody>
-                  {misioneros.map(misionero => {
+                  {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                     const evang = obtenerEvangelismoActual(misionero.id);
                     
                     let horasVirtual = 0;
@@ -1359,7 +1553,7 @@ const nuevoPais = await administracionService.crearPais({
                   </tr>
                 </thead>
                 <tbody>
-                  {misioneros.map(misionero => {
+                  {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                     const dataSi = obtenerDigeronSiActual(misionero.id);
                     const dataContactos = obtenerContactosActual(misionero.id);
                     const totalSi = Object.values(dataSi).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
@@ -1398,8 +1592,8 @@ const nuevoPais = await administracionService.crearPais({
           {/* VISTA POR MISIONERO */}
           {vistaActual === "misioneros" && (
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px", marginBottom: "20px" }}>
-                {misioneros.map(misionero => {
+<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px", marginBottom: "20px" }}>
+                {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                   const estudiantesLista = obtenerEstudiantesActuales(misionero.id);
                   
                   // Calcular horas de ESTUDIOS (solo estudiantes)
@@ -1457,7 +1651,7 @@ const nuevoPais = await administracionService.crearPais({
 
               <div className="no-print">
                 <button
-                  onClick={() => setMostrandoModalMisionero(true)}
+                  onClick={() => navigate("/miembros")}
                   className="btn-add-new"
                 >
                   <FaPlus size={18} /> Añadir Nuevo Misionero
@@ -1491,7 +1685,7 @@ const nuevoPais = await administracionService.crearPais({
                     </tr>
                   </thead>
                   <tbody>
-                    {misioneros.map(misionero => {
+                    {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                       const data = obtenerDigeronSiActual(misionero.id);
                       const total = Object.values(data).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
                       
@@ -1557,7 +1751,7 @@ const nuevoPais = await administracionService.crearPais({
                     </tr>
                   </thead>
                   <tbody>
-                    {misioneros.map(misionero => {
+                    {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                       const data = obtenerContactosActual(misionero.id);
                       const total = Object.values(data).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
                       
@@ -1641,11 +1835,11 @@ const nuevoPais = await administracionService.crearPais({
                     </th>
                   ))}
                 </tr>
-                <tr>
+<tr>
                   {diasDelMes.map(dia => (
                     <React.Fragment key={dia}>
-                      <th style={{ fontSize: "11px" }}>Cap.</th>
-                      <th style={{ fontSize: "11px" }}>Hr</th>
+                      <th style={{ fontSize: "12px", fontWeight: "600" }}>Cap</th>
+                      <th style={{ fontSize: "12px", fontWeight: "600" }}>Hr</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -1717,115 +1911,167 @@ const nuevoPais = await administracionService.crearPais({
                 ))}
                 
                 {/* Filas vacías FUNCIONALES */}
-                {Array.from({ length: Math.max(5 - obtenerEstudiantesActuales(misioneroSeleccionado).length, 0) }).map((_, idx) => {
-                  const tempId = `temp-${idx}`;
-                  return (
-                    <tr key={`empty-${idx}`} className="fila-vacia">
-                      <td></td>
-                      <td>
-                        <input 
-                          type="text" 
-                          placeholder="-" 
-                          style={{ width: "70px" }}
-                          onBlur={(e) => {
-                            if (e.target.value.trim()) {
-                              // Crear estudiante temporal
-                              const nuevoEst = {
-                                id: Date.now() + idx,
-                                numero: e.target.value,
-                                nombre: "",
-                                pais: "",
-                                estudios: {}
-                              };
-                              const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-                              setEstudiantes(prev => ({
-                                ...prev,
-                                [clave]: {
-                                  ...prev[clave],
-                                  [misioneroSeleccionado]: [
-                                    ...(prev[clave]?.[misioneroSeleccionado] || []),
-                                    nuevoEst
-                                  ]
-                                }
-                              }));
-                            }
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <input 
-                          type="text" 
-                          placeholder="Nombre" 
-                          style={{ width: "210px" }}
-                          onBlur={(e) => {
-                            if (e.target.value.trim()) {
-                              const nuevoEst = {
-                                id: Date.now() + idx,
-                                numero: "",
-                                nombre: e.target.value,
-                                pais: "",
-                                estudios: {}
-                              };
-                              const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-                              setEstudiantes(prev => ({
-                                ...prev,
-                                [clave]: {
-                                  ...prev[clave],
-                                  [misioneroSeleccionado]: [
-                                    ...(prev[clave]?.[misioneroSeleccionado] || []),
-                                    nuevoEst
-                                  ]
-                                }
-                              }));
-                            }
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <select 
-                          style={{ width: "150px" }}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              const nuevoEst = {
-                                id: Date.now() + idx,
-                                numero: "",
-                                nombre: "Nuevo",
-                                pais: e.target.value,
-                                estudios: {}
-                              };
-                              const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-                              setEstudiantes(prev => ({
-                                ...prev,
-                                [clave]: {
-                                  ...prev[clave],
-                                  [misioneroSeleccionado]: [
-                                    ...(prev[clave]?.[misioneroSeleccionado] || []),
-                                    nuevoEst
-                                  ]
-                                }
-                              }));
-                            }
-                          }}
-                        >
-                          <option value="">Seleccionar</option>
-                          {paisesDelContinente.map(pais => (
-                            <option key={pais.id} value={pais.nombre}>{pais.nombre}</option>
-                          ))}
-                        </select>
-                      </td>
-                      {diasDelMes.map(dia => (
-                        <React.Fragment key={dia}>
-                          <td>
-                            <input type="text" placeholder="Cap" style={{ width: "55px" }} disabled />
-                          </td>
-                          <td>
-                            <input type="number" min="0" placeholder="0" style={{ width: "50px" }} disabled />
-                          </td>
-                        </React.Fragment>
-                      ))}
-                    </tr>
-                  );
-                })}
+              {Array.from({ length: Math.max(5 - obtenerEstudiantesActuales(misioneroSeleccionado).length, 0) }).map((_, idx) => {
+                  const handleFilaBlur = async (e) => {
+                  const fila = e.currentTarget;
+                  const relatedTarget = e.relatedTarget;
+                  if (fila.contains(relatedTarget)) return; // el foco sigue dentro de la misma fila
+
+                  const numeroInput = fila.querySelector('input[data-campo="numero"]');
+                  const nombreInput = fila.querySelector('input[data-campo="nombre"]');
+                  const paisSelect  = fila.querySelector('select[data-campo="pais"]');
+
+                  const numero = numeroInput?.value?.trim();
+                  const nombre = nombreInput?.value?.trim();
+                  const pais   = paisSelect?.value || "";
+
+                  if (nombre) {
+                    // Capturar Cap y Hr de cada día antes de limpiar
+                    const estudiosCapturados = {};
+                    fila.querySelectorAll('input[data-campo="cap"]').forEach(input => {
+                      const dia = input.dataset.dia;
+                      const cap = input.value.trim();
+                      if (cap) {
+                        if (!estudiosCapturados[dia]) estudiosCapturados[dia] = {};
+                        estudiosCapturados[dia].capitulo = cap;
+                      }
+                    });
+                    
+                    fila.querySelectorAll('input[data-campo="hr"]').forEach(input => {
+                     console.log('Capturando día:', input.dataset.dia, 'horas:', input.value);
+                      const dia = input.dataset.dia;
+                      const hr = input.value.trim();
+                      if (hr) {
+                        if (!estudiosCapturados[dia]) estudiosCapturados[dia] = {};
+                        estudiosCapturados[dia].horas = hr;
+                      }
+                    });
+
+                  // Primero crear el contacto en la BD
+                    try {
+                      const nuevoContacto = await contactosService.create({
+                        nombre: nombre,
+                        pais_id: paisSeleccionado,
+                        miembro_id: misioneroSeleccionado,
+                        telefono: '',
+                        notas: '',
+                        estado: 'Activo'
+                      });
+                      
+                      const nuevoEst = {
+                        id: nuevoContacto.id,
+                        numero: nuevoContacto.id,
+                        nombre,
+                        pais,
+                        estudios: estudiosCapturados
+                      };
+                    
+                    const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+                    setEstudiantes(prev => ({
+                      ...prev,
+                      [clave]: {
+                        ...prev[clave],
+                        [misioneroSeleccionado]: [
+                          ...(prev[clave]?.[misioneroSeleccionado] || []),
+                          nuevoEst
+                        ]
+                      }
+                    }));
+                    
+                    // Limpiar los campos
+                    if (numeroInput) numeroInput.value = "";
+                    if (nombreInput) nombreInput.value = "";
+                    if (paisSelect)  paisSelect.value  = "";
+                    fila.querySelectorAll('input[data-campo="cap"]').forEach(input => input.value = "");
+                    fila.querySelectorAll('input[data-campo="hr"]').forEach(input => input.value = "");
+                    // Guardar las horas de estudio también
+                    const promesasEstudios = [];
+                    Object.entries(estudiosCapturados).forEach(([dia, datos]) => {
+                      if (datos.horas && datos.horas > 0) {
+                        promesasEstudios.push(
+                          estudiosService.guardarEstudio({
+                            contacto_id: nuevoContacto.id,
+                            miembro_responsable_id: misioneroSeleccionado,
+                            pais_id: paisSeleccionado,
+                            mes: mesSeleccionado,
+                            anio: añoActual,
+                            dia: parseInt(dia),
+                            capitulo: datos.capitulo || '',
+                            horas: parseFloat(datos.horas)
+                          })
+                        );
+                      }
+                    });
+                    
+                    if (promesasEstudios.length > 0) {
+                      await Promise.all(promesasEstudios);
+                    }
+                    toast.success('✅ Estudiante guardado en BD');
+                  } catch (error) {
+                    console.error('Error al guardar contacto:', error);
+                    toast.error('Error al guardar estudiante');
+                  }
+                }
+              };  
+
+                const handleKeyDown = (e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const fila = e.currentTarget.closest('tr');
+                    const campo = e.currentTarget.dataset.campo;
+                    
+                    if (campo === 'numero') {
+                      const nombreInput = fila.querySelector('input[data-campo="nombre"]');
+                      nombreInput?.focus();
+                    } else if (campo === 'nombre') {
+                      const paisSelect = fila.querySelector('select[data-campo="pais"]');
+                      paisSelect?.focus();
+                    }
+                  }
+                };
+
+                return (
+                  <tr key={`empty-${idx}`} className="fila-vacia" onBlur={handleFilaBlur}>
+                    <td></td>
+                    <td>
+                      <input 
+                        type="text" 
+                        data-campo="numero" 
+                        placeholder="-" 
+                        style={{ width: "70px" }}
+                        onKeyDown={handleKeyDown}
+                      />
+                    </td>
+                    <td>
+                      <input 
+                        type="text" 
+                        data-campo="nombre" 
+                        placeholder="Nombre" 
+                        style={{ width: "210px" }}
+                        onKeyDown={handleKeyDown}
+                      />
+                    </td>
+                    <td>
+                      <select 
+                        data-campo="pais" 
+                        style={{ width: "150px" }}
+                        onKeyDown={handleKeyDown}
+                      >
+                        <option value="">Seleccionar</option>
+                        {paisesDelContinente.map(pais => (
+                          <option key={pais.id} value={pais.nombre}>{pais.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
+                    {diasDelMes.map(dia => (
+                      <React.Fragment key={dia}>
+                        <td><input type="text" data-campo="cap" data-dia={dia} placeholder="Cap" style={{ width: "55px" }} /></td>
+                        <td><input type="number" data-campo="hr" data-dia={dia} min="0" placeholder="0" style={{ width: "50px" }} /></td>
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                );
+              })}
                 
                 {/* Fila TOTAL GENERAL DE ESTUDIOS - suma HORAS */}
                 <tr style={{ background: "#0E5A61", color: "white", fontWeight: "700" }}>
@@ -2182,7 +2428,7 @@ const nuevoPais = await administracionService.crearPais({
                   </tr>
                 </thead>
                 <tbody>
-                  {misioneros.map(m => {
+                  {misioneros.filter(m => m.pais_id === paisSeleccionado).map(m => {
                     const estudios = calcularTotalEstudiosMisionero(m.id);
                     const horas = calcularTotalHorasMisionero(m.id);
                     const estudiantesLista = obtenerEstudiantesActuales(m.id);

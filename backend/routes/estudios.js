@@ -3,6 +3,10 @@ const router = express.Router();
 const estudiosController = require('../controllers/estudiosController');
 const { verificarToken } = require('../middleware/auth');
 
+// Ruta pública (sin token) - DEBE IR ANTES de router.use
+router.get('/reporte', estudiosController.getReporteCompleto);
+
+// Aplicar token a todas las demás rutas
 router.use(verificarToken);
 
 router.post('/estudio', estudiosController.guardarEstudio);

@@ -67,4 +67,26 @@ exports.getResumenCompleto = async (req, res) => {
   }
 };
 
-module.exports = exports;
+exports.getReporteCompleto = async (req, res) => {
+  try {
+    const { pais_id, mes, anio, tipo } = req.query;
+    
+    if (!pais_id || !mes || !anio) {
+      return res.status(400).json({ error: 'Faltan parámetros requeridos' });
+    }
+    
+    const reporte = await EstudiosService.getReporteCompleto(
+      parseInt(pais_id), 
+      mes.toUpperCase(), 
+      parseInt(anio),
+      tipo
+    );
+    
+    res.json(reporte);
+  } catch (error) {
+    console.error('Error en getReporteCompleto:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+

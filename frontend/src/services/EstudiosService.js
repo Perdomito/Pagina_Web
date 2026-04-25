@@ -49,6 +49,14 @@ const estudiosService = {
       params: { pais_id, mes, anio }
     });
     return response.data;
+  },
+
+  // Obtener reporte completo
+  getReporteCompleto: async (pais_id, mes, anio, tipo = 'mensual') => {
+    const response = await API.get('/estudios/reporte', {
+      params: { pais_id, mes, anio, tipo }
+    });
+    return response.data;
   }
 };
 
