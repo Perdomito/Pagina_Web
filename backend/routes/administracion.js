@@ -26,7 +26,7 @@ router.delete('/paises/:id', verificarToken, administracionController.eliminarPa
 router.get('/roles', verificarRol(['admin']), administracionController.getAllRoles);
 
 // Estadísticas (admin y pastor)
-router.get('/estadisticas', verificarRol(['admin', 'pastor']), administracionController.getEstadisticasGenerales);
+router.get('/estadisticas', verificarToken, verificarRol(['admin', 'pastor']), administracionController.getEstadisticasGenerales);
 
 // ===== PRESUPUESTOS =====
 router.get('/presupuestos', administracionController.getPresupuestosPorPais);

@@ -5,6 +5,91 @@ const bcrypt = require('bcryptjs');
 const { query } = require('../config/database');
 
 class AdministracionService {
+  getMonthOrderCase(fieldName = 'mes') {
+    return `
+      CASE ${fieldName}
+        WHEN 'ENERO' THEN 1
+        WHEN 'FEBRERO' THEN 2
+        WHEN 'MARZO' THEN 3
+        WHEN 'ABRIL' THEN 4
+        WHEN 'MAYO' THEN 5
+        WHEN 'JUNIO' THEN 6
+        WHEN 'JULIO' THEN 7
+        WHEN 'AGOSTO' THEN 8
+        WHEN 'SEPTIEMBRE' THEN 9
+        WHEN 'OCTUBRE' THEN 10
+        WHEN 'NOVIEMBRE' THEN 11
+        WHEN 'DICIEMBRE' THEN 12
+        ELSE 0
+      END
+    `;
+  }
+
+  calcularPorcentajeCambio(actual, anterior) {
+    if (!anterior) {
+      return actual > 0 ? 100 : 0;
+    }
+
+    return Number((((actual - anterior) / anterior) * 100).toFixed(1));
+  }
+
+  getPreviousMonth(mes, anio) {
+    const meses = [
+      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+    ];
+
+    const monthIndex = meses.indexOf(mes);
+    if (monthIndex <= 0) {
+      return {
+        mes: 'DICIEMBRE',
+        anio: anio - 1
+      };
+    }
+
+    return {
+      mes: meses[monthIndex - 1],
+      anio
+    };
+  }
+
+  getMonthLabels() {
+    return [
+      'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN',
+      'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'
+    ];
+  }
+
+  mapMonthlySeries(rows, anio) {
+    const monthOrder = {
+      ENERO: 0,
+      FEBRERO: 1,
+      MARZO: 2,
+      ABRIL: 3,
+      MAYO: 4,
+      JUNIO: 5,
+      JULIO: 6,
+      AGOSTO: 7,
+      SEPTIEMBRE: 8,
+      OCTUBRE: 9,
+      NOVIEMBRE: 10,
+      DICIEMBRE: 11
+    };
+
+    const serie = Array(12).fill(0);
+
+    rows
+      .filter((row) => parseInt(row.anio) === anio)
+      .forEach((row) => {
+        const index = monthOrder[row.mes];
+        if (index !== undefined) {
+          serie[index] = parseInt(row.total_estudios) || 0;
+        }
+      });
+
+    return serie;
+  }
+
   // ===== USUARIOS =====
   async getAllUsuarios() {
     const result = await query(`
@@ -165,18 +250,56 @@ class AdministracionService {
 
   // ===== ESTADÍSTICAS GENERALES =====
   async getEstadisticasGenerales() {
-    const [usuarios, miembros, contactos, estudios] = await Promise.all([
+    const [usuarios, miembros, contactos, estudios, estudiosPorAnioMes] = await Promise.all([
       query('SELECT COUNT(*) as total FROM usuarios WHERE activo = TRUE'),
       query('SELECT COUNT(*) as total FROM miembros WHERE activo = TRUE'),
       query('SELECT COUNT(*) as total FROM contactos WHERE activo = TRUE'),
-      query('SELECT COUNT(*) as total FROM estudios_biblicos WHERE activo = TRUE')
+      query('SELECT COUNT(*) as total FROM estudios_biblicos WHERE activo = TRUE'),
+      query(`
+        SELECT
+          anio,
+          mes,
+          COUNT(*) AS total_estudios
+        FROM estudios_biblicos
+        WHERE activo = TRUE
+        GROUP BY anio, mes
+        ORDER BY anio DESC, ${this.getMonthOrderCase('mes')} DESC
+      `)
     ]);
+
+    const aniosDisponibles = [...new Set(
+      estudiosPorAnioMes.rows.map((row) => parseInt(row.anio))
+    )].sort((a, b) => b - a);
+
+    const anioActual = aniosDisponibles[0] || new Date().getFullYear();
+    const anioAnterior = aniosDisponibles[1] || (anioActual - 1);
+
+    const labels = this.getMonthLabels();
+    const serieActual = this.mapMonthlySeries(estudiosPorAnioMes.rows, anioActual);
+    const serieAnterior = this.mapMonthlySeries(estudiosPorAnioMes.rows, anioAnterior);
+    const totalAnterior = serieAnterior.reduce((sum, value) => sum + value, 0);
+    const totalActual = serieActual.reduce((sum, value) => sum + value, 0);
 
     return {
       total_usuarios: parseInt(usuarios.rows[0].total),
       total_miembros: parseInt(miembros.rows[0].total),
       total_contactos: parseInt(contactos.rows[0].total),
-      total_estudios: parseInt(estudios.rows[0].total)
+      total_estudios: parseInt(estudios.rows[0].total),
+      comparacion_estudios: {
+        labels,
+        serie_anterior: {
+          etiqueta: `${anioAnterior}`,
+          data: serieAnterior,
+          total: totalAnterior
+        },
+        serie_actual: {
+          etiqueta: `${anioActual}`,
+          data: serieActual,
+          total: totalActual
+        },
+        crecimiento: this.calcularPorcentajeCambio(totalActual, totalAnterior),
+        diferencia: totalActual - totalAnterior
+      }
     };
   }
 
