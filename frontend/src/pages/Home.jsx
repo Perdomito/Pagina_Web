@@ -1,12 +1,43 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { FaUsers, FaBook, FaChartLine, FaAddressBook, FaMoneyBillWave, FaSignOutAlt, FaUser } from "react-icons/fa";
+import { 
+  FaUsers, 
+  FaBook,
+  FaBookOpen, 
+  FaChartBar, 
+  FaAddressBook, 
+  FaMoneyBillWave, 
+  FaSignOutAlt, 
+  FaUser, 
+  FaCog,
+  FaChartLine,
+  FaHammer
+} from "react-icons/fa";
 import toast from 'react-hot-toast';
+import axios from '../api/axios';
 
 export default function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [permisosUsuario, setPermisosUsuario] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    cargarPermisos();
+  }, []);
+
+  const cargarPermisos = async () => {
+    try {
+      const response = await axios.get('/auth/mis-permisos');
+      setPermisosUsuario(response.data.permisos);
+    } catch (error) {
+      console.error('Error al cargar permisos:', error);
+      setPermisosUsuario(['estudios_biblicos', 'reportes', 'administracion', 'miembros', 'contactos', 'configuracion']);
+    } finally {
+      setCargando(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -14,57 +45,93 @@ export default function Home() {
     navigate("/");
   };
 
-  const tarjetas = [
+  const modulosConPermisos = [
     { 
       titulo: "Miembros", 
       desc: "Registros, seguimiento, visitas.", 
       ruta: "/miembros",
       icon: <FaUsers size={32} />,
-      color: "#2196F3"
+      color: "#2196F3",
+      permiso: "miembros",
+      animacion: "bounce"
     },
     { 
       titulo: "Estudios Bíblicos", 
       desc: "Control semanal tipo Excel.", 
       ruta: "/estudios-biblicos",
       icon: <FaBook size={32} />,
-      color: "#4CAF50"
+      color: "#4CAF50",
+      permiso: "estudios_biblicos",
+      animacion: "flip"
     },
     { 
       titulo: "Reportes", 
       desc: "Resultados y metas cumplidas.", 
       ruta: "/reportes",
-      icon: <FaChartLine size={32} />,
-      color: "#FF9800"
+      icon: <FaChartBar size={32} />,
+      color: "#4CAF50",
+      permiso: "reportes",
+      animacion: "pulse"
     },
     { 
       titulo: "Contactos", 
       desc: "Nuevos, pendientes y seguimiento.", 
       ruta: "/contactos",
       icon: <FaAddressBook size={32} />,
-      color: "#9C27B0"
+      color: "#9C27B0",
+      permiso: "contactos",
+      animacion: "shake"
     },
     { 
       titulo: "Administración", 
       desc: "Presupuesto, control financiero.", 
       ruta: "/administracion",
       icon: <FaMoneyBillWave size={32} />,
-      color: "#F44336"
+      color: "#F44336",
+      permiso: "administracion",
+      animacion: "spin-slow"
     },
     { 
       titulo: "Estadísticas", 
       desc: "Gráficos y reportes por país.", 
       ruta: "/estadisticas",
       icon: <FaChartLine size={32} />,
-      color: "#673AB7"
+      color: "#673AB7",
+      permiso: "reportes",
+      animacion: "pulse"
     },
     { 
       titulo: "Estudios", 
-      desc: "Lista de estudiantes activos.", 
-      ruta: "/estudios",
-      icon: <FaBook size={32} />,
-      color: "#00BCD4"
+      desc: "🚧 En construcción - Próximamente", 
+      ruta: null,
+      icon: <FaHammer size={32} />,
+      color: "#FF9800",
+      permiso: "estudios_biblicos",
+      animacion: "shake",
+      enConstruccion: true
+    },
+    { 
+      titulo: "Configuración", 
+      desc: "Usuarios, roles y permisos.", 
+      ruta: "/configuracion",
+      icon: <FaCog size={32} />,
+      color: "#607D8B",
+      permiso: "configuracion",
+      animacion: "spin"
     }
   ];
+
+  const tarjetasPermitidas = modulosConPermisos.filter(tarjeta => 
+    permisosUsuario.includes(tarjeta.permiso)
+  );
+
+  if (cargando) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #0E5A61, #15777F)" }}>
+        <div style={{ fontSize: "18px", color: "white" }}>Cargando...</div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -86,6 +153,62 @@ export default function Home() {
             to { opacity: 1; transform: translateY(0); }
           }
 
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+
+          @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+          }
+
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+          }
+
+          @keyframes flip {
+            0% { transform: rotateY(0deg); }
+            50% { transform: rotateY(180deg); }
+            100% { transform: rotateY(360deg); }
+          }
+
+          .icon-spin {
+            animation: spin 2s linear infinite;
+          }
+
+          .icon-spin-slow {
+            animation: spin-slow 3s linear infinite;
+          }
+
+          .icon-pulse {
+            animation: pulse 2s ease-in-out infinite;
+          }
+
+          .icon-bounce {
+            animation: bounce 2s ease-in-out infinite;
+          }
+
+          .icon-shake {
+            animation: shake 1.5s ease-in-out infinite;
+          }
+
+          .icon-flip {
+            animation: flip 3s ease-in-out infinite;
+          }
+
           .card-hover {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           }
@@ -93,6 +216,19 @@ export default function Home() {
           .card-hover:hover {
             transform: translateY(-8px);
             box-shadow: 0 12px 24px rgba(0,0,0,0.15) !important;
+          }
+
+          .card-hover:hover .icon-container {
+            transform: scale(1.1);
+          }
+          
+          .card-construccion {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+          
+          .card-construccion:hover {
+            transform: none;
           }
         `}
       </style>
@@ -134,8 +270,8 @@ export default function Home() {
             <div>
               <div style={{ fontSize: "14px", fontWeight: "600" }}>{user?.nombre}</div>
               <div style={{ fontSize: "12px", opacity: 0.8 }}>
-                {user?.rol === 'admin' ? 'Administrador' : 
-                 user?.rol === 'pastor' ? 'Pastor' : 'Miembro'} 
+                {user?.rol_id === 1 ? 'Administrador' : 
+                 user?.rol_id === 2 ? 'Pastor' : 'Misionero'} 
                 {user?.pais && ` • ${user.pais}`}
               </div>
             </div>
@@ -181,21 +317,27 @@ export default function Home() {
           gap: "25px"
         }}
       >
-        {tarjetas.map((card, i) => (
+        {tarjetasPermitidas.map((card, i) => (
           <div
             key={i}
-            className="card-hover"
+            className={`card-hover ${card.enConstruccion ? 'card-construccion' : ''}`}
             style={{
               background: "white",
               padding: "30px",
               borderRadius: "16px",
               boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               animation: `slideUp ${0.5 + i * 0.1}s ease`,
-              cursor: "pointer",
+              cursor: card.enConstruccion ? "not-allowed" : "pointer",
               position: "relative",
               overflow: "hidden"
             }}
-            onClick={() => navigate(card.ruta)}
+            onClick={() => {
+              if (card.enConstruccion) {
+                toast.info('🚧 Módulo en construcción');
+              } else {
+                navigate(card.ruta);
+              }
+            }}
           >
             {/* Acento de color */}
             <div
@@ -209,8 +351,9 @@ export default function Home() {
               }}
             />
 
-            {/* Icono */}
+            {/* Icono con animación */}
             <div
+              className="icon-container"
               style={{
                 width: "60px",
                 height: "60px",
@@ -220,10 +363,13 @@ export default function Home() {
                 alignItems: "center",
                 justifyContent: "center",
                 color: card.color,
-                marginBottom: "20px"
+                marginBottom: "20px",
+                transition: "transform 0.3s"
               }}
             >
-              {card.icon}
+              <div className={`icon-${card.animacion}`}>
+                {card.icon}
+              </div>
             </div>
 
             {/* Contenido */}
@@ -249,25 +395,27 @@ export default function Home() {
             </p>
 
             {/* Flecha indicadora */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: "20px",
-                right: "20px",
-                width: "30px",
-                height: "30px",
-                borderRadius: "50%",
-                background: `${card.color}15`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: card.color,
-                fontSize: "16px",
-                fontWeight: "bold"
-              }}
-            >
-              →
-            </div>
+            {!card.enConstruccion && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "20px",
+                  right: "20px",
+                  width: "30px",
+                  height: "30px",
+                  borderRadius: "50%",
+                  background: `${card.color}15`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: card.color,
+                  fontSize: "16px",
+                  fontWeight: "bold"
+                }}
+              >
+                →
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -13,6 +13,7 @@ import Estadisticas from './pages/Estadisticas';
 import Reportes from './pages/Reportes';
 import Contactos from './pages/Contactos';
 import Administracion from './pages/Administracion';
+import Configuracion from './pages/Configuracion';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="/reportes" element={<PrivateRoute><Reportes /></PrivateRoute>} />
         <Route path="/contactos" element={<PrivateRoute><Contactos /></PrivateRoute>} />
         <Route path="/administracion" element={<PrivateRoute><Administracion /></PrivateRoute>} />
+        <Route path="/configuracion" element={<PrivateRoute><Configuracion /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   );

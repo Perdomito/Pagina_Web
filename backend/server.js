@@ -29,6 +29,15 @@ const contactosRoutes = require('./routes/contactos');
 const reportesRoutes = require('./routes/reportes');
 const estudiosRoutes = require('./routes/estudios');
 const administracionRoutes = require('./routes/administracion');
+let configuracionRoutes;
+try {
+  configuracionRoutes = require('./routes/configuracion');
+  console.log('✅ Archivo configuracion.js cargado correctamente');
+} catch (error) {
+  console.error('❌ ERROR al cargar configuracion.js:', error.message);
+  console.error('Stack:', error.stack);
+}
+
 
 // ============================================
 // USAR LAS RUTAS
@@ -39,6 +48,7 @@ app.use('/api/contactos', contactosRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/estudios', estudiosRoutes);
 app.use('/api/administracion', administracionRoutes);
+app.use('/api/configuracion', configuracionRoutes);
 
 // Ruta de prueba
 app.get('/api', (req, res) => {
