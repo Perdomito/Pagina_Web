@@ -33,6 +33,10 @@ class AdministracionService {
     return Number((((actual - anterior) / anterior) * 100).toFixed(1));
   }
 
+  redondear(valor, decimales = 2) {
+    return Number(Number(valor || 0).toFixed(decimales));
+  }
+
   getPreviousMonth(mes, anio) {
     const meses = [
       'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -250,7 +254,7 @@ class AdministracionService {
 
   // ===== ESTADÍSTICAS GENERALES =====
   async getEstadisticasGenerales() {
-    const [usuarios, miembros, contactos, estudios, estudiosPorAnioMes] = await Promise.all([
+    const [usuarios, miembros, contactos, estudios, estudiosPorAnioMes, estudiantesPorAnioMes] = await Promise.all([
       query('SELECT COUNT(*) as total FROM usuarios WHERE activo = TRUE'),
       query('SELECT COUNT(*) as total FROM miembros WHERE activo = TRUE'),
       query('SELECT COUNT(*) as total FROM contactos WHERE activo = TRUE'),
@@ -260,6 +264,16 @@ class AdministracionService {
           anio,
           mes,
           COUNT(*) AS total_estudios
+        FROM estudios_biblicos
+        WHERE activo = TRUE
+        GROUP BY anio, mes
+        ORDER BY anio DESC, ${this.getMonthOrderCase('mes')} DESC
+      `),
+      query(`
+        SELECT
+          anio,
+          mes,
+          COUNT(DISTINCT contacto_id) AS total_estudiantes
         FROM estudios_biblicos
         WHERE activo = TRUE
         GROUP BY anio, mes
@@ -277,8 +291,40 @@ class AdministracionService {
     const labels = this.getMonthLabels();
     const serieActual = this.mapMonthlySeries(estudiosPorAnioMes.rows, anioActual);
     const serieAnterior = this.mapMonthlySeries(estudiosPorAnioMes.rows, anioAnterior);
+    const crecimientoEstudiantesActual = this.mapMonthlySeries(
+      estudiantesPorAnioMes.rows.map((row) => ({
+        ...row,
+        total_estudios: row.total_estudiantes
+      })),
+      anioActual
+    );
     const totalAnterior = serieAnterior.reduce((sum, value) => sum + value, 0);
     const totalActual = serieActual.reduce((sum, value) => sum + value, 0);
+    const rendimientoProfesoresResult = await query(`
+      SELECT
+        m.id,
+        m.nombre,
+        COUNT(e.id) AS total_estudios
+      FROM estudios_biblicos e
+      INNER JOIN miembros m ON m.id = e.miembro_responsable_id
+      WHERE e.activo = TRUE
+        AND m.activo = TRUE
+        AND e.anio = $1
+      GROUP BY m.id, m.nombre
+      ORDER BY COUNT(e.id) DESC, m.nombre ASC
+    `, [anioActual]);
+
+    const rendimientoProfesores = rendimientoProfesoresResult.rows.map((row) => {
+      const totalEstudiosProfesor = parseInt(row.total_estudios) || 0;
+
+      return {
+        id: parseInt(row.id),
+        nombre: row.nombre,
+        total_estudios: totalEstudiosProfesor,
+        promedio_mensual: this.redondear(totalEstudiosProfesor / 12, 1),
+        promedio_diario: this.redondear(totalEstudiosProfesor / 365, 2)
+      };
+    });
 
     return {
       total_usuarios: parseInt(usuarios.rows[0].total),
@@ -299,6 +345,16 @@ class AdministracionService {
         },
         crecimiento: this.calcularPorcentajeCambio(totalActual, totalAnterior),
         diferencia: totalActual - totalAnterior
+      },
+      rendimiento_profesores: {
+        anio: anioActual,
+        profesores: rendimientoProfesores
+      },
+      crecimiento_estudiantes: {
+        anio: anioActual,
+        labels,
+        serie: crecimientoEstudiantesActual,
+        total: crecimientoEstudiantesActual.reduce((sum, value) => sum + value, 0)
       }
     };
   }
