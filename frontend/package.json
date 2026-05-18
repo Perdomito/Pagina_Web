@@ -16,6 +16,9 @@
     "react-scripts": "5.0.1"
   },
   "scripts": {
+    "prestart": "node scripts/fix-dompurify-sourcemaps.js",
+    "prebuild": "node scripts/fix-dompurify-sourcemaps.js",
+    "postinstall": "node scripts/fix-dompurify-sourcemaps.js",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

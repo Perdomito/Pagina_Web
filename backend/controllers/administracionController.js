@@ -114,7 +114,19 @@ exports.getAllRoles = async (req, res) => {
 // Estadísticas
 exports.getEstadisticasGenerales = async (req, res) => {
   try {
-    const stats = await AdministracionService.getEstadisticasGenerales();
+    const anio = req.query.anio ? parseInt(req.query.anio, 10) : null;
+    const anioEvangelismo = req.query.anio_evangelismo ? parseInt(req.query.anio_evangelismo, 10) : null;
+    const mesEvangelismo = req.query.mes_evangelismo || null;
+    const modoEvangelismo = req.query.modo_evangelismo || null;
+    const anioComparacionEvangelismo = req.query.anio_comparacion_evangelismo
+      ? parseInt(req.query.anio_comparacion_evangelismo, 10)
+      : null;
+    const stats = await AdministracionService.getEstadisticasGenerales(anio, {
+      anioEvangelismo,
+      mesEvangelismo,
+      modoEvangelismo,
+      anioComparacionEvangelismo
+    });
     res.json(stats);
   } catch (error) {
     res.status(500).json({ error: error.message });

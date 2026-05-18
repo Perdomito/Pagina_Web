@@ -29,7 +29,7 @@ export default function EstudiosBiblicos() {
   const añoActual = fechaActual.getFullYear();
   
   //
-const [cargandoDatos, setCargandoDatos] = useState(false);
+const [, setCargandoDatos] = useState(false);
 
  const [continentes, setContinentes] = useState([]);
   
@@ -93,105 +93,6 @@ const cargarDatosIniciales = async () => {
     setCargandoDatos(false);
   }
 };
-// ============================================
-// ✅ GUARDAR DATOS EN LA API
-// ============================================
-const guardarTodosLosDatos = async () => {
-  if (!continenteSeleccionado || !paisSeleccionado || !mesSeleccionado) {
-    toast.error('Selecciona continente, país y mes primero');
-    return;
-  }
-  
-  try {
-    setCargandoDatos(true);
-    const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-    
-    const continente = continentes.find(c => c.id === continenteSeleccionado);
-    const pais = continente?.paises.find(p => p.id === paisSeleccionado);
-    
-    if (!pais) {
-      toast.error('País no encontrado');
-      return;
-    }
-    
-    const promises = [];
-    const datosActuales = datosEstudios[clave] || {};
-    const evangelismoActual = evangelismoData[clave] || {};
-    const dijeronSiActual = estudiantesQueDigeronSi[clave] || {};
-    const contactosActual = nuevosContactos[clave] || {};
-    
-    Object.entries(datosActuales).forEach(([misioneroId, data]) => {
-      Object.entries(data.estudios || {}).forEach(([estudianteNum, dias]) => {
-        Object.entries(dias).forEach(([dia, horas]) => {
-          if (horas > 0) {
-            promises.push(
-              estudiosService.guardarEstudio({
-                contacto_id: parseInt(estudianteNum),
-                miembro_responsable_id: parseInt(misioneroId),
-                pais_id: pais.id,
-                mes: mesSeleccionado,
-                anio: añoActual,
-                dia: parseInt(dia),
-                capitulo: '',
-                horas: parseFloat(horas)
-              })
-            );
-          }
-        });
-      });
-    });
-    
-    Object.entries(evangelismoActual).forEach(([misioneroId, tipos]) => {
-      ['virtual', 'presencial'].forEach(tipo => {
-        Object.entries(tipos[tipo] || {}).forEach(([dia, data]) => {
-          if (data.horas > 0 || data.donde) {
-            promises.push(
-              estudiosService.guardarEvangelismo({
-                miembro_id: parseInt(misioneroId),
-                pais_id: pais.id,
-                mes: mesSeleccionado,
-                anio: añoActual,
-                dia: parseInt(dia),
-                tipo: tipo === 'virtual' ? 'Virtual' : 'Presencial',
-                donde: data.donde || '',
-                horas: parseFloat(data.horas || 0)
-              })
-            );
-          }
-        });
-      });
-    });
-    
-    Object.entries(dijeronSiActual).forEach(([misioneroId, dias]) => {
-      Object.entries(dias).forEach(([dia, cantidad]) => {
-        const contactosCantidad = contactosActual[misioneroId]?.[dia] || 0;
-        if (cantidad > 0 || contactosCantidad > 0) {
-          promises.push(
-            estudiosService.guardarNuevosEstudiantes({
-              miembro_id: parseInt(misioneroId),
-              pais_id: pais.id,
-              mes: mesSeleccionado,
-              anio: añoActual,
-              dia: parseInt(dia),
-              dijeron_si: parseInt(cantidad || 0),
-              nuevos_contactos: parseInt(contactosCantidad || 0)
-            })
-          );
-        }
-      });
-    });
-    
-    await Promise.all(promises);
-    toast.success('✅ Datos guardados exitosamente en la base de datos');
-    
-  } catch (error) {
-    console.error('Error al guardar:', error);
-    toast.error('Error al guardar datos');
-  } finally {
-    setCargandoDatos(false);
-  }
-};
-
   const obtenerDiasDelMes = (mes, año) => {
     const mesIndex = meses.indexOf(mes);
     const diasEnMes = new Date(año, mesIndex + 1, 0).getDate();
@@ -814,13 +715,6 @@ const eliminarPais = async (continenteId, paisId) => {
   
   const obtenerDiaSemana = (dia, mes, año) => {
     const dias = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
-    const mesIndex = meses.indexOf(mes);
-    const fecha = new Date(año, mesIndex, dia);
-    return dias[fecha.getDay()];
-  };
-  
-  const obtenerNombreDiaCompleto = (dia, mes, año) => {
-    const dias = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
     const mesIndex = meses.indexOf(mes);
     const fecha = new Date(año, mesIndex, dia);
     return dias[fecha.getDay()];
@@ -1921,7 +1815,6 @@ const eliminarPais = async (continenteId, paisId) => {
                   const nombreInput = fila.querySelector('input[data-campo="nombre"]');
                   const paisSelect  = fila.querySelector('select[data-campo="pais"]');
 
-                  const numero = numeroInput?.value?.trim();
                   const nombre = nombreInput?.value?.trim();
                   const pais   = paisSelect?.value || "";
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaFilePdf, FaChartLine, FaUsers, FaClock, FaBookOpen, FaUserPlus, FaCheckCircle, FaEye, FaTimes } from "react-icons/fa";
+import { FaArrowLeft, FaFilePdf, FaChartLine, FaUsers, FaClock, FaBookOpen, FaUserPlus, FaCheckCircle, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -71,7 +71,6 @@ export default function Reportes() {
   
   const [reporteActual, setReporteActual] = useState(null);
   const [reporteAnterior, setReporteAnterior] = useState(null);
-  const [mostrandoComparacion, setMostrandoComparacion] = useState(false);
   
   const [mostrandoDetalle, setMostrandoDetalle] = useState(false);
   const [misioneros, setMisioneros] = useState([]);
@@ -137,7 +136,7 @@ export default function Reportes() {
     return periodos;
   };
   
-  const calcularReporte = async () => {
+  const calcularReporte = useCallback(async () => {
     if (!continenteSeleccionado || !paisSeleccionado || !periodoSeleccionado) {
       return null;
     }
@@ -179,19 +178,19 @@ export default function Reportes() {
         ovejasPotenciales: 0
       };
     }
-  };
+  }, [continenteSeleccionado, paisSeleccionado, periodoSeleccionado, tipoReporte]);
   
-  const generarReporte = async () => {
+  const generarReporte = useCallback(async () => {
     const reporte = await calcularReporte();
     setReporteActual(reporte);
     setReporteAnterior(null);
-  };
+  }, [calcularReporte]);
   
   useEffect(() => {
     if (continenteSeleccionado && paisSeleccionado && periodoSeleccionado) {
       generarReporte();
     }
-  }, [continenteSeleccionado, paisSeleccionado, tipoReporte, periodoSeleccionado]);
+  }, [continenteSeleccionado, paisSeleccionado, tipoReporte, periodoSeleccionado, generarReporte]);
   
   const cargarDetalleMisioneros = async () => {
     try {

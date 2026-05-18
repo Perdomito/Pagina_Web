@@ -75,9 +75,17 @@ const administracionService = {
   },
 
   // Estadísticas generales
-  getEstadisticasGenerales: async () => {
+  getEstadisticasGenerales: async (anio, filtros = {}) => {
     try {
-      const response = await axios.get('/administracion/estadisticas');
+      const response = await axios.get('/administracion/estadisticas', {
+        params: {
+          ...(anio ? { anio } : {}),
+          ...(filtros.anio_evangelismo ? { anio_evangelismo: filtros.anio_evangelismo } : {}),
+          ...(filtros.mes_evangelismo ? { mes_evangelismo: filtros.mes_evangelismo } : {}),
+          ...(filtros.modo_evangelismo ? { modo_evangelismo: filtros.modo_evangelismo } : {}),
+          ...(filtros.anio_comparacion_evangelismo ? { anio_comparacion_evangelismo: filtros.anio_comparacion_evangelismo } : {})
+        }
+      });
       return response.data;
     } catch (error) {
       console.error('Error al obtener estadísticas:', error);

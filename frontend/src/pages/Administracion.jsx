@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaPlus, FaTrash, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSave } from "react-icons/fa";
 import toast from 'react-hot-toast';
@@ -36,12 +36,6 @@ export default function Administracion() {
     }
   }, [user]);
   
-  useEffect(() => {
-    if (paisSeleccionado && mesSeleccionado) {
-      cargarDatosMes();
-    }
-  }, [mesSeleccionado, paisSeleccionado]);
-  
   const cargarNombrePais = async (pais_id) => {
     try {
       const paises = await administracionService.getAllPaises();
@@ -72,7 +66,7 @@ export default function Administracion() {
     }
   };
   
-  const cargarDatosMes = async () => {
+  const cargarDatosMes = useCallback(async () => {
     try {
       setCargando(true);
       
@@ -97,7 +91,13 @@ export default function Administracion() {
     } finally {
       setCargando(false);
     }
-  };
+  }, [añoSeleccionado, mesSeleccionado, paisSeleccionado]);
+
+  useEffect(() => {
+    if (paisSeleccionado && mesSeleccionado) {
+      cargarDatosMes();
+    }
+  }, [mesSeleccionado, paisSeleccionado, cargarDatosMes]);
   
   const guardarMontoRecibido = async (nuevoMonto) => {
     setMontoRecibidoUSD(nuevoMonto);
