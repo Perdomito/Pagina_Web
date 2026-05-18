@@ -33,6 +33,17 @@ Thumbs.db
 
 # Testing
 coverage/
+.pytest_cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+.venv/
+venv/
 
 # Temporary files
 tmp/
