@@ -12,7 +12,7 @@ import {
   FaCog,
   FaChartLine,
   FaHammer,
-  FaBook,
+  //FaBook, 
   FaBars
 } from "react-icons/fa";
 import toast from 'react-hot-toast';
