@@ -51,11 +51,56 @@ const MESES_EVANGELISMO = [
   "DICIEMBRE"
 ];
 
+const MESES_EN_ANIO = 12;
+
+const sumarSerie = (serie = []) => serie.reduce((sum, value) => sum + Number(value || 0), 0);
+
+const sumarSerieHastaMes = (serie = [], mesIndice = 0) =>
+  serie.slice(0, Math.max(0, Math.min(mesIndice + 1, serie.length))).reduce((sum, value) => sum + Number(value || 0), 0);
+
+const proyectarCierreAnual = (acumulado, mesesTranscurridos) => {
+  if (!mesesTranscurridos || mesesTranscurridos <= 0) return 0;
+  return Number(((Number(acumulado || 0) / mesesTranscurridos) * MESES_EN_ANIO).toFixed(1));
+};
+
+const calcularVariacion = (actual, anterior) => {
+  if (anterior > 0) {
+    return Number((((Number(actual || 0) - Number(anterior || 0)) / anterior) * 100).toFixed(1));
+  }
+
+  return actual > 0 ? 100 : 0;
+};
+
+const obtenerLecturaPronostico = (variacion) => {
+  if (variacion >= 10) {
+    return {
+      etiqueta: "Alto",
+      color: "#2E7D32",
+      descripcion: "El cierre proyectado va por encima del año anterior."
+    };
+  }
+
+  if (variacion <= -10) {
+    return {
+      etiqueta: "Bajo",
+      color: "#C62828",
+      descripcion: "El cierre proyectado va por debajo del año anterior."
+    };
+  }
+
+  return {
+    etiqueta: "Estable",
+    color: "#B26A00",
+    descripcion: "El cierre proyectado está cerca del año anterior."
+  };
+};
+
 export default function Estadisticas() {
   const navigate = useNavigate();
   const anioActualPorDefecto = new Date().getFullYear();
   const mesActualPorDefecto = new Date().toLocaleString('es-ES', { month: 'long' }).toUpperCase();
   const [stats, setStats] = useState(null);
+  const [statsProyeccion, setStatsProyeccion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tabActiva, setTabActiva] = useState("evangelismo");
   const [profesorSeleccionado, setProfesorSeleccionado] = useState("");
@@ -67,26 +112,34 @@ export default function Estadisticas() {
   const [anioComparacionEvangelismoSeleccionado, setAnioComparacionEvangelismoSeleccionado] = useState(anioActualPorDefecto - 1);
 
   useEffect(() => {
-    cargarEstadisticas(anioActualPorDefecto);
-  }, [anioEvangelismoSeleccionado, mesEvangelismoSeleccionado, modoEvangelismoSeleccionado, anioComparacionEvangelismoSeleccionado]);
+    const cargarEstadisticas = async () => {
+      try {
+        setLoading(true);
+        const [data, dataProyeccion] = await Promise.all([
+          administracionService.getEstadisticasGenerales(anioActualPorDefecto, {
+            anio_evangelismo: anioEvangelismoSeleccionado,
+            mes_evangelismo: mesEvangelismoSeleccionado,
+            modo_evangelismo: modoEvangelismoSeleccionado,
+            anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
+          }),
+          administracionService.getEstadisticasGenerales(anioActualPorDefecto, {
+            anio_evangelismo: anioEvangelismoSeleccionado,
+            modo_evangelismo: "anual",
+            anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
+          })
+        ]);
+        setStats(data);
+        setStatsProyeccion(dataProyeccion);
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error('Error al cargar estadísticas');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const cargarEstadisticas = async (anio) => {
-    try {
-      setLoading(true);
-      const data = await administracionService.getEstadisticasGenerales(anio, {
-        anio_evangelismo: anioEvangelismoSeleccionado,
-        mes_evangelismo: mesEvangelismoSeleccionado,
-        modo_evangelismo: modoEvangelismoSeleccionado,
-        anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
-      });
-      setStats(data);
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar estadísticas');
-    } finally {
-      setLoading(false);
-    }
-  };
+    cargarEstadisticas();
+  }, [anioActualPorDefecto, anioEvangelismoSeleccionado, mesEvangelismoSeleccionado, modoEvangelismoSeleccionado, anioComparacionEvangelismoSeleccionado]);
 
   useEffect(() => {
     const profesores = stats?.rendimiento_profesores?.profesores || [];
@@ -167,6 +220,10 @@ export default function Estadisticas() {
     : (totalEvangelismoActual > 0 ? 100 : 0);
   const crecimientoEstudiantes = stats?.crecimiento_estudiantes || {};
   const crecimientoMiembros = stats?.crecimiento_miembros || {};
+  const crecimientoEstudiantesProyeccion = statsProyeccion?.crecimiento_estudiantes || crecimientoEstudiantes;
+  const crecimientoMiembrosProyeccion = statsProyeccion?.crecimiento_miembros || crecimientoMiembros;
+  const comparacionEstudiosProyeccion = statsProyeccion?.comparacion_estudios || comparacion;
+  const evangelismoProyeccion = statsProyeccion?.evangelismo_profesores || {};
   const anioSeleccionado = stats?.anio_seleccionado || anioActualPorDefecto;
   const aniosDisponibles = stats?.anios_disponibles || [anioSeleccionado];
   const tiposMiembroDisponibles = crecimientoMiembros.tipos_disponibles || ["Todos"];
@@ -187,6 +244,77 @@ export default function Estadisticas() {
   const profesorActivo = rendimientoProfesores.find(
     (profesor) => String(profesor.id) === profesorSeleccionado
   ) || rendimientoProfesores[0] || null;
+  const mesActualIndice = new Date().getMonth();
+  const mesCorteProyeccion = anioSeleccionado < anioActualPorDefecto
+    ? MESES_EN_ANIO - 1
+    : Math.min(mesActualIndice, MESES_EN_ANIO - 1);
+  const mesesTranscurridosProyeccion = mesCorteProyeccion + 1;
+  const serieEstudiosActual = comparacionEstudiosProyeccion?.serie_actual?.data || Array(MESES_EN_ANIO).fill(0);
+  const serieEstudiosAnterior = comparacionEstudiosProyeccion?.serie_anterior?.data || Array(MESES_EN_ANIO).fill(0);
+  const acumuladoEstudiosActual = sumarSerieHastaMes(serieEstudiosActual, mesCorteProyeccion);
+  const acumuladoEstudiosAnteriorMismoPeriodo = sumarSerieHastaMes(serieEstudiosAnterior, mesCorteProyeccion);
+  const totalEstudiosAnterior = sumarSerie(serieEstudiosAnterior);
+  const proyeccionEstudios = proyectarCierreAnual(acumuladoEstudiosActual, mesesTranscurridosProyeccion);
+  const variacionProyeccionEstudios = calcularVariacion(proyeccionEstudios, totalEstudiosAnterior);
+  const lecturaEstudios = obtenerLecturaPronostico(variacionProyeccionEstudios);
+  const seriesMiembrosTodosProyeccion = crecimientoMiembrosProyeccion.series_por_tipo?.Todos || {};
+  const serieMiembrosActualProyeccion = seriesMiembrosTodosProyeccion[anioSeleccionado] || Array(MESES_EN_ANIO).fill(0);
+  const anioComparacionPronosticoMiembros = aniosComparacionMiembrosOpciones.includes(anioComparacionMiembros)
+    ? anioComparacionMiembros
+    : aniosComparacionMiembrosOpciones[0];
+  const serieMiembrosAnteriorProyeccion = seriesMiembrosTodosProyeccion[anioComparacionPronosticoMiembros] || Array(MESES_EN_ANIO).fill(0);
+  const acumuladoMiembrosActual = sumarSerieHastaMes(serieMiembrosActualProyeccion, mesCorteProyeccion);
+  const acumuladoMiembrosAnteriorMismoPeriodo = sumarSerieHastaMes(serieMiembrosAnteriorProyeccion, mesCorteProyeccion);
+  const totalMiembrosAnterior = sumarSerie(serieMiembrosAnteriorProyeccion);
+  const proyeccionMiembros = proyectarCierreAnual(acumuladoMiembrosActual, mesesTranscurridosProyeccion);
+  const variacionProyeccionMiembros = calcularVariacion(proyeccionMiembros, totalMiembrosAnterior);
+  const lecturaMiembros = obtenerLecturaPronostico(variacionProyeccionMiembros);
+  const serieEstudiantesActualProyeccion = crecimientoEstudiantesProyeccion.serie || Array(MESES_EN_ANIO).fill(0);
+  const acumuladoEstudiantesActual = sumarSerieHastaMes(serieEstudiantesActualProyeccion, mesCorteProyeccion);
+  const proyeccionEstudiantes = proyectarCierreAnual(acumuladoEstudiantesActual, mesesTranscurridosProyeccion);
+  const totalEvangelismoActualProyeccion = (evangelismoProyeccion.profesores || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const totalEvangelismoAnteriorProyeccion = (evangelismoProyeccion.profesores_comparacion || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const proyeccionEvangelismo = proyectarCierreAnual(totalEvangelismoActualProyeccion, mesesTranscurridosProyeccion);
+  const variacionProyeccionEvangelismo = calcularVariacion(proyeccionEvangelismo, totalEvangelismoAnteriorProyeccion);
+  const lecturaEvangelismo = obtenerLecturaPronostico(variacionProyeccionEvangelismo);
+  const resumenesPronostico = [
+    {
+      id: "evangelismo",
+      titulo: "Evangelismo",
+      color: "#0E5A61",
+      actual: totalEvangelismoActualProyeccion,
+      anteriorMismoPeriodo: null,
+      proyectado: proyeccionEvangelismo,
+      cierreAnterior: totalEvangelismoAnteriorProyeccion,
+      variacion: variacionProyeccionEvangelismo,
+      lectura: lecturaEvangelismo,
+      unidad: "horas"
+    },
+    {
+      id: "miembros",
+      titulo: "Miembros",
+      color: "#8E24AA",
+      actual: acumuladoMiembrosActual,
+      anteriorMismoPeriodo: acumuladoMiembrosAnteriorMismoPeriodo,
+      proyectado: proyeccionMiembros,
+      cierreAnterior: totalMiembrosAnterior,
+      variacion: variacionProyeccionMiembros,
+      lectura: lecturaMiembros,
+      unidad: "registros"
+    },
+    {
+      id: "estudios",
+      titulo: "Estudios",
+      color: "#2E7D32",
+      actual: acumuladoEstudiosActual,
+      anteriorMismoPeriodo: acumuladoEstudiosAnteriorMismoPeriodo,
+      proyectado: proyeccionEstudios,
+      cierreAnterior: totalEstudiosAnterior,
+      variacion: variacionProyeccionEstudios,
+      lectura: lecturaEstudios,
+      unidad: "estudios"
+    }
+  ];
   const graficoComparacion = {
     labels: comparacion.labels || ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"],
     datasets: [
@@ -457,11 +585,39 @@ export default function Estadisticas() {
     ]
   };
 
+  const graficoPronostico = {
+    labels: resumenesPronostico.map((item) => item.titulo),
+    datasets: [
+      {
+        label: `Acumulado ${anioSeleccionado}`,
+        data: resumenesPronostico.map((item) => Number(formatearDecimal(item.actual, 1))),
+        backgroundColor: ["#8FD3D7", "#D2A8E6", "#A5D6A7"],
+        borderRadius: 10,
+        borderSkipped: false
+      },
+      {
+        label: `Proyección cierre ${anioSeleccionado}`,
+        data: resumenesPronostico.map((item) => item.proyectado),
+        backgroundColor: ["#0E5A61", "#8E24AA", "#2E7D32"],
+        borderRadius: 10,
+        borderSkipped: false
+      },
+      {
+        label: `Cierre ${anioSeleccionado - 1}`,
+        data: resumenesPronostico.map((item) => Number(item.cierreAnterior || 0)),
+        backgroundColor: ["#B8C4CC", "#C9B6D9", "#C8E6C9"],
+        borderRadius: 10,
+        borderSkipped: false
+      }
+    ]
+  };
+
   const tabs = [
     { id: "evangelismo", label: "Evangelismo" },
     { id: "estudios", label: "Estudios" },
     { id: "profesores", label: "Profesores" },
-    { id: "crecimiento", label: "Crecimiento" }
+    { id: "crecimiento", label: "Crecimiento" },
+    { id: "proyeccion", label: "Proyección" }
   ];
 
   return (
@@ -994,6 +1150,86 @@ export default function Estadisticas() {
 
                 <div style={{ height: "360px" }}>
                   <Line data={graficoCrecimientoEstudiantes} options={opcionesGrafico} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tabActiva === "proyeccion" && (
+            <div style={{ padding: "10px" }}>
+              <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Proyección de cierre anual</h2>
+                <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
+                  Estima cómo podría cerrar el año {anioSeleccionado} si el ritmo promedio de enero a {formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} se mantiene hasta diciembre, comparándolo con el cierre del año anterior.
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+                  <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Año proyectado</div>
+                    <div style={{ fontSize: "24px", fontWeight: "700", color: "#0E5A61" }}>{anioSeleccionado}</div>
+                  </div>
+                  <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Meses analizados</div>
+                    <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>{mesesTranscurridosProyeccion}</div>
+                  </div>
+                  <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Criterio</div>
+                    <div style={{ fontSize: "16px", fontWeight: "700", color: "#1f2937" }}>Ritmo promedio mensual</div>
+                  </div>
+                  <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Estudiantes proyectados</div>
+                    <div style={{ fontSize: "24px", fontWeight: "700", color: "#2E7D32" }}>{formatearDecimal(proyeccionEstudiantes, 1)}</div>
+                  </div>
+                </div>
+
+                <div style={{ height: "360px", marginBottom: "24px" }}>
+                  <Bar data={graficoPronostico} options={opcionesGraficoEvangelismo} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+                  {resumenesPronostico.map((item) => (
+                    <div key={item.id} style={{ background: "white", borderRadius: "16px", padding: "18px", border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", gap: "12px" }}>
+                        <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a1a" }}>{item.titulo}</div>
+                        <div style={{ background: `${item.lectura.color}18`, color: item.lectura.color, borderRadius: "999px", padding: "6px 10px", fontSize: "12px", fontWeight: "700" }}>
+                          {item.lectura.etiqueta}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", marginBottom: "14px" }}>
+                        <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Acumulado actual</div>
+                          <div style={{ fontSize: "24px", fontWeight: "700", color: item.color }}>
+                            {formatearDecimal(item.actual, 1)}
+                          </div>
+                        </div>
+                        <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cierre proyectado</div>
+                          <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
+                            {formatearDecimal(item.proyectado, 1)}
+                          </div>
+                        </div>
+                        <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cierre año anterior</div>
+                          <div style={{ fontSize: "24px", fontWeight: "700", color: "#475467" }}>
+                            {formatearDecimal(item.cierreAnterior, 1)}
+                          </div>
+                        </div>
+                        <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Variación proyectada</div>
+                          <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(item.variacion) }}>
+                            {formatearVariacion(item.variacion)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ color: "#4b5563", fontSize: "14px", lineHeight: "1.6" }}>
+                        {item.titulo === "Evangelismo"
+                          ? `Si el ritmo actual se mantiene, ${item.titulo.toLowerCase()} podría cerrar en ${formatearDecimal(item.proyectado, 1)} ${item.unidad}, frente a ${formatearDecimal(item.cierreAnterior, 1)} ${item.unidad} del año anterior. ${item.lectura.descripcion}`
+                          : `Hasta ${formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} llevas ${formatearDecimal(item.actual, 1)} ${item.unidad}. En el mismo periodo del año anterior iban ${formatearDecimal(item.anteriorMismoPeriodo, 1)} ${item.unidad}. ${item.lectura.descripcion}`}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
