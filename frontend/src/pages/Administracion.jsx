@@ -1,732 +1,797 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaPlus, FaTrash, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSave } from "react-icons/fa";
+import {
+  FaHome, FaUniversity, FaExchangeAlt, FaFileInvoiceDollar,
+  FaListAlt, FaPlus, FaTrash, FaSearch, FaFilter, FaTimes,
+  FaSave, FaArrowLeft, FaDollarSign, FaCheckCircle,
+  FaTimesCircle, FaFileAlt, FaChartBar, FaGlobe,
+  FaArrowDown, FaArrowUp, FaEdit
+} from "react-icons/fa";
 import toast from 'react-hot-toast';
 import administracionService from '../services/AdministracionService';
 import { useAuth } from '../context/AuthContext';
 
+const P  = "#1a5490";
+const PL = "#2a72b8";
+
+const CATEGORIAS_GASTO = [
+  { codigo: "51957001", nombre: "Gasto transporte misiones" },
+  { codigo: "51957002", nombre: "Gastos alimentación misiones" },
+  { codigo: "51957003", nombre: "Comisiones misioneros" },
+  { codigo: "51957004", nombre: "Gastos eventos" },
+  { codigo: "51957005", nombre: "Gastos operativos" },
+  { codigo: "51957006", nombre: "Pago misioneros" },
+  { codigo: "51957007", nombre: "Otros gastos" },
+];
+
+const FORMAS_PAGO = ["Cash", "Bank Transfer", "Check", "Other"];
+
+const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+const MES_EN = { ENERO:"January",FEBRERO:"February",MARZO:"March",ABRIL:"April",MAYO:"May",JUNIO:"June",JULIO:"July",AGOSTO:"August",SEPTIEMBRE:"September",OCTUBRE:"October",NOVIEMBRE:"November",DICIEMBRE:"December" };
+
 export default function Administracion() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  const [paisSeleccionado, setPaisSeleccionado] = useState(1);
-  const [paisNombre, setPaisNombre] = useState("");
-  const [añoSeleccionado] = useState(2026);
-  const [mesSeleccionado, setMesSeleccionado] = useState("ENERO");
-  const [tabActivo, setTabActivo] = useState("presupuesto");
-  
-  const [tasaCambio, setTasaCambio] = useState(58.00);
-  const [montoRecibidoUSD, setMontoRecibidoUSD] = useState(0);
-  const [gastos, setGastos] = useState([]);
-  const [cotizaciones, setCotizaciones] = useState([]);
-  
-  const [cargando, setCargando] = useState(false);
-  const [mostrandoModal, setMostrandoModal] = useState(false);
-  const [tipoModal, setTipoModal] = useState("");
-  const [nuevoItem, setNuevoItem] = useState({ concepto: "", monto: "", solicitante: "" });
-  
-  const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-  
-  useEffect(() => {
-    if (user) {
-      const pais = user.pais_id || 1;
-      setPaisSeleccionado(pais);
-      cargarDatosIniciales(pais);
-      cargarNombrePais(pais);
-    }
-  }, [user]);
-  
-  const cargarNombrePais = async (pais_id) => {
-    try {
-      const paises = await administracionService.getAllPaises();
-      const pais = paises.find(p => p.id === pais_id);
-      if (pais) {
-        setPaisNombre(pais.nombre);
-      }
-    } catch (error) {
-      console.error('Error al cargar nombre del país:', error);
-    }
-  };
-  
-  const cargarDatosIniciales = async (pais_id) => {
-    try {
-      setCargando(true);
-      const tasa = await administracionService.getTasaCambio();
-      setTasaCambio(parseFloat(tasa));
-      
-      const cotizacionesData = await administracionService.getAllCotizaciones();
-      setCotizaciones(cotizacionesData);
-      
-      toast.success("Datos cargados correctamente");
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
-      toast.error("Error al cargar datos iniciales");
-    } finally {
-      setCargando(false);
-    }
-  };
-  
-  const cargarDatosMes = useCallback(async () => {
-    try {
-      setCargando(true);
-      
-      const detalles = await administracionService.getDetallePresupuesto(
-        paisSeleccionado,
-        mesSeleccionado,
-        añoSeleccionado
-      );
-      
-      const gastosDelMes = detalles.map(d => ({
-        id: d.id,
-        concepto: d.concepto,
-        monto: parseFloat(d.monto),
-        tipo: d.tipo
-      }));
-      
-      setGastos(gastosDelMes);
-      setMontoRecibidoUSD(0);
-      
-    } catch (error) {
-      console.error('Error al cargar datos del mes:', error);
-    } finally {
-      setCargando(false);
-    }
-  }, [añoSeleccionado, mesSeleccionado, paisSeleccionado]);
+  const navigate   = useNavigate();
+  const { user }   = useAuth();
+
+  const [seccion, setSeccion]         = useState("dashboard");
+  const [mes, setMes]                 = useState(MESES[new Date().getMonth()]);
+  const [año]                         = useState(new Date().getFullYear());
+  const [paisNombre, setPaisNombre]   = useState("");
+  const [paisId, setPaisId]           = useState(1);
+  const [tasaCambio, setTasaCambio]   = useState(58.00);
+
+  // Cajas y bancos
+  const [saldoCaja, setSaldoCaja]     = useState(0);
+  const [saldoBanco, setSaldoBanco]   = useState(0);
+
+  // Traslados
+  const [traslados, setTraslados]     = useState([]);
+  const [modalTraslado, setModalTraslado] = useState(false);
+  const [nuevoTraslado, setNuevoTraslado] = useState({ de: "banco", a: "caja", valor: "", observaciones: "", fecha: new Date().toISOString().split('T')[0] });
+
+  // Ingresos (recibos de caja)
+  const [ingresos, setIngresos]       = useState([]);
+  const [modalIngreso, setModalIngreso] = useState(false);
+  const [nuevoIngreso, setNuevoIngreso] = useState({ tipo: "RC-1-Recibo de caja", origen: "World Olivet Assembly", dondeIngresa: "banco", valorRecibido: "", observaciones: "", fecha: new Date().toISOString().split('T')[0] });
+
+  // Gastos
+  const [gastos, setGastos]           = useState([]);
+  const [modalGasto, setModalGasto]   = useState(false);
+  const [busqueda, setBusqueda]       = useState("");
+  const [filtroTipo, setFiltroTipo]   = useState("");
+  const [nuevoGasto, setNuevoGasto]   = useState({
+    tipo: "", fecha: new Date().toISOString().split('T')[0],
+    proveedor: "", categoria: "", descripcion: "",
+    cantidad: 1, valorUnitario: 0, descuento: 0,
+    formaPago: "Cash", observaciones: ""
+  });
 
   useEffect(() => {
-    if (paisSeleccionado && mesSeleccionado) {
-      cargarDatosMes();
+    if (user) {
+      const pid = user.pais_id || 1;
+      setPaisId(pid);
+      cargarDatos(pid);
     }
-  }, [mesSeleccionado, paisSeleccionado, cargarDatosMes]);
-  
-  const guardarMontoRecibido = async (nuevoMonto) => {
-    setMontoRecibidoUSD(nuevoMonto);
+  }, [user]);
+
+  const cargarDatos = async (pid) => {
+    try {
+      const [paises, tasa] = await Promise.all([
+        administracionService.getAllPaises(),
+        administracionService.getTasaCambio()
+      ]);
+      const p = paises.find(x => x.id === pid);
+      if (p) setPaisNombre(p.nombre);
+      setTasaCambio(parseFloat(tasa));
+    } catch {}
   };
-  
-  const abrirModalAgregar = (tipo) => {
-    setTipoModal(tipo);
-    setNuevoItem({ concepto: "", monto: "", solicitante: "" });
-    setMostrandoModal(true);
+
+  const cargarGastosMes = useCallback(async () => {
+    try {
+      const d = await administracionService.getDetallePresupuesto(paisId, mes, año);
+      setGastos(d.map(x => ({
+        id: x.id, concepto: x.concepto, monto: parseFloat(x.monto),
+        tipo: x.tipo, fecha: x.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+      })));
+    } catch {}
+  }, [paisId, mes, año]);
+
+  useEffect(() => { cargarGastosMes(); }, [mes, cargarGastosMes]);
+
+  // Totales
+  const totalIngresos  = ingresos.reduce((s, i) => s + parseFloat(i.valorRecibido || 0), 0);
+  const totalGastos    = gastos.reduce((s, g) => s + g.monto, 0);
+  const totalTraslados = traslados.length;
+  const saldoNeto      = totalIngresos - totalGastos;
+
+  const gastosFiltrados = gastos.filter(g => {
+    const matchBusq = g.concepto?.toLowerCase().includes(busqueda.toLowerCase());
+    const matchTipo = filtroTipo ? g.tipo === filtroTipo : true;
+    return matchBusq && matchTipo;
+  });
+
+  const guardarTraslado = () => {
+    if (!nuevoTraslado.valor) { toast.error("Enter an amount"); return; }
+    const t = { ...nuevoTraslado, id: Date.now(), valor: parseFloat(nuevoTraslado.valor) };
+    setTraslados([t, ...traslados]);
+    if (nuevoTraslado.de === "banco") setSaldoBanco(s => s - t.valor);
+    else setSaldoCaja(s => s - t.valor);
+    if (nuevoTraslado.a === "caja") setSaldoCaja(s => s + t.valor);
+    else setSaldoBanco(s => s + t.valor);
+    toast.success("Transfer recorded");
+    setModalTraslado(false);
+    setNuevoTraslado({ de:"banco", a:"caja", valor:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
   };
-  
-  const agregarItem = async () => {
-    if (tipoModal === "cotizacion") {
-      if (!nuevoItem.solicitante || !nuevoItem.concepto || !nuevoItem.monto) {
-        toast.error("Complete todos los campos");
-        return;
-      }
-      
-      try {
-        const datos = {
-          fecha: new Date().toISOString().split('T')[0],
-          solicitante: nuevoItem.solicitante,
-          concepto: nuevoItem.concepto,
-          monto: parseFloat(nuevoItem.monto)
-        };
-        
-        const nuevaCotizacion = await administracionService.crearCotizacion(datos);
-        setCotizaciones([...cotizaciones, nuevaCotizacion]);
-        toast.success("Cotización creada");
-        setMostrandoModal(false);
-      } catch (error) {
-        console.error('Error al crear cotización:', error);
-        toast.error("Error al crear cotización");
-      }
-    } else {
-      if (!nuevoItem.concepto || !nuevoItem.monto) {
-        toast.error("Complete todos los campos");
-        return;
-      }
-      
-      try {
-        const datos = {
-          pais_id: paisSeleccionado,
-          mes: mesSeleccionado,
-          anio: añoSeleccionado,
-          tipo: tipoModal,
-          concepto: nuevoItem.concepto,
-          monto: parseFloat(nuevoItem.monto),
-          moneda: "DOP",
-          tasa_cambio: tasaCambio
-        };
-        
-        const gastoGuardado = await administracionService.agregarItemPresupuesto(datos);
-        
-        setGastos([...gastos, {
-          id: gastoGuardado.id,
-          concepto: nuevoItem.concepto,
-          monto: parseFloat(nuevoItem.monto),
-          tipo: tipoModal
-        }]);
-        
-        toast.success("Gasto agregado");
-        setMostrandoModal(false);
-      } catch (error) {
-        console.error('Error al agregar gasto:', error);
-        toast.error("Error al guardar gasto");
-      }
-    }
+
+  const guardarIngreso = () => {
+    if (!nuevoIngreso.valorRecibido) { toast.error("Enter the amount received"); return; }
+    const ing = { ...nuevoIngreso, id: Date.now(), numero: `RC-${Date.now()}` };
+    setIngresos([ing, ...ingresos]);
+    const val = parseFloat(nuevoIngreso.valorRecibido);
+    if (nuevoIngreso.dondeIngresa === "caja") setSaldoCaja(s => s + val);
+    else setSaldoBanco(s => s + val);
+    toast.success("Income recorded");
+    setModalIngreso(false);
+    setNuevoIngreso({ tipo:"RC-1-Recibo de caja", origen:"World Olivet Assembly", dondeIngresa:"banco", valorRecibido:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
   };
-  
+
+  const guardarGasto = async () => {
+    if (!nuevoGasto.descripcion || !nuevoGasto.valorUnitario) { toast.error("Complete the required fields"); return; }
+    const total = (parseFloat(nuevoGasto.valorUnitario) * parseInt(nuevoGasto.cantidad)) - parseFloat(nuevoGasto.descuento || 0);
+    try {
+      const g = await administracionService.agregarItemPresupuesto({
+        pais_id: paisId, mes, anio: año,
+        tipo: nuevoGasto.tipo || "otro_gasto",
+        concepto: `${nuevoGasto.descripcion}${nuevoGasto.proveedor ? ` — ${nuevoGasto.proveedor}` : ""}`,
+        monto: total, moneda: "DOP", tasa_cambio: tasaCambio
+      });
+      setGastos([{ id: g.id, concepto: g.concepto || nuevoGasto.descripcion, monto: total, tipo: nuevoGasto.tipo || "otro_gasto", fecha: nuevoGasto.fecha }, ...gastos]);
+      toast.success("Expense saved");
+      setModalGasto(false);
+      setNuevoGasto({ tipo:"", fecha: new Date().toISOString().split('T')[0], proveedor:"", categoria:"", descripcion:"", cantidad:1, valorUnitario:0, descuento:0, formaPago:"Cash", observaciones:"" });
+    } catch { toast.error("Error saving expense"); }
+  };
+
   const eliminarGasto = async (id) => {
-    if (!window.confirm("¿Eliminar este gasto?")) return;
-    
+    if (!window.confirm("Delete this expense?")) return;
     try {
       await administracionService.eliminarItemPresupuesto(id);
       setGastos(gastos.filter(g => g.id !== id));
-      toast.success("Gasto eliminado");
-    } catch (error) {
-      console.error('Error al eliminar:', error);
-      toast.error("Error al eliminar");
-    }
+      toast.success("Deleted");
+    } catch { toast.error("Error deleting"); }
   };
-  
-  const aprobarCotizacion = async (id) => {
-    try {
-      const cotizacion = cotizaciones.find(c => c.id === id);
-      
-      if (!cotizacion) {
-        toast.error("Cotización no encontrada");
-        return;
-      }
-      
-      await administracionService.aprobarCotizacion(id, mesSeleccionado, añoSeleccionado);
-      
-      const datos = {
-        pais_id: paisSeleccionado,
-        mes: mesSeleccionado,
-        anio: añoSeleccionado,
-        tipo: "otro_gasto",
-        concepto: `${cotizacion.concepto} (${cotizacion.solicitante})`,
-        monto: parseFloat(cotizacion.monto),
-        moneda: "DOP",
-        tasa_cambio: tasaCambio
-      };
-      
-      const gastoGuardado = await administracionService.agregarItemPresupuesto(datos);
-      
-      cotizacion.estado = "aprobado";
-      cotizacion.agregado_a_gastos = true;
-      setCotizaciones([...cotizaciones]);
-      
-      setGastos([...gastos, {
-        id: gastoGuardado.id,
-        concepto: datos.concepto,
-        monto: parseFloat(cotizacion.monto),
-        tipo: "otro_gasto"
-      }]);
-      
-      toast.success("Cotización aprobada y agregada a gastos");
-    } catch (error) {
-      console.error('Error al aprobar:', error);
-      toast.error("Error al aprobar cotización");
-    }
-  };
-  
-  const rechazarCotizacion = async (id) => {
-    try {
-      await administracionService.rechazarCotizacion(id);
-      const cotizacion = cotizaciones.find(c => c.id === id);
-      cotizacion.estado = "rechazado";
-      setCotizaciones([...cotizaciones]);
-      toast.success("Cotización rechazada");
-    } catch (error) {
-      console.error('Error al rechazar:', error);
-      toast.error("Error al rechazar cotización");
-    }
-  };
-  
-  const actualizarTasaCambio = async (nuevaTasa) => {
-    setTasaCambio(nuevaTasa);
-    try {
-      await administracionService.actualizarTasaCambio(nuevaTasa);
-    } catch (error) {
-      console.error('Error al actualizar tasa:', error);
-    }
-  };
-  
-  const totalGastado = gastos.reduce((sum, g) => sum + g.monto, 0);
-  const presupuestoDOP = montoRecibidoUSD * tasaCambio;
-  const restante = presupuestoDOP - totalGastado;
-  const alertaPresupuesto = restante < 0;
-  
-  if (cargando && !paisSeleccionado) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f7fa" }}>
-        <div style={{ fontSize: "18px", color: "#666" }}>Cargando...</div>
-      </div>
-    );
-  }
-  
+
+  const nav = [
+    { key:"dashboard",  icon:<FaHome />,              label:"Dashboard"    },
+    { key:"cajas",      icon:<FaUniversity />,         label:"Cash & Banks" },
+    { key:"traslados",  icon:<FaExchangeAlt />,        label:"Transfers"    },
+    { key:"ingresos",   icon:<FaArrowDown />,          label:"Income"       },
+    { key:"gastos",     icon:<FaFileInvoiceDollar />,  label:"Expenses"     },
+    { key:"reporte",    icon:<FaChartBar />,           label:"Reports"      },
+  ];
+
+  const inputCls = { width:"100%", padding:"9px 12px", border:"1.5px solid #dde3ef", borderRadius:"8px", fontSize:"13px", fontFamily:"'Lato', sans-serif", color:"#1a2d5a", outline:"none", boxSizing:"border-box", marginBottom:"12px" };
+  const labelCls = { display:"block", fontSize:"11px", fontWeight:"700", color:"#5a6a85", letterSpacing:"0.8px", textTransform:"uppercase", marginBottom:"5px" };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f7fa", padding: "20px" }}>
+    <div style={{ display:"flex", height:"100vh", fontFamily:"'Lato', sans-serif", background:"#f4f6fb", overflow:"hidden" }}>
       <style>{`
-        .tab-button {
-          padding: 12px 24px;
-          border: none;
-          background: transparent;
-          color: #666;
-          font-weight: 600;
-          font-size: 15px;
-          cursor: pointer;
-          border-bottom: 3px solid transparent;
-          transition: all 0.3s;
-        }
-        
-        .tab-button:hover {
-          color: #0E5A61;
-        }
-        
-        .tab-button.active {
-          color: #0E5A61;
-          border-bottom-color: #0E5A61;
-        }
-        
-        .mes-button {
-          padding: 10px 18px;
-          border: 2px solid #e0e0e0;
-          background: white;
-          color: #666;
-          font-weight: 600;
-          font-size: 13px;
-          cursor: pointer;
-          border-radius: 8px;
-          transition: all 0.3s;
-        }
-        
-        .mes-button:hover {
-          border-color: #0E5A61;
-          color: #0E5A61;
-        }
-        
-        .mes-button.active {
-          background: #0E5A61;
-          color: white;
-          border-color: #0E5A61;
-        }
-        
-        .card {
-          background: white;
-          border-radius: 12px;
-          padding: 25px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        
-        .gasto-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 15px;
-          border-bottom: 1px solid #f0f0f0;
-          transition: background 0.2s;
-        }
-        
-        .gasto-item:hover {
-          background: #f8f9fa;
-        }
-        
-        .gasto-item:last-child {
-          border-bottom: none;
-        }
-        
-        .btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 20px;
-          border: none;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s;
-          font-size: 14px;
-        }
-        
-        .btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .btn-success {
-          background: #4CAF50;
-          color: white;
-        }
-        
-        .btn-danger {
-          background: #f44336;
-          color: white;
-        }
-        
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-        
-        .modal-content {
-          background: white;
-          padding: 30px;
-          border-radius: 16px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-          max-width: 500px;
-          width: 90%;
-        }
-        
-        .input {
-          width: 100%;
-          padding: 12px 16px;
-          border: 2px solid #e0e0e0;
-          border-radius: 8px;
-          font-size: 14px;
-          margin-bottom: 15px;
-          box-sizing: border-box;
-          transition: border-color 0.3s;
-        }
-        
-        .input:focus {
-          outline: none;
-          border-color: #0E5A61;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
+        .adm-nav { display:flex; align-items:center; gap:10px; padding:12px 20px; color:rgba(255,255,255,0.65); font-size:13px; font-weight:600; cursor:pointer; border-left:3px solid transparent; transition:all 0.2s; }
+        .adm-nav:hover { background:rgba(255,255,255,0.08); color:white; }
+        .adm-nav.active { background:rgba(255,255,255,0.12); color:white; border-left-color:white; }
+        .adm-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border:none; border-radius:8px; font-family:'Lato',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; }
+        .adm-btn:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,0.12); }
+        .adm-btn-p { background:${P}; color:white; }
+        .adm-btn-s { background:#4CAF50; color:white; }
+        .adm-btn-d { background:#f44336; color:white; }
+        .adm-btn-o { background:#f0f4fa; color:#5a6a85; }
+        .adm-btn-sm { padding:5px 12px; font-size:11px; }
+        .adm-card { background:white; border-radius:12px; border:1px solid #e8edf5; margin-bottom:20px; }
+        .adm-card-hdr { padding:16px 22px; border-bottom:1px solid #e8edf5; display:flex; align-items:center; justify-content:space-between; }
+        .adm-card-ttl { font-family:'Cinzel',serif; font-size:14px; color:#1a2d5a; font-weight:600; margin:0; }
+        .adm-table { width:100%; border-collapse:collapse; }
+        .adm-table th { padding:10px 18px; text-align:left; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:#8a97b0; border-bottom:2px solid #e8edf5; background:#fafbfd; }
+        .adm-table td { padding:13px 18px; font-size:13px; color:#1a2d5a; border-bottom:1px solid #f0f4fa; }
+        .adm-table tr:last-child td { border-bottom:none; }
+        .adm-table tr:hover td { background:#f8faff; }
+        .adm-input:focus { border-color:${P} !important; box-shadow:0 0 0 3px rgba(26,84,144,0.08); }
+        .adm-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px; }
+        .adm-modal { background:white; border-radius:14px; width:100%; max-width:580px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+        .adm-modal-hdr { padding:18px 24px; border-bottom:1px solid #e8edf5; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:white; z-index:1; }
+        .adm-modal-ttl { font-family:'Cinzel',serif; font-size:15px; color:${P}; margin:0; }
+        .adm-modal-body { padding:20px 24px; }
+        .adm-modal-ftr { padding:14px 24px; border-top:1px solid #e8edf5; display:flex; gap:10px; }
+        .adm-stat { background:white; border-radius:12px; border:1px solid #e8edf5; padding:18px 20px; }
+        .adm-stat-lbl { font-size:11px; color:#8a97b0; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
+        .adm-stat-val { font-size:22px; font-weight:700; }
+        .adm-mes-btn { padding:6px 12px; border:1.5px solid #dde3ef; background:white; color:#8a97b0; font-size:11px; font-weight:700; border-radius:6px; cursor:pointer; font-family:'Lato',sans-serif; transition:all 0.15s; }
+        .adm-mes-btn:hover { border-color:${P}; color:${P}; }
+        .adm-mes-btn.active { background:${P}; color:white; border-color:${P}; }
+        .adm-badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:99px; font-size:10px; font-weight:700; }
+        .adm-badge-in  { background:#e8f5e9; color:#2e7d32; }
+        .adm-badge-out { background:#ffebee; color:#c62828; }
+        .adm-badge-tr  { background:#e3f2fd; color:#1565c0; }
+        .adm-section-divider { font-size:11px; font-weight:700; color:rgba(255,255,255,0.4); letter-spacing:1px; text-transform:uppercase; padding:12px 20px 4px; }
+        .adm-back { display:flex; align-items:center; gap:6px; padding:14px 20px; color:rgba(255,255,255,0.5); font-size:12px; cursor:pointer; border-top:1px solid rgba(255,255,255,0.1); margin-top:auto; transition:color 0.2s; }
+        .adm-back:hover { color:white; }
       `}</style>
 
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <div className="card" style={{ marginBottom: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-            <div>
-              <button onClick={() => navigate("/home")} style={{ background: "none", border: "none", color: "#0E5A61", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", padding: 0 }}>
-                <FaArrowLeft /> Volver
-              </button>
-              <h1 style={{ margin: 0, color: "#0E5A61", fontSize: "28px" }}>💼 Administración Financiera</h1>
-              <p style={{ color: "#666", margin: "5px 0 0", fontSize: "14px" }}>
-                {paisNombre} • Año {añoSeleccionado}
-              </p>
+      {/* ── SIDEBAR ── */}
+      <div style={{ width:220, background:P, display:"flex", flexDirection:"column", flexShrink:0 }}>
+        <div style={{ padding:"22px 20px 16px", borderBottom:"1px solid rgba(255,255,255,0.12)" }}>
+          <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:13, color:"white", margin:"0 0 4px", letterSpacing:1 }}>Administration</h2>
+          <p style={{ fontSize:11, color:"rgba(255,255,255,0.5)", margin:0 }}>{paisNombre} · {año}</p>
+        </div>
+
+        <nav style={{ paddingTop:8 }}>
+          <div className="adm-section-divider">Main</div>
+          {nav.map(item => (
+            <div key={item.key} className={`adm-nav ${seccion===item.key?"active":""}`} onClick={()=>setSeccion(item.key)}>
+              <span style={{ fontSize:14, width:18, textAlign:"center" }}>{item.icon}</span>
+              {item.label}
             </div>
-            
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "5px" }}>Tasa de Cambio</div>
-              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ fontSize: "16px", color: "#666" }}>1 USD =</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={tasaCambio}
-                  onChange={(e) => actualizarTasaCambio(parseFloat(e.target.value))}
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "700",
-                    color: "#0E5A61",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    padding: "5px 10px",
-                    width: "100px",
-                    textAlign: "center"
-                  }}
-                />
-                <span style={{ fontSize: "16px", color: "#666" }}>DOP</span>
-              </div>
-            </div>
+          ))}
+          <div className="adm-section-divider" style={{ marginTop:8 }}>Regional</div>
+          <div className="adm-nav" onClick={()=>navigate("/informe-regional")}>
+            <span style={{ fontSize:14, width:18, textAlign:"center" }}><FaGlobe /></span>
+            HQ Report
           </div>
-          
-          <div style={{ borderTop: "1px solid #f0f0f0", paddingTop: "20px" }}>
-            <div style={{ fontSize: "14px", color: "#666", marginBottom: "12px", fontWeight: "600" }}>📅 Selecciona el mes:</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: "10px" }}>
-              {meses.map(mes => (
-                <button
-                  key={mes}
-                  onClick={() => setMesSeleccionado(mes)}
-                  className={`mes-button ${mesSeleccionado === mes ? 'active' : ''}`}
-                >
-                  {mes.charAt(0) + mes.slice(1).toLowerCase()}
-                </button>
-              ))}
-            </div>
+        </nav>
+
+        {/* Tasa de cambio */}
+        <div style={{ padding:"14px 20px", borderTop:"1px solid rgba(255,255,255,0.1)", marginTop:"auto" }}>
+          <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>Exchange Rate</div>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <FaDollarSign style={{ color:"rgba(255,255,255,0.5)", fontSize:11 }} />
+            <span style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>1 USD =</span>
+            <input type="number" step="0.01" value={tasaCambio}
+              onChange={e => { setTasaCambio(parseFloat(e.target.value)); administracionService.actualizarTasaCambio(parseFloat(e.target.value)).catch(()=>{}); }}
+              style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:6, color:"white", fontSize:13, fontWeight:700, width:60, padding:"3px 6px", textAlign:"center", outline:"none", fontFamily:"'Lato',sans-serif" }} />
+            <span style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>DOP</span>
           </div>
         </div>
-        
-        <div className="card" style={{ marginBottom: "20px", padding: "0" }}>
-          <div style={{ display: "flex", borderBottom: "1px solid #f0f0f0" }}>
-            <button
-              onClick={() => setTabActivo("presupuesto")}
-              className={`tab-button ${tabActivo === "presupuesto" ? 'active' : ''}`}
-            >
-              💰 Presupuesto
-            </button>
-            <button
-              onClick={() => setTabActivo("gastos")}
-              className={`tab-button ${tabActivo === "gastos" ? 'active' : ''}`}
-            >
-              💸 Gastos
-            </button>
-            <button
-              onClick={() => setTabActivo("cotizaciones")}
-              className={`tab-button ${tabActivo === "cotizaciones" ? 'active' : ''}`}
-            >
-              📝 Cotizaciones
-            </button>
-          </div>
+
+        <div className="adm-back" onClick={()=>navigate("/home")}>
+          <FaArrowLeft style={{ fontSize:11 }} /> Back to Home
         </div>
-        
-        {tabActivo === "presupuesto" && (
-          <div className="card">
-            <h2 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: "700" }}>
-              Presupuesto de {mesSeleccionado.charAt(0) + mesSeleccionado.slice(1).toLowerCase()} {añoSeleccionado}
-            </h2>
-            
-            <div style={{ marginBottom: "30px" }}>
-              <label style={{ display: "block", fontWeight: "600", marginBottom: "10px", color: "#333" }}>
-                💵 Presupuesto recibido (USD):
-              </label>
-              <input
-                type="number"
-                className="input"
-                placeholder="Ingrese el monto en USD..."
-                value={montoRecibidoUSD || ""}
-                onChange={(e) => guardarMontoRecibido(parseFloat(e.target.value) || 0)}
-                style={{ marginBottom: "10px" }}
-              />
-              <div style={{ fontSize: "14px", color: "#666" }}>
-                Equivalente: <strong style={{ color: "#0E5A61" }}>${presupuestoDOP.toLocaleString()} DOP</strong>
-              </div>
-            </div>
-            
-            {montoRecibidoUSD > 0 && (
-              <div style={{ padding: "20px", background: "#e8f5e9", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "5px" }}>Presupuesto disponible</div>
-                <div style={{ fontSize: "36px", fontWeight: "700", color: "#4CAF50" }}>
-                  ${presupuestoDOP.toLocaleString()} DOP
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {tabActivo === "gastos" && (
-          <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
-              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>
-                Gastos de {mesSeleccionado.charAt(0) + mesSeleccionado.slice(1).toLowerCase()}
-              </h2>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={() => abrirModalAgregar("gasto_fijo")} className="btn btn-success">
-                  <FaPlus /> Gasto Fijo
-                </button>
-                <button onClick={() => abrirModalAgregar("pago_misionero")} className="btn btn-success">
-                  <FaPlus /> Misionero
-                </button>
-                <button onClick={() => abrirModalAgregar("otro_gasto")} className="btn btn-success">
-                  <FaPlus /> Otro Gasto
-                </button>
-              </div>
-            </div>
-            
-            {alertaPresupuesto && (
-              <div style={{ padding: "15px", background: "#ffebee", borderRadius: "8px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px", borderLeft: "4px solid #f44336" }}>
-                <FaExclamationTriangle style={{ color: "#f44336", fontSize: "20px" }} />
-                <div>
-                  <div style={{ fontWeight: "700", color: "#f44336", fontSize: "15px" }}>⚠️ ALERTA: Presupuesto excedido</div>
-                  <div style={{ fontSize: "13px", color: "#666", marginTop: "3px" }}>
-                    Has gastado <strong>${Math.abs(restante).toLocaleString()} DOP</strong> más del presupuesto asignado
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "15px", marginBottom: "25px" }}>
-              <div style={{ padding: "20px", background: "#e3f2fd", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "13px", color: "#666", marginBottom: "5px" }}>💰 Presupuesto</div>
-                <div style={{ fontSize: "24px", fontWeight: "700", color: "#2196F3" }}>
-                  ${presupuestoDOP.toLocaleString()}
-                </div>
-              </div>
-              
-              <div style={{ padding: "20px", background: "#ffebee", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "13px", color: "#666", marginBottom: "5px" }}>💸 Gastado</div>
-                <div style={{ fontSize: "24px", fontWeight: "700", color: "#f44336" }}>
-                  ${totalGastado.toLocaleString()}
-                </div>
-              </div>
-              
-              <div style={{ padding: "20px", background: alertaPresupuesto ? "#ffebee" : "#e8f5e9", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "13px", color: "#666", marginBottom: "5px" }}>✅ Restante</div>
-                <div style={{ fontSize: "24px", fontWeight: "700", color: alertaPresupuesto ? "#f44336" : "#4CAF50" }}>
-                  ${restante.toLocaleString()}
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "15px", color: "#333" }}>Lista de gastos:</h3>
-              {gastos.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
-                  Sin gastos registrados para este mes
-                </div>
-              ) : (
-                gastos.map(gasto => (
-                  <div key={gasto.id} className="gasto-item">
-                    <div>
-                      <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>{gasto.concepto}</div>
-                      <div style={{ fontSize: "12px", color: "#999" }}>
-                        {gasto.tipo === "gasto_fijo" ? "🏢 Gasto Fijo" : gasto.tipo === "pago_misionero" ? "👤 Pago Misionero" : "📦 Otro Gasto"}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-                      <span style={{ fontWeight: "700", fontSize: "16px", color: "#0E5A61" }}>
-                        ${gasto.monto.toLocaleString()}
-                      </span>
-                      <button onClick={() => eliminarGasto(gasto.id)} style={{ background: "none", border: "none", color: "#f44336", cursor: "pointer", fontSize: "16px" }}>
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-        
-        {tabActivo === "cotizaciones" && (
-          <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>Cotizaciones</h2>
-                <p style={{ color: "#666", fontSize: "13px", margin: "5px 0 0" }}>
-                  Solicitudes de misioneros. Al aprobar, se agregan automáticamente a gastos.
-                </p>
-              </div>
-              <button onClick={() => abrirModalAgregar("cotizacion")} className="btn btn-success">
-                <FaPlus /> Nueva Cotización
-              </button>
-            </div>
-            
-            <div style={{ display: "grid", gap: "15px" }}>
-              {cotizaciones.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
-                  Sin cotizaciones registradas
-                </div>
-              ) : (
-                cotizaciones.map(cot => (
-                  <div key={cot.id} style={{ 
-                    background: "white", 
-                    padding: "20px", 
-                    borderRadius: "12px", 
-                    border: "2px solid #e0e0e0",
-                    borderLeftWidth: "5px",
-                    borderLeftColor: cot.estado === "aprobado" ? "#4CAF50" : cot.estado === "rechazado" ? "#f44336" : "#FF9800"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "5px", color: "#333" }}>
-                          {cot.concepto}
-                        </div>
-                        <div style={{ fontSize: "14px", color: "#666", marginBottom: "10px" }}>
-                          👤 {cot.solicitante} • {new Date(cot.fecha).toLocaleDateString('es-DO')}
-                        </div>
-                        <div style={{ fontSize: "28px", fontWeight: "700", color: "#0E5A61" }}>
-                          ${parseFloat(cot.monto).toLocaleString()} DOP
-                        </div>
-                        {cot.agregado_a_gastos && (
-                          <div style={{ marginTop: "10px", fontSize: "13px", color: "#4CAF50", fontWeight: "600" }}>
-                            ✓ Ya agregada a gastos
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
-                        {cot.estado === "pendiente" && (
-                          <>
-                            <button onClick={() => aprobarCotizacion(cot.id)} className="btn btn-success" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                              <FaCheckCircle /> Aprobar
-                            </button>
-                            <button onClick={() => rechazarCotizacion(cot.id)} className="btn btn-danger" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                              <FaTimesCircle /> Rechazar
-                            </button>
-                          </>
-                        )}
-                        {cot.estado === "aprobado" && (
-                          <div style={{ padding: "10px 20px", background: "#4CAF50", color: "white", borderRadius: "8px", fontWeight: "600", fontSize: "13px" }}>
-                            ✓ Aprobada
-                          </div>
-                        )}
-                        {cot.estado === "rechazado" && (
-                          <div style={{ padding: "10px 20px", background: "#f44336", color: "white", borderRadius: "8px", fontWeight: "600", fontSize: "13px" }}>
-                            ✗ Rechazada
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-        
-        {mostrandoModal && (
-          <div className="modal-overlay" onClick={() => setMostrandoModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h3 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: "700" }}>
-                {tipoModal === "cotizacion" ? "➕ Nueva Cotización" : 
-                 tipoModal === "gasto_fijo" ? "➕ Nuevo Gasto Fijo" :
-                 tipoModal === "pago_misionero" ? "➕ Nuevo Pago Misionero" :
-                 "➕ Nuevo Otro Gasto"}
-              </h3>
-              
-              {tipoModal === "cotizacion" && (
-                <>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Nombre del solicitante"
-                    value={nuevoItem.solicitante}
-                    onChange={(e) => setNuevoItem({...nuevoItem, solicitante: e.target.value})}
-                  />
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Concepto (ej: Materiales, Comida...)"
-                    value={nuevoItem.concepto}
-                    onChange={(e) => setNuevoItem({...nuevoItem, concepto: e.target.value})}
-                  />
-                </>
-              )}
-              
-              {tipoModal !== "cotizacion" && (
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Concepto del gasto"
-                  value={nuevoItem.concepto}
-                  onChange={(e) => setNuevoItem({...nuevoItem, concepto: e.target.value})}
-                />
-              )}
-              
-              <input
-                type="number"
-                className="input"
-                placeholder="Monto en DOP"
-                value={nuevoItem.monto}
-                onChange={(e) => setNuevoItem({...nuevoItem, monto: e.target.value})}
-              />
-              
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={agregarItem} className="btn btn-success" style={{ flex: 1, justifyContent: "center" }}>
-                  <FaSave /> Guardar
-                </button>
-                <button onClick={() => setMostrandoModal(false)} className="btn btn-danger" style={{ flex: 1, justifyContent: "center" }}>
-                  <FaTimesCircle /> Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* ── MAIN ── */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+        {/* TOPBAR */}
+        <div style={{ background:"white", borderBottom:"1px solid #e8edf5", padding:"0 28px", height:60, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+          <span style={{ fontFamily:"'Cinzel',serif", fontSize:16, color:"#1a2d5a", fontWeight:600 }}>
+            { seccion==="dashboard" ? "Dashboard"
+            : seccion==="cajas"     ? "Cash & Banks"
+            : seccion==="traslados" ? "Money Transfers"
+            : seccion==="ingresos"  ? "Income — Cash Receipts"
+            : seccion==="gastos"    ? "Purchases & Expenses"
+            :                         "Reports" }
+          </span>
+          <div style={{ display:"flex", gap:10 }}>
+            { seccion==="traslados" && <button className="adm-btn adm-btn-p adm-btn-sm" onClick={()=>setModalTraslado(true)}><FaPlus /> New Transfer</button> }
+            { seccion==="ingresos"  && <button className="adm-btn adm-btn-s adm-btn-sm" onClick={()=>setModalIngreso(true)}><FaPlus /> New Receipt</button> }
+            { seccion==="gastos"    && <button className="adm-btn adm-btn-p adm-btn-sm" onClick={()=>setModalGasto(true)}><FaPlus /> New Expense</button> }
+          </div>
+        </div>
+
+        {/* MES SELECTOR */}
+        <div style={{ background:"white", borderBottom:"1px solid #e8edf5", padding:"10px 28px", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", flexShrink:0 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:"#8a97b0", letterSpacing:1, textTransform:"uppercase", marginRight:4 }}>Month:</span>
+          {MESES.map(m => (
+            <button key={m} className={`adm-mes-btn ${mes===m?"active":""}`} onClick={()=>setMes(m)}>
+              {MES_EN[m].slice(0,3)}
+            </button>
+          ))}
+        </div>
+
+        {/* CONTENT */}
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 28px" }}>
+
+          {/* ── DASHBOARD ── */}
+          {seccion==="dashboard" && (
+            <>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:20 }}>
+                <div className="adm-stat">
+                  <div className="adm-stat-lbl">Cash Available</div>
+                  <div className="adm-stat-val" style={{ color:"#4CAF50" }}>${saldoCaja.toLocaleString()}</div>
+                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>DOP · Petty Cash</div>
+                </div>
+                <div className="adm-stat">
+                  <div className="adm-stat-lbl">Bank Balance</div>
+                  <div className="adm-stat-val" style={{ color:P }}>${saldoBanco.toLocaleString()}</div>
+                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>DOP · Bank Account</div>
+                </div>
+                <div className="adm-stat">
+                  <div className="adm-stat-lbl">Total Income</div>
+                  <div className="adm-stat-val" style={{ color:"#4CAF50" }}>${totalIngresos.toLocaleString()}</div>
+                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>{ingresos.length} receipt{ingresos.length!==1?"s":""}</div>
+                </div>
+                <div className="adm-stat">
+                  <div className="adm-stat-lbl">Total Expenses</div>
+                  <div className="adm-stat-val" style={{ color:"#f44336" }}>${totalGastos.toLocaleString()}</div>
+                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>{gastos.length} record{gastos.length!==1?"s":""}</div>
+                </div>
+              </div>
+
+              {/* Balance neto */}
+              <div className="adm-card">
+                <div className="adm-card-hdr">
+                  <h3 className="adm-card-ttl">Net Balance — {MES_EN[mes]} {año}</h3>
+                </div>
+                <div style={{ padding:"24px", display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:24 }}>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ fontSize:11, color:"#8a97b0", marginBottom:6, textTransform:"uppercase", letterSpacing:0.8 }}>Income</div>
+                    <div style={{ fontSize:32, fontWeight:700, color:"#4CAF50" }}>${totalIngresos.toLocaleString()}</div>
+                  </div>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ fontSize:11, color:"#8a97b0", marginBottom:6, textTransform:"uppercase", letterSpacing:0.8 }}>Expenses</div>
+                    <div style={{ fontSize:32, fontWeight:700, color:"#f44336" }}>${totalGastos.toLocaleString()}</div>
+                  </div>
+                  <div style={{ textAlign:"center", borderLeft:"2px solid #eef2f7", paddingLeft:24 }}>
+                    <div style={{ fontSize:11, color:"#8a97b0", marginBottom:6, textTransform:"uppercase", letterSpacing:0.8 }}>Net Balance</div>
+                    <div style={{ fontSize:32, fontWeight:700, color:saldoNeto>=0?"#4CAF50":"#f44336" }}>
+                      {saldoNeto<0?"-":""}${Math.abs(saldoNeto).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick actions */}
+              <div className="adm-card">
+                <div className="adm-card-hdr"><h3 className="adm-card-ttl">Quick Actions</h3></div>
+                <div style={{ padding:"20px 24px", display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
+                  {[
+                    { icon:<FaArrowDown />, label:"Register Income",   color:"#4CAF50", action:()=>{setSeccion("ingresos"); setModalIngreso(true);} },
+                    { icon:<FaFileInvoiceDollar />, label:"Register Expense", color:P, action:()=>{setSeccion("gastos"); setModalGasto(true);} },
+                    { icon:<FaExchangeAlt />, label:"Transfer Money",  color:"#FF9800", action:()=>{setSeccion("traslados"); setModalTraslado(true);} },
+                  ].map(a => (
+                    <button key={a.label} onClick={a.action} style={{ padding:"18px", background:`${a.color}12`, border:`1.5px solid ${a.color}30`, borderRadius:12, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:10, transition:"all 0.2s", fontFamily:"'Lato',sans-serif" }}
+                      onMouseOver={e=>e.currentTarget.style.background=`${a.color}22`}
+                      onMouseOut={e=>e.currentTarget.style.background=`${a.color}12`}>
+                      <span style={{ fontSize:24, color:a.color }}>{a.icon}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a2d5a" }}>{a.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── CAJAS Y BANCOS ── */}
+          {seccion==="cajas" && (
+            <div className="adm-card">
+              <div className="adm-card-hdr"><h3 className="adm-card-ttl">Bank Accounts & Cash</h3></div>
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>Account Code</th>
+                    <th>Account / Cash Register</th>
+                    <th style={{ textAlign:"right" }}>Balance (DOP)</th>
+                    <th style={{ textAlign:"center" }}>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ color:"#8a97b0", fontSize:12 }}>11050501</td>
+                    <td style={{ fontWeight:700 }}>Petty Cash</td>
+                    <td style={{ textAlign:"right", fontWeight:700, color:"#4CAF50", fontSize:16 }}>${saldoCaja.toLocaleString()}</td>
+                    <td style={{ textAlign:"center" }}><span className="adm-badge adm-badge-in">Cash</span></td>
+                  </tr>
+                  <tr>
+                    <td style={{ color:"#8a97b0", fontSize:12 }}>11200501</td>
+                    <td style={{ fontWeight:700 }}>Bank Account (Savings)</td>
+                    <td style={{ textAlign:"right", fontWeight:700, color:P, fontSize:16 }}>${saldoBanco.toLocaleString()}</td>
+                    <td style={{ textAlign:"center" }}><span className="adm-badge adm-badge-tr">Bank</span></td>
+                  </tr>
+                  <tr style={{ background:"#f0f4fa" }}>
+                    <td colSpan={2} style={{ fontWeight:700, color:"#5a6a85", fontSize:12, textTransform:"uppercase" }}>Total</td>
+                    <td style={{ textAlign:"right", fontWeight:700, fontSize:18, color:P }}>${(saldoCaja+saldoBanco).toLocaleString()}</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── TRASLADOS ── */}
+          {seccion==="traslados" && (
+            <div className="adm-card">
+              <div className="adm-card-hdr">
+                <h3 className="adm-card-ttl">Money Transfers</h3>
+                <span style={{ fontSize:12, color:"#8a97b0" }}>Record cash withdrawals and transfers between accounts</span>
+              </div>
+              {traslados.length===0 ? (
+                <div style={{ padding:"48px", textAlign:"center", color:"#b0bcd0" }}>
+                  <FaExchangeAlt style={{ fontSize:36, marginBottom:12, opacity:0.3 }} />
+                  <div style={{ fontWeight:700 }}>No transfers recorded</div>
+                </div>
+              ) : (
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {traslados.map(t => (
+                      <tr key={t.id}>
+                        <td style={{ color:"#8a97b0", fontSize:12 }}>{t.fecha}</td>
+                        <td style={{ fontWeight:600 }}>{t.de==="banco"?"Bank Account":"Petty Cash"}</td>
+                        <td style={{ fontWeight:600 }}>{t.a==="caja"?"Petty Cash":"Bank Account"}</td>
+                        <td style={{ textAlign:"right", fontWeight:700, color:"#FF9800" }}>${t.valor.toLocaleString()}</td>
+                        <td style={{ color:"#8a97b0", fontSize:12 }}>{t.observaciones||"—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* ── INGRESOS ── */}
+          {seccion==="ingresos" && (
+            <div className="adm-card">
+              <div className="adm-card-hdr">
+                <h3 className="adm-card-ttl">Cash Receipts — Income</h3>
+                <span style={{ fontSize:12, color:"#8a97b0" }}>Record money received from headquarters</span>
+              </div>
+              {ingresos.length===0 ? (
+                <div style={{ padding:"48px", textAlign:"center", color:"#b0bcd0" }}>
+                  <FaArrowDown style={{ fontSize:36, marginBottom:12, opacity:0.3 }} />
+                  <div style={{ fontWeight:700 }}>No income recorded</div>
+                </div>
+              ) : (
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>No.</th>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Origin</th>
+                      <th>Where</th>
+                      <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ingresos.map((ing,i) => (
+                      <tr key={ing.id}>
+                        <td style={{ color:"#8a97b0", fontSize:12 }}>RC-{i+1}</td>
+                        <td style={{ color:"#8a97b0", fontSize:12 }}>{ing.fecha}</td>
+                        <td>{ing.tipo}</td>
+                        <td style={{ fontWeight:600 }}>{ing.origen}</td>
+                        <td><span className="adm-badge adm-badge-tr">{ing.dondeIngresa==="caja"?"Petty Cash":"Bank"}</span></td>
+                        <td style={{ textAlign:"right", fontWeight:700, color:"#4CAF50" }}>${parseFloat(ing.valorRecibido).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ background:"#f0f4fa" }}>
+                      <td colSpan={5} style={{ fontWeight:700, color:"#5a6a85", fontSize:12, textTransform:"uppercase" }}>Total Income</td>
+                      <td style={{ textAlign:"right", fontWeight:700, fontSize:16, color:"#4CAF50" }}>${totalIngresos.toLocaleString()}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* ── GASTOS ── */}
+          {seccion==="gastos" && (
+            <>
+              {/* Filtros estilo Siigo */}
+              <div style={{ background:"white", borderRadius:12, border:"1px solid #e8edf5", padding:"16px 20px", marginBottom:16 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:12, fontSize:12, color:"#8a97b0", cursor:"pointer" }}>
+                  <FaFilter /> Hide search criteria
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+                  <div>
+                    <label style={labelCls}>Search</label>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, border:"1.5px solid #dde3ef", borderRadius:8, padding:"8px 12px" }}>
+                      <FaSearch style={{ color:"#b0bcd0", fontSize:13 }} />
+                      <input type="text" placeholder="Description..." value={busqueda} onChange={e=>setBusqueda(e.target.value)}
+                        style={{ border:"none", outline:"none", fontSize:13, fontFamily:"'Lato',sans-serif", color:"#1a2d5a", width:"100%" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelCls}>Transaction Type</label>
+                    <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)}
+                      style={{ ...inputCls, marginBottom:0 }} className="adm-input">
+                      <option value="">All</option>
+                      <option value="gasto_fijo">Fixed Expense</option>
+                      <option value="pago_misionero">Missionary Payment</option>
+                      <option value="otro_gasto">Other Expense</option>
+                    </select>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"flex-end", gap:10 }}>
+                    <button className="adm-btn adm-btn-p" style={{ flex:1, justifyContent:"center" }}>Search</button>
+                    <button className="adm-btn adm-btn-o" onClick={()=>{setBusqueda(""); setFiltroTipo("");}}>Clear</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="adm-card">
+                <div className="adm-card-hdr">
+                  <h3 className="adm-card-ttl">Purchases, Expenses — {MES_EN[mes]}</h3>
+                  <span style={{ fontSize:12, color:"#8a97b0" }}>{gastosFiltrados.length} records</span>
+                </div>
+                {gastosFiltrados.length===0 ? (
+                  <div style={{ padding:"48px", textAlign:"center", color:"#b0bcd0" }}>
+                    <FaFileInvoiceDollar style={{ fontSize:36, marginBottom:12, opacity:0.3 }} />
+                    <div style={{ fontWeight:700 }}>No expenses found</div>
+                  </div>
+                ) : (
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Receipt No.</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                        <th style={{ textAlign:"center", width:60 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gastosFiltrados.map((g,i) => (
+                        <tr key={g.id}>
+                          <td><span className="adm-badge adm-badge-out">
+                            { g.tipo==="gasto_fijo"?"Fixed"
+                            : g.tipo==="pago_misionero"?"Missionary"
+                            : "Other" }
+                          </span></td>
+                          <td style={{ color:`${P}`, fontWeight:600, fontSize:12 }}>RP-{año}-{String(i+1).padStart(4,"0")}</td>
+                          <td style={{ color:"#8a97b0", fontSize:12 }}>{g.fecha}</td>
+                          <td style={{ fontWeight:600 }}>{g.concepto}</td>
+                          <td style={{ textAlign:"right", fontWeight:700, color:"#f44336" }}>${g.monto.toLocaleString()}</td>
+                          <td style={{ textAlign:"center" }}>
+                            <button onClick={()=>eliminarGasto(g.id)} style={{ background:"none", border:"none", color:"#f44336", cursor:"pointer", fontSize:14 }}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr style={{ background:"#f0f4fa" }}>
+                        <td colSpan={4} style={{ fontWeight:700, color:"#5a6a85", fontSize:12, textTransform:"uppercase" }}>Total Expenses</td>
+                        <td style={{ textAlign:"right", fontWeight:700, fontSize:16, color:"#f44336" }}>${totalGastos.toLocaleString()}</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── REPORTES ── */}
+          {seccion==="reporte" && (
+            <div className="adm-card">
+              <div className="adm-card-hdr"><h3 className="adm-card-ttl">Financial Reports</h3></div>
+              <div style={{ padding:"20px 24px" }}>
+                {[
+                  { grupo:"Accounting", items:["Account List","Detailed Vouchers","Voucher Sequence","Financial Movement Report"] },
+                  { grupo:"Financial", items:["Financial Situation Statement","Trial Balance","Income Statement"] },
+                  { grupo:"Balances", items:["General Trial Balance","Balance by Country","Balance by Missionary"] },
+                ].map(g => (
+                  <div key={g.grupo} style={{ marginBottom:24 }}>
+                    <div style={{ fontWeight:700, color:"#1a2d5a", fontSize:13, marginBottom:10, fontFamily:"'Cinzel',serif" }}>{g.grupo}</div>
+                    {g.items.map(item => (
+                      <div key={item} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #f0f4fa", cursor:"pointer" }}
+                        onMouseOver={e=>e.currentTarget.style.paddingLeft="8px"}
+                        onMouseOut={e=>e.currentTarget.style.paddingLeft="0"}>
+                        <span style={{ fontSize:13, color:"#5a6a85", transition:"all 0.2s" }}>{item}</span>
+                        <FaFileAlt style={{ color:"#b0bcd0", fontSize:12 }} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* ── MODAL TRASLADO ── */}
+      {modalTraslado && (
+        <div className="adm-overlay" onClick={()=>setModalTraslado(false)}>
+          <div className="adm-modal" onClick={e=>e.stopPropagation()}>
+            <div className="adm-modal-hdr">
+              <h3 className="adm-modal-ttl">New Money Transfer</h3>
+              <button onClick={()=>setModalTraslado(false)} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#8a97b0" }}><FaTimes /></button>
+            </div>
+            <div className="adm-modal-body">
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+                <div>
+                  <label style={labelCls}>From</label>
+                  <select value={nuevoTraslado.de} onChange={e=>setNuevoTraslado({...nuevoTraslado, de:e.target.value})} style={{...inputCls, marginBottom:0}} className="adm-input">
+                    <option value="banco">Bank Account</option>
+                    <option value="caja">Petty Cash</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelCls}>To</label>
+                  <select value={nuevoTraslado.a} onChange={e=>setNuevoTraslado({...nuevoTraslado, a:e.target.value})} style={{...inputCls, marginBottom:0}} className="adm-input">
+                    <option value="caja">Petty Cash</option>
+                    <option value="banco">Bank Account</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+                <div>
+                  <label style={labelCls}>Date</label>
+                  <input type="date" value={nuevoTraslado.fecha} onChange={e=>setNuevoTraslado({...nuevoTraslado, fecha:e.target.value})} style={{...inputCls, marginBottom:0}} className="adm-input" />
+                </div>
+                <div>
+                  <label style={labelCls}>Amount (DOP)</label>
+                  <input type="number" placeholder="0.00" value={nuevoTraslado.valor} onChange={e=>setNuevoTraslado({...nuevoTraslado, valor:e.target.value})} style={{...inputCls, marginBottom:0}} className="adm-input" />
+                </div>
+              </div>
+              <label style={labelCls}>Notes</label>
+              <textarea value={nuevoTraslado.observaciones} onChange={e=>setNuevoTraslado({...nuevoTraslado, observaciones:e.target.value})}
+                style={{...inputCls, minHeight:70, resize:"vertical", marginBottom:0}} className="adm-input" placeholder="Optional notes..." />
+            </div>
+            <div className="adm-modal-ftr">
+              <button className="adm-btn adm-btn-p" style={{ flex:1, justifyContent:"center" }} onClick={guardarTraslado}><FaSave /> Save</button>
+              <button className="adm-btn adm-btn-o" style={{ flex:1, justifyContent:"center" }} onClick={()=>setModalTraslado(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL INGRESO ── */}
+      {modalIngreso && (
+        <div className="adm-overlay" onClick={()=>setModalIngreso(false)}>
+          <div className="adm-modal" onClick={e=>e.stopPropagation()}>
+            <div className="adm-modal-hdr">
+              <h3 className="adm-modal-ttl">New Cash Receipt — Income</h3>
+              <button onClick={()=>setModalIngreso(false)} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#8a97b0" }}><FaTimes /></button>
+            </div>
+            <div className="adm-modal-body">
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div>
+                  <label style={labelCls}>Type</label>
+                  <select value={nuevoIngreso.tipo} onChange={e=>setNuevoIngreso({...nuevoIngreso, tipo:e.target.value})} style={{...inputCls}} className="adm-input">
+                    <option>RC-1-Recibo de caja</option>
+                    <option>RC-2-Advance</option>
+                    <option>RC-3-Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelCls}>Date</label>
+                  <input type="date" value={nuevoIngreso.fecha} onChange={e=>setNuevoIngreso({...nuevoIngreso, fecha:e.target.value})} style={{...inputCls}} className="adm-input" />
+                </div>
+              </div>
+              <label style={labelCls}>Origin (Client / Sender)</label>
+              <input type="text" value={nuevoIngreso.origen} onChange={e=>setNuevoIngreso({...nuevoIngreso, origen:e.target.value})} style={{...inputCls}} className="adm-input" placeholder="e.g. World Olivet Assembly INC" />
+              <label style={labelCls}>Where the money enters</label>
+              <select value={nuevoIngreso.dondeIngresa} onChange={e=>setNuevoIngreso({...nuevoIngreso, dondeIngresa:e.target.value})} style={{...inputCls}} className="adm-input">
+                <option value="banco">Bank Account</option>
+                <option value="caja">Petty Cash</option>
+              </select>
+              <label style={labelCls}>Amount Received (DOP)</label>
+              <input type="number" placeholder="0.00" value={nuevoIngreso.valorRecibido} onChange={e=>setNuevoIngreso({...nuevoIngreso, valorRecibido:e.target.value})} style={{...inputCls}} className="adm-input" />
+              <label style={labelCls}>Notes</label>
+              <textarea value={nuevoIngreso.observaciones} onChange={e=>setNuevoIngreso({...nuevoIngreso, observaciones:e.target.value})}
+                style={{...inputCls, minHeight:70, resize:"vertical", marginBottom:0}} className="adm-input" placeholder="Optional notes..." />
+            </div>
+            <div className="adm-modal-ftr">
+              <button className="adm-btn adm-btn-s" style={{ flex:1, justifyContent:"center" }} onClick={guardarIngreso}><FaSave /> Save & Record</button>
+              <button className="adm-btn adm-btn-o" style={{ flex:1, justifyContent:"center" }} onClick={()=>setModalIngreso(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL GASTO (estilo factura de compra Siigo) ── */}
+      {modalGasto && (
+        <div className="adm-overlay" onClick={()=>setModalGasto(false)}>
+          <div className="adm-modal" onClick={e=>e.stopPropagation()} style={{ maxWidth:640 }}>
+            <div className="adm-modal-hdr">
+              <h3 className="adm-modal-ttl">New Purchase / Expense</h3>
+              <button onClick={()=>setModalGasto(false)} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#8a97b0" }}><FaTimes /></button>
+            </div>
+            <div className="adm-modal-body">
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+                <div>
+                  <label style={labelCls}>Type</label>
+                  <select value={nuevoGasto.tipo} onChange={e=>setNuevoGasto({...nuevoGasto, tipo:e.target.value})} style={{...inputCls}} className="adm-input">
+                    <option value="">Select...</option>
+                    <option value="gasto_fijo">Fixed Expense</option>
+                    <option value="pago_misionero">Missionary Payment</option>
+                    <option value="otro_gasto">Other Expense</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelCls}>Date</label>
+                  <input type="date" value={nuevoGasto.fecha} onChange={e=>setNuevoGasto({...nuevoGasto, fecha:e.target.value})} style={{...inputCls}} className="adm-input" />
+                </div>
+                <div>
+                  <label style={labelCls}>Payment Method</label>
+                  <select value={nuevoGasto.formaPago} onChange={e=>setNuevoGasto({...nuevoGasto, formaPago:e.target.value})} style={{...inputCls}} className="adm-input">
+                    {FORMAS_PAGO.map(f=><option key={f}>{f}</option>)}
+                  </select>
+                </div>
+              </div>
+              <label style={labelCls}>Supplier / Provider</label>
+              <input type="text" placeholder="e.g. Person or company name" value={nuevoGasto.proveedor} onChange={e=>setNuevoGasto({...nuevoGasto, proveedor:e.target.value})} style={{...inputCls}} className="adm-input" />
+              <label style={labelCls}>Category</label>
+              <select value={nuevoGasto.categoria} onChange={e=>setNuevoGasto({...nuevoGasto, categoria:e.target.value})} style={{...inputCls}} className="adm-input">
+                <option value="">Select category...</option>
+                {CATEGORIAS_GASTO.map(c=><option key={c.codigo} value={c.codigo}>{c.codigo} — {c.nombre}</option>)}
+              </select>
+
+              {/* Detalle del gasto */}
+              <div style={{ border:"1px solid #e8edf5", borderRadius:8, overflow:"hidden", marginBottom:12 }}>
+                <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                  <thead>
+                    <tr style={{ background:"#fafbfd" }}>
+                      <th style={{ padding:"8px 12px", fontSize:11, fontWeight:700, color:"#8a97b0", textAlign:"left", letterSpacing:0.8 }}>Description *</th>
+                      <th style={{ padding:"8px 12px", fontSize:11, fontWeight:700, color:"#8a97b0", textAlign:"right", letterSpacing:0.8, width:70 }}>Qty</th>
+                      <th style={{ padding:"8px 12px", fontSize:11, fontWeight:700, color:"#8a97b0", textAlign:"right", letterSpacing:0.8, width:100 }}>Unit Value</th>
+                      <th style={{ padding:"8px 12px", fontSize:11, fontWeight:700, color:"#8a97b0", textAlign:"right", letterSpacing:0.8, width:80 }}>Discount</th>
+                      <th style={{ padding:"8px 12px", fontSize:11, fontWeight:700, color:"#8a97b0", textAlign:"right", letterSpacing:0.8, width:100 }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding:"8px 12px" }}>
+                        <input type="text" placeholder="Description..." value={nuevoGasto.descripcion} onChange={e=>setNuevoGasto({...nuevoGasto, descripcion:e.target.value})}
+                          style={{ width:"100%", border:"none", outline:"none", fontSize:13, fontFamily:"'Lato',sans-serif", color:"#1a2d5a" }} />
+                      </td>
+                      <td style={{ padding:"8px 12px" }}>
+                        <input type="number" value={nuevoGasto.cantidad} onChange={e=>setNuevoGasto({...nuevoGasto, cantidad:parseInt(e.target.value)||1})}
+                          style={{ width:"100%", border:"none", outline:"none", fontSize:13, textAlign:"right", fontFamily:"'Lato',sans-serif", color:"#1a2d5a" }} />
+                      </td>
+                      <td style={{ padding:"8px 12px" }}>
+                        <input type="number" step="0.01" value={nuevoGasto.valorUnitario} onChange={e=>setNuevoGasto({...nuevoGasto, valorUnitario:parseFloat(e.target.value)||0})}
+                          style={{ width:"100%", border:"none", outline:"none", fontSize:13, textAlign:"right", fontFamily:"'Lato',sans-serif", color:"#1a2d5a" }} />
+                      </td>
+                      <td style={{ padding:"8px 12px" }}>
+                        <input type="number" step="0.01" value={nuevoGasto.descuento} onChange={e=>setNuevoGasto({...nuevoGasto, descuento:parseFloat(e.target.value)||0})}
+                          style={{ width:"100%", border:"none", outline:"none", fontSize:13, textAlign:"right", fontFamily:"'Lato',sans-serif", color:"#1a2d5a" }} />
+                      </td>
+                      <td style={{ padding:"8px 12px", textAlign:"right", fontWeight:700, color:P }}>
+                        ${((nuevoGasto.valorUnitario*nuevoGasto.cantidad)-nuevoGasto.descuento).toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totales estilo Siigo */}
+              <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                <div style={{ width:220 }}>
+                  {[
+                    { label:"Gross Total", val: nuevoGasto.valorUnitario*nuevoGasto.cantidad },
+                    { label:"Discounts",   val: nuevoGasto.descuento },
+                    { label:"Subtotal",    val: (nuevoGasto.valorUnitario*nuevoGasto.cantidad)-nuevoGasto.descuento, bold:true },
+                  ].map(r => (
+                    <div key={r.label} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #f0f4fa" }}>
+                      <span style={{ fontSize:12, color:"#8a97b0" }}>{r.label}:</span>
+                      <span style={{ fontSize:r.bold?15:12, fontWeight:r.bold?700:400, color:r.bold?P:"#1a2d5a" }}>${r.val.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", marginTop:4 }}>
+                    <span style={{ fontWeight:700, fontSize:13 }}>Total Neto:</span>
+                    <span style={{ fontWeight:700, fontSize:18, color:P }}>${((nuevoGasto.valorUnitario*nuevoGasto.cantidad)-nuevoGasto.descuento).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <label style={labelCls}>Notes</label>
+              <textarea value={nuevoGasto.observaciones} onChange={e=>setNuevoGasto({...nuevoGasto, observaciones:e.target.value})}
+                style={{...inputCls, minHeight:60, resize:"vertical", marginBottom:0}} className="adm-input" placeholder="Optional notes..." />
+            </div>
+            <div className="adm-modal-ftr">
+              <button className="adm-btn adm-btn-p" style={{ flex:1, justifyContent:"center" }} onClick={guardarGasto}><FaSave /> Save</button>
+              <button className="adm-btn adm-btn-o" style={{ flex:1, justifyContent:"center" }} onClick={()=>setModalGasto(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

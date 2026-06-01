@@ -138,7 +138,7 @@ export default function Login() {
           font-size: 14px;
           font-style: italic;
           color: rgba(255,255,255,0.65);
-          max-width: 320px;
+          max-width: 420px;
           line-height: 1.8;
         }
 
