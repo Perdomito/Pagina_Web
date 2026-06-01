@@ -18,7 +18,7 @@ const contactosService = {
   },
 
   update: async (id, datos) => {
-    const response = await API.put(`/contactos/${id}`, datos);
+    const response = await API.patch(`/contactos/${id}`, datos);
     return response.data;
   },
 

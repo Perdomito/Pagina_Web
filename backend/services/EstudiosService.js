@@ -1,34 +1,22 @@
-// ============================================
-// ESTUDIOS SERVICE
-// ============================================
 const { query, transaction } = require('../config/database');
 
 class EstudiosService {
-  // Guardar estudio (crear o actualizar)
   async guardarEstudio(datos) {
     const {
-      contacto_id,
-      miembro_responsable_id,
-      pais_id,
-      mes,
-      anio,
-      dia,
-      capitulo,
-      horas
+      contacto_id, miembro_responsable_id, pais_id,
+      mes, anio, dia, capitulo, horas
     } = datos;
 
     if (!contacto_id || !miembro_responsable_id || !pais_id || !mes || !anio || !dia) {
       throw new Error('Datos incompletos');
     }
 
-    // Verificar si ya existe
     const existente = await query(`
       SELECT id FROM estudios_biblicos
       WHERE contacto_id = $1 AND mes = $2 AND anio = $3 AND dia = $4
     `, [contacto_id, mes, anio, dia]);
 
     if (existente.rows.length > 0) {
-      // Actualizar
       const result = await query(`
         UPDATE estudios_biblicos
         SET capitulo = $1, horas = $2, miembro_responsable_id = $3, pais_id = $4
@@ -37,9 +25,8 @@ class EstudiosService {
       `, [capitulo, horas, miembro_responsable_id, pais_id, existente.rows[0].id]);
       return result.rows[0];
     } else {
-      // Crear
       const result = await query(`
-        INSERT INTO estudios_biblicos 
+        INSERT INTO estudios_biblicos
         (contacto_id, miembro_responsable_id, pais_id, mes, anio, dia, capitulo, horas)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
@@ -48,7 +35,6 @@ class EstudiosService {
     }
   }
 
-  // Obtener estudios por país y mes
   async getEstudiosPorPaisYMes(pais_id, mes, anio) {
     const result = await query(`
       SELECT e.*, c.nombre as contacto_nombre, m.nombre as miembro_nombre
@@ -62,7 +48,6 @@ class EstudiosService {
     return result.rows;
   }
 
-  // Guardar evangelismo
   async guardarEvangelismo(datos) {
     const { miembro_id, pais_id, mes, anio, dia, tipo, donde, horas } = datos;
 
@@ -70,7 +55,6 @@ class EstudiosService {
       throw new Error('Datos incompletos');
     }
 
-    // Verificar si existe
     const existente = await query(`
       SELECT id FROM evangelismo
       WHERE miembro_id = $1 AND mes = $2 AND anio = $3 AND dia = $4 AND tipo = $5
@@ -90,7 +74,6 @@ class EstudiosService {
     }
   }
 
-  // Obtener evangelismo
   async getEvangelismoPorPaisYMes(pais_id, mes, anio) {
     const result = await query(`
       SELECT e.*, m.nombre as miembro_nombre
@@ -103,7 +86,6 @@ class EstudiosService {
     return result.rows;
   }
 
-  // Guardar nuevos estudiantes
   async guardarNuevosEstudiantes(datos) {
     const { miembro_id, pais_id, mes, anio, dia, dijeron_si, nuevos_contactos } = datos;
 
@@ -127,7 +109,6 @@ class EstudiosService {
     }
   }
 
-  // Obtener nuevos estudiantes
   async getNuevosEstudiantesPorPaisYMes(pais_id, mes, anio) {
     const result = await query(`
       SELECT n.*, m.nombre as miembro_nombre
@@ -140,7 +121,6 @@ class EstudiosService {
     return result.rows;
   }
 
-  // Obtener resumen completo
   async getResumenCompleto(pais_id, mes, anio) {
     const [estudios, evangelismo, nuevosEstudiantes] = await Promise.all([
       this.getEstudiosPorPaisYMes(pais_id, mes, anio),
@@ -148,57 +128,44 @@ class EstudiosService {
       this.getNuevosEstudiantesPorPaisYMes(pais_id, mes, anio)
     ]);
 
-    return {
-      estudios,
-      evangelismo,
-      nuevosEstudiantes
-    };
+    return { estudios, evangelismo, nuevosEstudiantes };
   }
 
-  // Obtener datos para reporte
   async getReporteCompleto(pais_id, mes, anio, tipo = 'mensual') {
     try {
-// 1. Estudiantes que tomaron estudio en este mes
       const estudiantesActuales = await query(`
         SELECT COUNT(DISTINCT contacto_id) as total
         FROM estudios_biblicos
         WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
       `, [pais_id, mes, anio]);
 
-      // 2. Evangelismo (online = virtual, presencial)
       const evangelismo = await query(`
-        SELECT 
-          tipo,
-          SUM(horas) as total_horas
+        SELECT tipo, SUM(horas) as total_horas
         FROM evangelismo
         WHERE pais_id = $1 AND mes = $2 AND anio = $3
         GROUP BY tipo
       `, [pais_id, mes, anio]);
 
-      // 3. Número de estudios realizados
       const numeroEstudios = await query(`
         SELECT COUNT(*) as total
         FROM estudios_biblicos
         WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
       `, [pais_id, mes, anio]);
 
-      // 4. Nuevos contactos y dijeron que sí
       const nuevosEstudiantes = await query(`
-        SELECT 
+        SELECT
           SUM(nuevos_contactos) as total_contactos,
           SUM(dijeron_si) as total_dijeron_si
         FROM nuevos_estudiantes
         WHERE pais_id = $1 AND mes = $2 AND anio = $3
       `, [pais_id, mes, anio]);
 
-      // 5. Contactos que tomaron estudio (contactos con al menos 1 estudio)
       const contactosEstudian = await query(`
         SELECT COUNT(DISTINCT contacto_id) as total
         FROM estudios_biblicos
         WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
       `, [pais_id, mes, anio]);
 
-      // Procesar resultados
       const evangelismoVirtual = evangelismo.rows.find(e => e.tipo === 'Virtual')?.total_horas || 0;
       const evangelismoPresencial = evangelismo.rows.find(e => e.tipo === 'Presencial')?.total_horas || 0;
 
@@ -209,7 +176,6 @@ class EstudiosService {
         numeroEstudios: parseInt(numeroEstudios.rows[0]?.total || 0),
         nuevosContactos: parseInt(nuevosEstudiantes.rows[0]?.total_contactos || 0),
         contactosEstudian: parseInt(contactosEstudian.rows[0]?.total || 0),
-        // Datos futuros (dejar en 0 por ahora)
         hastRomanos4: 0,
         terminadoRomanos8: 0,
         terminado4Leyes: 0,

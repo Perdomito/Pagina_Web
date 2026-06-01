@@ -1,271 +1,163 @@
 import axios from '../api/axios';
 
 const administracionService = {
-  // Continentes
-  getAllContinentes: async () => {
-    try {
-      const response = await axios.get('/administracion/continentes');
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener continentes:', error);
-      throw error;
-    }
-  },
-
-  crearContinente: async (datos) => {
-    try {
-      const response = await axios.post('/administracion/continentes', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error al crear continente:', error);
-      throw error;
-    }
-  },
-
-  eliminarContinente: async (id) => {
-    try {
-      const response = await axios.delete(`/administracion/continentes/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error al eliminar continente:', error);
-      throw error;
-    }
-  },
-
-  // Países
   getAllPaises: async () => {
-    try {
-      const response = await axios.get('/administracion/paises');
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener países:', error);
-      throw error;
-    }
+    const response = await axios.get('/paises');
+    return response.data;
   },
 
   crearPais: async (datos) => {
-    try {
-      const response = await axios.post('/administracion/paises', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error al crear país:', error);
-      throw error;
-    }
+    const response = await axios.post('/paises', datos);
+    return response.data;
   },
 
   eliminarPais: async (id) => {
-    try {
-      const response = await axios.delete(`/administracion/paises/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error al eliminar país:', error);
-      throw error;
-    }
+    const response = await axios.delete(`/paises/${id}`);
+    return response.data;
   },
 
-  // Roles
+  getAllContinentes: async () => {
+    const response = await axios.get('/continentes');
+    const continentes = response.data;
+    const paises = await axios.get('/paises').then(r => r.data).catch(() => []);
+    return continentes.map(cont => ({
+      ...cont,
+      paises: paises
+        .filter(p => p.continente_id === cont.id)
+        .map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          continente: cont.nombre,
+          codigo_iso: p.iso || '',
+          activo: true
+        }))
+    }));
+  },
+
+  crearContinente: async (datos) => {
+    const response = await axios.post('/continentes', datos);
+    return response.data;
+  },
+
+  eliminarContinente: async (id) => {
+    const response = await axios.delete(`/continentes/${id}`);
+    return response.data;
+  },
+
+  crearPaisConContinente: async (datos) => {
+    const response = await axios.post('/paises', {
+      nombre: datos.nombre,
+      iso: datos.codigo_iso || ''
+    });
+    return { ...response.data, continente: datos.continente };
+  },
+
   getAllRoles: async () => {
-    try {
-      const response = await axios.get('/administracion/roles');
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener roles:', error);
-      throw error;
-    }
+    const response = await axios.get('/roles');
+    return response.data;
   },
 
-  // Estadísticas generales
   getEstadisticasGenerales: async (anio, filtros = {}) => {
-    try {
-      const response = await axios.get('/administracion/estadisticas', {
-        params: {
-          ...(anio ? { anio } : {}),
-          ...(filtros.anio_evangelismo ? { anio_evangelismo: filtros.anio_evangelismo } : {}),
-          ...(filtros.mes_evangelismo ? { mes_evangelismo: filtros.mes_evangelismo } : {}),
-          ...(filtros.modo_evangelismo ? { modo_evangelismo: filtros.modo_evangelismo } : {}),
-          ...(filtros.anio_comparacion_evangelismo ? { anio_comparacion_evangelismo: filtros.anio_comparacion_evangelismo } : {})
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
-      throw error;
-    }
+    const response = await axios.get('/estadisticas', {
+      params: { ...(anio ? { anio } : {}) }
+    });
+    return response.data;
   },
 
-  // ===== PRESUPUESTOS =====
   getPresupuestosPorPais: async (pais_id, anio) => {
-    try {
-      const response = await axios.get('/administracion/presupuestos', {
-        params: { pais_id, anio }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener presupuestos:', error);
-      throw error;
-    }
+    const response = await axios.get('/presupuestos', {
+      params: { pais_id, anio }
+    });
+    return response.data;
   },
 
   getDetallePresupuesto: async (pais_id, mes, anio) => {
-    try {
-      const response = await axios.get('/administracion/presupuestos/detalle', {
-        params: { pais_id, mes, anio }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener detalle de presupuesto:', error);
-      throw error;
-    }
+    const response = await axios.get('/presupuestos', {
+      params: { pais_id, mes, anio }
+    });
+    return response.data;
   },
 
   agregarItemPresupuesto: async (datos) => {
-    try {
-      const response = await axios.post('/administracion/presupuestos', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error al agregar item:', error);
-      throw error;
-    }
+    const response = await axios.post('/presupuestos', datos);
+    return response.data;
   },
 
   eliminarItemPresupuesto: async (id) => {
-    try {
-      const response = await axios.delete(`/administracion/presupuestos/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error al eliminar item:', error);
-      throw error;
-    }
+    const response = await axios.delete(`/presupuestos/${id}`);
+    return response.data;
   },
 
-  // ===== EJECUCIONES =====
   getEjecucionesPorPais: async (pais_id, anio) => {
-    try {
-      const response = await axios.get('/administracion/ejecuciones', {
-        params: { pais_id, anio }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener ejecuciones:', error);
-      throw error;
-    }
+    const response = await axios.get('/ejecuciones', {
+      params: { pais_id, anio }
+    });
+    return response.data;
   },
 
   crearEjecucion: async (datos) => {
-    try {
-      const response = await axios.post('/administracion/ejecuciones', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error al crear ejecución:', error);
-      throw error;
-    }
+    const response = await axios.post('/ejecuciones', datos);
+    return response.data;
   },
 
   actualizarMontoEjecucion: async (id, monto_recibido_usd) => {
-    try {
-      const response = await axios.put(`/administracion/ejecuciones/${id}/monto`, {
-        monto_recibido_usd
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error al actualizar monto:', error);
-      throw error;
-    }
+    const response = await axios.patch(`/ejecuciones/${id}`, {
+      monto_recibido_usd
+    });
+    return response.data;
   },
 
   getGastosReales: async (ejecucion_id) => {
-    try {
-      const response = await axios.get(`/administracion/ejecuciones/${ejecucion_id}/gastos`);
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener gastos reales:', error);
-      throw error;
-    }
+    const response = await axios.get('/gastos-reales', {
+      params: { ejecucion_id }
+    });
+    return response.data;
   },
 
   agregarGastoReal: async (datos) => {
-    try {
-      const response = await axios.post('/administracion/ejecuciones/gastos', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error al agregar gasto real:', error);
-      throw error;
-    }
+    const response = await axios.post('/gastos-reales', datos);
+    return response.data;
   },
 
   eliminarGastoReal: async (id) => {
-    try {
-      const response = await axios.delete(`/administracion/ejecuciones/gastos/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error al eliminar gasto real:', error);
-      throw error;
-    }
+    const response = await axios.delete(`/gastos-reales/${id}`);
+    return response.data;
   },
 
-  // ===== COTIZACIONES =====
   getAllCotizaciones: async () => {
-    try {
-      const response = await axios.get('/administracion/cotizaciones');
-      return response.data;
-    } catch (error) {
-      console.error('Error al obtener cotizaciones:', error);
-      throw error;
-    }
+    const response = await axios.get('/cotizaciones');
+    return response.data;
   },
 
   crearCotizacion: async (datos) => {
-    try {
-      const response = await axios.post('/administracion/cotizaciones', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error al crear cotización:', error);
-      throw error;
-    }
+    const response = await axios.post('/cotizaciones', datos);
+    return response.data;
   },
 
   aprobarCotizacion: async (id, mes_agregado, anio_agregado) => {
-    try {
-      const response = await axios.put(`/administracion/cotizaciones/${id}/aprobar`, {
-        mes_agregado,
-        anio_agregado
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error al aprobar cotización:', error);
-      throw error;
-    }
+    const response = await axios.patch(`/cotizaciones/${id}`, {
+      estado: 'aprobado',
+      mes_agregado,
+      anio_agregado
+    });
+    return response.data;
   },
 
   rechazarCotizacion: async (id) => {
-    try {
-      const response = await axios.put(`/administracion/cotizaciones/${id}/rechazar`);
-      return response.data;
-    } catch (error) {
-      console.error('Error al rechazar cotización:', error);
-      throw error;
-    }
+    const response = await axios.patch(`/cotizaciones/${id}`, {
+      estado: 'rechazado'
+    });
+    return response.data;
   },
 
-  // ===== CONFIGURACIÓN =====
   getTasaCambio: async () => {
-    try {
-      const response = await axios.get('/administracion/configuracion/tasa-cambio');
-      return response.data.tasa_cambio;
-    } catch (error) {
-      console.error('Error al obtener tasa de cambio:', error);
-      throw error;
-    }
+    const response = await axios.get('/configuracion/tasa_cambio');
+    return response.data.valor;
   },
 
   actualizarTasaCambio: async (tasa) => {
-    try {
-      const response = await axios.put('/administracion/configuracion/tasa-cambio', { tasa });
-      return response.data;
-    } catch (error) {
-      console.error('Error al actualizar tasa de cambio:', error);
-      throw error;
-    }
+    const response = await axios.patch('/configuracion/tasa_cambio', { valor: tasa });
+    return response.data;
   }
 };
 

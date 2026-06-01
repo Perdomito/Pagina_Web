@@ -23,6 +23,28 @@ class CotizacionEstadoEnum(str, enum.Enum):
     rechazado = "rechazado"
 
 
+class EstadoPresenciaMisionEnum(str, enum.Enum):
+    con_iglesia = "Con iglesia"
+    evangelizado = "Evangelizado"
+    en_proceso = "En proceso"
+
+
+class CuentaTipoEnum(str, enum.Enum):
+    banco = "Banco"
+    caja = "Caja"
+
+
+class TipoSangreEnum(str, enum.Enum):
+    a_positivo = "A+"
+    a_negativo = "A-"
+    b_positivo = "B+"
+    b_negativo = "B-"
+    ab_positivo = "AB+"
+    ab_negativo = "AB-"
+    o_positivo = "O+"
+    o_negativo = "O-"
+
+
 # ── Models ─────────────────────────────────────────────────────────────────
 
 class Pais(Base):
@@ -31,6 +53,7 @@ class Pais(Base):
     id = Column(Integer, primary_key=True)
     iso = Column(String(2))
     nombre = Column(String(100), nullable=False)
+    continente_id = Column(Integer, ForeignKey("continentes.id", ondelete="SET NULL"))
 
     miembros = relationship("Miembro", back_populates="pais_rel")
     contactos = relationship("Contacto", back_populates="pais_rel")
@@ -39,6 +62,10 @@ class Pais(Base):
     ejecuciones = relationship("Ejecucion", back_populates="pais_rel")
     estadisticas = relationship("EstadisticaPais", back_populates="pais_rel")
     ciudades = relationship("Ciudad", back_populates="pais_rel")
+    ingresos = relationship("Ingreso", back_populates="pais_rel")
+    saldos = relationship("SaldoCajaBanco", back_populates="pais_rel")
+    traslados = relationship("Traslado", back_populates="pais_rel")
+    continente_rel = relationship("Continente", back_populates="paises")
 
 
 class Ciudad(Base):
@@ -59,6 +86,7 @@ class Ciudad(Base):
     miembros = relationship("Miembro", back_populates="ciudad_rel")
     contactos = relationship("Contacto", back_populates="ciudad_rel")
     reportes = relationship("Reporte", back_populates="ciudad_rel")
+    misiones = relationship("CiudadMision", back_populates="ciudad_rel")
 
 
 class Rol(Base):
@@ -118,6 +146,8 @@ class Miembro(Base):
     contactos = relationship("Contacto", back_populates="miembro_rel")
     reportes = relationship("Reporte", back_populates="miembro_rel")
     cotizaciones = relationship("Cotizacion", back_populates="miembro_rel")
+    info_adicional = relationship("MiembroInfoAdicional", back_populates="miembro_rel", uselist=False)
+    estudios_diarios = relationship("EstudioDiario", back_populates="miembro_rel")
 
 
 class Contacto(Base):
@@ -265,3 +295,114 @@ class Configuracion(Base):
     valor = Column(Text, nullable=False)
     descripcion = Column(Text)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CiudadMision(Base):
+    __tablename__ = "ciudades_mision"
+
+    id = Column(Integer, primary_key=True)
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"), nullable=False)
+    region = Column(String(150))
+    estado_presencia = Column(SAEnum(EstadoPresenciaMisionEnum, name="estado_presencia_mision_enum"), nullable=False, default=EstadoPresenciaMisionEnum.en_proceso)
+    fecha_inicio_trabajo = Column(Date)
+    pastor_encargado_id = Column(String(30))
+    pastor_encargado_nombre = Column(Text)
+    cantidad_miembros_activos = Column(Integer, default=0)
+    notas = Column(Text)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    ciudad_rel = relationship("Ciudad", back_populates="misiones")
+
+
+class Ingreso(Base):
+    __tablename__ = "ingresos"
+
+    id = Column(Integer, primary_key=True)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    mes = Column(Integer, nullable=False)
+    anio = Column(Integer, nullable=False)
+    tipo = Column(String(100), nullable=False)
+    origen = Column(Text)
+    donde_ingresa = Column(SAEnum(CuentaTipoEnum, name="cuenta_tipo_enum"), nullable=False)
+    valor = Column(Numeric(15, 2), nullable=False)
+    observaciones = Column(Text)
+    fecha = Column(Date, nullable=False)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    pais_rel = relationship("Pais", back_populates="ingresos")
+
+
+class MiembroInfoAdicional(Base):
+    __tablename__ = "miembros_info_adicional"
+
+    miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="CASCADE"), primary_key=True)
+    nombre_padre = Column(Text)
+    telefono_padre = Column(String(30))
+    nombre_madre = Column(Text)
+    telefono_madre = Column(String(30))
+    tipo_sangre = Column(SAEnum(TipoSangreEnum, name="tipo_sangre_enum"))
+    correo_electronico = Column(String(255))
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    miembro_rel = relationship("Miembro", back_populates="info_adicional")
+
+
+class SaldoCajaBanco(Base):
+    __tablename__ = "saldos_caja_banco"
+
+    id = Column(Integer, primary_key=True)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    saldo_caja = Column(Numeric(15, 2), nullable=False, default=0)
+    saldo_banco = Column(Numeric(15, 2), nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    pais_rel = relationship("Pais", back_populates="saldos")
+
+
+class Traslado(Base):
+    __tablename__ = "traslados"
+
+    id = Column(Integer, primary_key=True)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    de = Column(SAEnum(CuentaTipoEnum, name="cuenta_tipo_enum"), nullable=False)
+    a = Column(SAEnum(CuentaTipoEnum, name="cuenta_tipo_enum"), nullable=False)
+    valor = Column(Numeric(15, 2), nullable=False)
+    observaciones = Column(Text)
+    fecha = Column(Date, nullable=False)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    pais_rel = relationship("Pais", back_populates="traslados")
+
+
+class Continente(Base):
+    __tablename__ = "continentes"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(100), nullable=False, unique=True)
+
+    paises = relationship("Pais", back_populates="continente_rel")
+
+
+class EstudioDiario(Base):
+    __tablename__ = "estudios_diarios"
+
+    id = Column(Integer, primary_key=True)
+    miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="CASCADE"), nullable=False)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    contacto_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"))
+    mes = Column(Integer, nullable=False)
+    anio = Column(Integer, nullable=False)
+    dia = Column(Integer, nullable=False)
+    capitulo = Column(String(255))
+    horas = Column(Numeric(5, 2))
+    tipo = Column(String(50))
+    donde = Column(String(255))
+    dijeron_si = Column(Integer, default=0)
+    nuevos_contactos = Column(Integer, default=0)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    miembro_rel = relationship("Miembro", back_populates="estudios_diarios")
+    pais_rel = relationship("Pais")
+    contacto_rel = relationship("Contacto")

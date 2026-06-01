@@ -65,8 +65,8 @@ const cargarDatosIniciales = async () => {
   try {
     setCargandoDatos(true);
     
-    // Cargar continentes desde la BD
     const continentesData = await administracionService.getAllContinentes();
+    setContinentes(continentesData);
     
     // Cargar countries desde la API
     const paisesData = await administracionService.getAllPaises();
@@ -555,7 +555,7 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
   if (horasActual > 0 || capituloActual) {
     estudiosService.guardarEstudio({
       contacto_id: estudianteId,
-      miembro_responsable_id: misioneroId,
+      miembro_id: misioneroId,
       pais_id: paisSeleccionado,
       mes: mesSeleccionado,
       anio: añoActual,
@@ -636,11 +636,10 @@ const agregarPais = async () => {
     }
     
     // Crear país en la BD
-const nuevoPais = await administracionService.crearPais({
+const nuevoPais = await administracionService.crearPaisConContinente({
       nombre: nuevoNombrePais.trim(),
       continente: continente.nombre,
-      codigo_iso: '', // Opcional
-      activo: true
+      codigo_iso: '',
     });
     
     // Actualizar estado local
@@ -1884,7 +1883,7 @@ const eliminarPais = async (continenteId, paisId) => {
                         promesasStudies.push(
                           estudiosService.guardarEstudio({
                             contacto_id: nuevoContacto.id,
-                            miembro_responsable_id: misioneroSeleccionado,
+                            miembro_id: misioneroSeleccionado,
                             pais_id: paisSeleccionado,
                             mes: mesSeleccionado,
                             anio: añoActual,

@@ -1,12 +1,7 @@
-// ============================================
-// REPORTES SERVICE
-// ============================================
 const { query } = require('../config/database');
 
 class ReportesService {
-  // Generar reporte automático desde datos de estudios
   async generarReporte(pais_id, mes, anio, tipo = 'Mensual') {
-    // Obtener datos de estudios bíblicos
     const estudios = await query(`
       SELECT COUNT(DISTINCT contacto_id) as total_estudiantes,
              COUNT(*) FILTER (WHERE capitulo IS NOT NULL AND capitulo != '') as numero_estudios,
@@ -15,25 +10,23 @@ class ReportesService {
       WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND activo = TRUE
     `, [pais_id, mes, anio]);
 
-    // Obtener evangelismo
     const evangelismo = await query(`
-      SELECT 
+      SELECT
         SUM(horas) FILTER (WHERE tipo = 'Virtual') as evangelismo_online,
         SUM(horas) FILTER (WHERE tipo = 'Presencial') as evangelismo_presencial
       FROM evangelismo
       WHERE pais_id = $1 AND mes = $2 AND anio = $3
     `, [pais_id, mes, anio]);
 
-    // Obtener nuevos estudiantes
     const nuevos = await query(`
-      SELECT 
+      SELECT
         SUM(dijeron_si) as contactos_estudian,
         SUM(nuevos_contactos) as nuevos_contactos
       FROM nuevos_estudiantes
       WHERE pais_id = $1 AND mes = $2 AND anio = $3
     `, [pais_id, mes, anio]);
 
-    const datosReporte = {
+    return {
       pais_id,
       mes,
       anio,
@@ -50,11 +43,8 @@ class ReportesService {
       probabilidad_miembro: 0,
       ovejas_potenciales: 0
     };
-
-    return datosReporte;
   }
 
-  // Guardar reporte
   async guardarReporte(datos) {
     const {
       pais_id, mes, anio, tipo, estudiantes_actuales,
@@ -62,7 +52,6 @@ class ReportesService {
       nuevos_contactos, contactos_estudian, observaciones
     } = datos;
 
-    // Verificar si ya existe
     const existente = await query(`
       SELECT id FROM reportes
       WHERE pais_id = $1 AND mes = $2 AND anio = $3 AND tipo = $4
@@ -104,7 +93,6 @@ class ReportesService {
     }
   }
 
-  // Obtener reportes históricos
   async getHistorico(pais_id, limit = 12) {
     const result = await query(`
       SELECT r.*, p.nombre as pais_nombre
@@ -118,7 +106,6 @@ class ReportesService {
     return result.rows;
   }
 
-  // Obtener reporte específico
   async getReporte(pais_id, mes, anio, tipo) {
     const result = await query(`
       SELECT r.*, p.nombre as pais_nombre
@@ -128,7 +115,6 @@ class ReportesService {
     `, [pais_id, mes, anio, tipo]);
 
     if (result.rows.length === 0) {
-      // Si no existe, generarlo automáticamente
       return await this.generarReporte(pais_id, mes, anio, tipo);
     }
 

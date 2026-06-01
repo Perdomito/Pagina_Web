@@ -1,82 +1,71 @@
-// ============================================
-// CONTACTOS SERVICE
-// ============================================
-const { query } = require('../config/database');
+const pythonApi = require('../config/pythonApi');
 
 class ContactosService {
   async getAll(filtros = {}) {
-    let sql = `
-      SELECT c.*, m.nombre as miembro_nombre, p.nombre as pais_nombre
-      FROM contactos c
-      LEFT JOIN miembros m ON c.miembro_id = m.id
-      LEFT JOIN paises p ON c.pais_id = p.id
-      WHERE c.activo = TRUE
-    `;
-    const params = [];
+    const params = {};
+    if (filtros.miembro_id) params.miembro_responsable_id = filtros.miembro_id;
+    if (filtros.pais_id) params.pais_id = filtros.pais_id;
 
-    if (filtros.miembro_id) {
-      params.push(filtros.miembro_id);
-      sql += ` AND c.miembro_id = $${params.length}`;
-    }
-
-    if (filtros.pais_id) {
-      params.push(filtros.pais_id);
-      sql += ` AND c.pais_id = $${params.length}`;
-    }
-
-    sql += ' ORDER BY c.created_at DESC';
-    const result = await query(sql, params);
-    return result.rows;
+    const response = await pythonApi.get('/contactos', { params });
+    return response.data.map(c => ({
+      ...c,
+      miembro_nombre: c.miembro_responsable || null,
+      pais_nombre: c.pais || null,
+      activo: c.activo !== undefined ? c.activo : true
+    }));
   }
 
   async getById(id) {
-    const result = await query(`
-      SELECT c.*, m.nombre as miembro_nombre, p.nombre as pais_nombre
-      FROM contactos c
-      LEFT JOIN miembros m ON c.miembro_id = m.id
-      LEFT JOIN paises p ON c.pais_id = p.id
-      WHERE c.id = $1
-    `, [id]);
-
-    if (result.rows.length === 0) {
-      throw new Error('Contacto no encontrado');
-    }
-    return result.rows[0];
+    const response = await pythonApi.get(`/contactos/${id}`);
+    const c = response.data;
+    return {
+      ...c,
+      miembro_nombre: c.miembro_responsable || null,
+      pais_nombre: c.pais || null,
+      activo: c.activo !== undefined ? c.activo : true
+    };
   }
 
   async create(datos) {
-    const { miembro_id, nombre, telefono, pais_id, notas, estado } = datos;
-
-    if (!miembro_id || !nombre) {
+    if (!datos.miembro_id || !datos.nombre) {
       throw new Error('Miembro y nombre son requeridos');
     }
 
-    const result = await query(`
-      INSERT INTO contactos (miembro_id, nombre, telefono, pais_id, notas, estado)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-    `, [miembro_id, nombre, telefono, pais_id, notas, estado || 'Nuevo']);
+    const payload = {
+      miembro_responsable: datos.miembro_nombre || datos.miembro_responsable || '',
+      nombre: datos.nombre,
+      telefono: datos.telefono || null,
+      pais: datos.pais_nombre || datos.pais || null,
+      notas: datos.notas || null,
+      profesion: datos.profesion || null,
+      pais_id: datos.pais_id || null,
+      miembro_responsable_id: datos.miembro_id || datos.miembro_responsable_id || null,
+      ciudad_id: datos.ciudad_id || null
+    };
 
-    return result.rows[0];
+    const response = await pythonApi.post('/contactos', payload);
+    return response.data;
   }
 
   async update(id, datos) {
     await this.getById(id);
-    const { nombre, telefono, pais_id, notas, estado } = datos;
 
-    const result = await query(`
-      UPDATE contactos SET
-        nombre = $1, telefono = $2, pais_id = $3, notas = $4, estado = $5
-      WHERE id = $6
-      RETURNING *
-    `, [nombre, telefono, pais_id, notas, estado, id]);
+    const payload = {};
+    if (datos.nombre !== undefined) payload.nombre = datos.nombre;
+    if (datos.telefono !== undefined) payload.telefono = datos.telefono;
+    if (datos.pais !== undefined) payload.pais = datos.pais;
+    if (datos.notas !== undefined) payload.notas = datos.notas;
+    if (datos.profesion !== undefined) payload.profesion = datos.profesion;
+    if (datos.pais_id !== undefined) payload.pais_id = datos.pais_id;
+    if (datos.miembro_responsable_id !== undefined) payload.miembro_responsable_id = datos.miembro_responsable_id;
+    if (datos.ciudad_id !== undefined) payload.ciudad_id = datos.ciudad_id;
 
-    return result.rows[0];
+    const response = await pythonApi.patch(`/contactos/${id}`, payload);
+    return response.data;
   }
 
   async delete(id) {
-    await this.getById(id);
-    await query('UPDATE contactos SET activo = FALSE WHERE id = $1', [id]);
+    await pythonApi.delete(`/contactos/${id}`);
     return { message: 'Contacto eliminado' };
   }
 }

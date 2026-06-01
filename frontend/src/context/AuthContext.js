@@ -3,7 +3,6 @@ import API from '../api/axios';
 
 export const AuthContext = createContext();
 
-// Hook personalizado para usar el contexto
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -19,28 +18,21 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
     if (token && userData) {
       setUser(JSON.parse(userData));
-      API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
     setLoading(false);
   }, []);
 
   const login = async (email, password) => {
-    try {
-      const response = await API.post('/auth/login', { email, password });
-      const { token, usuario } = response.data;
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(usuario));
-      setUser(usuario);
-      API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      return usuario;
-    } catch (error) {
-      throw new Error(error.response?.data?.error || 'Error al iniciar sesión');
-    }
+    const response = await API.post('/auth/login', { email, password });
+    const { token, usuario } = response.data;
+
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(usuario));
+    setUser(usuario);
+
+    return usuario;
   };
 
   const logout = () => {

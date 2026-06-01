@@ -1,202 +1,106 @@
-// ============================================
-// MIEMBROS SERVICE
-// ============================================
-// Lógica de negocio para misioneros/miembros
-
-const { query, transaction } = require('../config/database');
+const pythonApi = require('../config/pythonApi');
 
 class MiembrosService {
-  // Obtener todos los miembros
   async getAll(filtros = {}) {
-    let sql = `
-      SELECT m.*, p.nombre as pais_nombre, p.continente
-      FROM miembros m
-      LEFT JOIN paises p ON m.pais_id = p.id
-      WHERE m.activo = TRUE
-    `;
-    const params = [];
+    const params = {};
+    if (filtros.pais_id) params.pais_id = filtros.pais_id;
+    if (filtros.tipo_miembro) params.tipo = filtros.tipo_miembro;
 
-    // Filtros opcionales
-    if (filtros.pais_id) {
-      params.push(filtros.pais_id);
-      sql += ` AND m.pais_id = $${params.length}`;
-    }
-
-    if (filtros.tipo_miembro) {
-      params.push(filtros.tipo_miembro);
-      sql += ` AND m.tipo_miembro = $${params.length}`;
-    }
+    const response = await pythonApi.get('/miembros', { params });
+    let miembros = response.data;
 
     if (filtros.busqueda) {
-      params.push(`%${filtros.busqueda}%`);
-      sql += ` AND (m.nombre ILIKE $${params.length} OR m.identidad ILIKE $${params.length})`;
-    }
-
-    sql += ' ORDER BY m.nombre ASC';
-
-    const result = await query(sql, params);
-    return result.rows;
-  }
-
-  // Obtener por ID
-  async getById(id) {
-    const result = await query(`
-      SELECT m.*, p.nombre as pais_nombre, p.continente
-      FROM miembros m
-      LEFT JOIN paises p ON m.pais_id = p.id
-      WHERE m.id = $1
-    `, [id]);
-
-    if (result.rows.length === 0) {
-      throw new Error('Miembro no encontrado');
-    }
-
-    return result.rows[0];
-  }
-
-  // Crear miembro
-  async create(datos) {
-    const {
-      nombre,
-      identidad,
-      pais_id,
-      ciudad,
-      edad,
-      evangelizado_por,
-      estado_civil,
-      profesion,
-      comentarios,
-      tipo_miembro,
-      cargo_funcion,
-      ministerio_of,
-      avance_audio
-    } = datos;
-
-    // Validaciones
-    if (!nombre || !pais_id) {
-      throw new Error('Nombre y país son requeridos');
-    }
-
-    // Verificar si la identidad ya existe
-    if (identidad) {
-      const existente = await query(
-        'SELECT id FROM miembros WHERE identidad = $1',
-        [identidad]
+      const term = filtros.busqueda.toLowerCase();
+      miembros = miembros.filter(m =>
+        (m.nombre && m.nombre.toLowerCase().includes(term)) ||
+        (m.identidad && m.identidad.toLowerCase().includes(term))
       );
-
-      if (existente.rows.length > 0) {
-        throw new Error('La identidad ya está registrada');
-      }
     }
 
-    const result = await query(`
-      INSERT INTO miembros (
-        nombre, identidad, pais_id, ciudad, edad,
-        evangelizado_por, estado_civil, profesion, comentarios,
-        tipo_miembro, cargo_funcion, ministerio_of, avance_audio
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING *
-    `, [
-      nombre, identidad, pais_id, ciudad, edad,
-      evangelizado_por, estado_civil, profesion, comentarios,
-      tipo_miembro || 'Registrado', cargo_funcion, ministerio_of, avance_audio
-    ]);
-
-    return result.rows[0];
+    return miembros.map(m => ({
+      ...m,
+      pais_nombre: m.pais || null,
+      activo: m.activo !== undefined ? m.activo : true
+    }));
   }
 
-  // Actualizar miembro
-  async update(id, datos) {
-    const {
-      nombre,
-      identidad,
-      pais_id,
-      ciudad,
-      edad,
-      evangelizado_por,
-      estado_civil,
-      profesion,
-      comentarios,
-      tipo_miembro,
-      cargo_funcion,
-      ministerio_of,
-      avance_audio
-    } = datos;
+  async getById(id) {
+    const response = await pythonApi.get(`/miembros/${id}`);
+    const m = response.data;
+    return {
+      ...m,
+      pais_nombre: m.pais || null,
+      activo: m.activo !== undefined ? m.activo : true
+    };
+  }
 
-    // Verificar que el miembro existe
+  async create(datos) {
+    if (!datos.nombre || !datos.pais_id) {
+      throw new Error('Nombre y pais son requeridos');
+    }
+
+    const payload = {
+      nombre: datos.nombre,
+      identidad: datos.identidad || null,
+      pais: datos.pais_nombre || null,
+      ciudad: datos.ciudad || null,
+      edad: datos.edad || null,
+      evangelizado_por: datos.evangelizado_por || null,
+      estado_civil: datos.estado_civil || null,
+      profesion: datos.profesion || null,
+      comentarios: datos.comentarios || null,
+      tipo_miembro: datos.tipo_miembro || 'Registrado',
+      pais_id: datos.pais_id,
+      ciudad_id: datos.ciudad_id || null
+    };
+
+    if (datos.id) {
+      payload.id = datos.id;
+    }
+
+    const response = await pythonApi.post('/miembros', payload);
+    return response.data;
+  }
+
+  async update(id, datos) {
     await this.getById(id);
 
-    // Verificar identidad duplicada (excepto el mismo miembro)
-    if (identidad) {
-      const existente = await query(
-        'SELECT id FROM miembros WHERE identidad = $1 AND id != $2',
-        [identidad, id]
-      );
+    const payload = {};
+    if (datos.nombre !== undefined) payload.nombre = datos.nombre;
+    if (datos.identidad !== undefined) payload.identidad = datos.identidad;
+    if (datos.pais !== undefined) payload.pais = datos.pais;
+    if (datos.ciudad !== undefined) payload.ciudad = datos.ciudad;
+    if (datos.edad !== undefined) payload.edad = datos.edad;
+    if (datos.evangelizado_por !== undefined) payload.evangelizado_por = datos.evangelizado_por;
+    if (datos.estado_civil !== undefined) payload.estado_civil = datos.estado_civil;
+    if (datos.profesion !== undefined) payload.profesion = datos.profesion;
+    if (datos.comentarios !== undefined) payload.comentarios = datos.comentarios;
+    if (datos.tipo_miembro !== undefined) payload.tipo_miembro = datos.tipo_miembro;
+    if (datos.pais_id !== undefined) payload.pais_id = datos.pais_id;
+    if (datos.ciudad_id !== undefined) payload.ciudad_id = datos.ciudad_id;
 
-      if (existente.rows.length > 0) {
-        throw new Error('La identidad ya está registrada');
-      }
-    }
-
-    const result = await query(`
-      UPDATE miembros SET
-        nombre = $1,
-        identidad = $2,
-        pais_id = $3,
-        ciudad = $4,
-        edad = $5,
-        evangelizado_por = $6,
-        estado_civil = $7,
-        profesion = $8,
-        comentarios = $9,
-        tipo_miembro = $10,
-        cargo_funcion = $11,
-        ministerio_of = $12,
-        avance_audio = $13
-      WHERE id = $14
-      RETURNING *
-    `, [
-      nombre, identidad, pais_id, ciudad, edad,
-      evangelizado_por, estado_civil, profesion, comentarios,
-      tipo_miembro, cargo_funcion, ministerio_of, avance_audio, id
-    ]);
-
-    return result.rows[0];
+    const response = await pythonApi.patch(`/miembros/${id}`, payload);
+    return response.data;
   }
 
-  // Eliminar miembro (soft delete)
   async delete(id) {
-    await this.getById(id); // Verificar que existe
-
-    await query(
-      'UPDATE miembros SET activo = FALSE WHERE id = $1',
-      [id]
-    );
-
+    await pythonApi.delete(`/miembros/${id}`);
     return { message: 'Miembro eliminado exitosamente' };
   }
 
-  // Obtener estadísticas
   async getEstadisticas(pais_id = null) {
-    let sql = `
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE tipo_miembro = 'Comprometido') as comprometidos,
-        COUNT(*) FILTER (WHERE tipo_miembro = 'Registrado') as registrados,
-        COUNT(*) FILTER (WHERE tipo_miembro = 'Voluntario') as voluntarios
-      FROM miembros
-      WHERE activo = TRUE
-    `;
+    const params = {};
+    if (pais_id) params.pais_id = pais_id;
 
-    const params = [];
-    if (pais_id) {
-      params.push(pais_id);
-      sql += ` AND pais_id = $1`;
-    }
+    const response = await pythonApi.get('/miembros', { params });
+    const miembros = response.data;
 
-    const result = await query(sql, params);
-    return result.rows[0];
+    const total = miembros.length;
+    const comprometidos = miembros.filter(m => m.tipo_miembro === 'Comprometido').length;
+    const registrados = miembros.filter(m => m.tipo_miembro === 'Registrado').length;
+    const voluntarios = miembros.filter(m => m.tipo_miembro === 'Voluntario').length;
+
+    return { total, comprometidos, registrados, voluntarios };
   }
 }
 

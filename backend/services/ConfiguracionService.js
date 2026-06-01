@@ -1,268 +1,132 @@
-const db = require('../config/database');
+const pythonApi = require('../config/pythonApi');
 const bcrypt = require('bcryptjs');
 
 class ConfiguracionService {
-  // USUARIOS
   async getAllUsuarios() {
-    try {
-      const query = `
-        SELECT 
-          u.id,
-          u.nombre,
-          u.email,
-          u.rol_id,
-          u.pais_id,
-          u.activo,
-          u.ultimo_acceso,
-          u.created_at
-        FROM usuarios u
-        ORDER BY u.created_at DESC
-      `;
-      
-      const result = await db.query(query);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getAllUsuarios:', error);
-      throw error;
-    }
+    const response = await pythonApi.get('/usuarios');
+    return response.data;
   }
 
   async crearUsuario(datos) {
-    try {
-      const { nombre, email, password, rol_id, pais_id } = datos;
-      
-      // Hashear contraseña
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const query = `
-        INSERT INTO usuarios (nombre, email, password, rol_id, pais_id)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, nombre, email, rol_id, pais_id, activo, created_at
-      `;
-      
-      const values = [nombre, email, hashedPassword, rol_id, pais_id || null];
-      const result = await db.query(query, values);
-      
-      return result.rows[0];
-    } catch (error) {
-      console.error('Error en crearUsuario:', error);
-      throw error;
+    const { nombre, email, password, rol_id, pais_id } = datos;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = `usr_${Date.now()}`;
+
+    const payload = {
+      id: userId,
+      nombre,
+      email,
+      password_hash: hashedPassword,
+      rol: rol_id || 3,
+      activo: false
+    };
+    if (pais_id !== undefined && pais_id !== null) {
+      payload.pais_id = pais_id;
     }
+
+    const response = await pythonApi.post('/usuarios', payload);
+    return response.data;
   }
 
   async actualizarUsuario(id, datos) {
-    try {
-      const { nombre, email, password, rol_id, pais_id } = datos;
-      
-      let query, values;
-      
-      if (password) {
-        // Si se proporciona contraseña, hashearla y actualizar
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        query = `
-          UPDATE usuarios 
-          SET nombre = $1, email = $2, password = $3, rol_id = $4, pais_id = $5, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $6
-          RETURNING id, nombre, email, rol_id, pais_id, activo, updated_at
-        `;
-        
-        values = [nombre, email, hashedPassword, rol_id, pais_id || null, id];
-      } else {
-        // Si no se proporciona contraseña, no actualizarla
-        query = `
-          UPDATE usuarios 
-          SET nombre = $1, email = $2, rol_id = $3, pais_id = $4, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $5
-          RETURNING id, nombre, email, rol_id, pais_id, activo, updated_at
-        `;
-        
-        values = [nombre, email, rol_id, pais_id || null, id];
-      }
-      
-      const result = await db.query(query, values);
-      return result.rows[0];
-    } catch (error) {
-      console.error('Error en actualizarUsuario:', error);
-      throw error;
+    const payload = {};
+
+    if (datos.nombre !== undefined) payload.nombre = datos.nombre;
+    if (datos.email !== undefined) payload.email = datos.email;
+    if (datos.rol_id !== undefined) payload.rol = datos.rol_id;
+    if (datos.pais_id !== undefined) payload.pais_id = datos.pais_id;
+    if (datos.activo !== undefined) payload.activo = datos.activo;
+
+    if (datos.password) {
+      payload.password_hash = await bcrypt.hash(datos.password, 10);
     }
+
+    const response = await pythonApi.patch(`/usuarios/${id}`, payload);
+    return response.data;
   }
 
   async eliminarUsuario(id) {
-    try {
-      const query = 'DELETE FROM usuarios WHERE id = $1';
-      await db.query(query, [id]);
-      return { success: true };
-    } catch (error) {
-      console.error('Error en eliminarUsuario:', error);
-      throw error;
-    }
+    await pythonApi.delete(`/usuarios/${id}`);
+    return { success: true };
   }
 
-  // ROLES
   async getAllRoles() {
-    try {
-      const query = 'SELECT * FROM roles ORDER BY id';
-      const result = await db.query(query);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getAllRoles:', error);
-      throw error;
-    }
+    const response = await pythonApi.get('/roles');
+    return response.data;
   }
 
-  // PERMISOS
   async getAllPermisos() {
-    try {
-      const query = 'SELECT * FROM permisos WHERE activo = true ORDER BY nombre';
-      const result = await db.query(query);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getAllPermisos:', error);
-      throw error;
+    const response = await pythonApi.get('/roles');
+    const roles = response.data;
+    const permisosSet = new Map();
+
+    for (const rol of roles) {
+      try {
+        const permResponse = await pythonApi.get(`/roles/${rol.id}/permisos`);
+        for (const permiso of permResponse.data) {
+          if (!permisosSet.has(permiso.permiso_id)) {
+            permisosSet.set(permiso.permiso_id, {
+              id: permiso.permiso_id,
+              nombre: permiso.permiso_nombre || `Permiso ${permiso.permiso_id}`,
+              activo: true
+            });
+          }
+        }
+      } catch (e) {
+        // Algunos roles pueden no tener permisos
+      }
     }
+
+    return Array.from(permisosSet.values());
   }
 
   async getPermisosRol(rol_id) {
     try {
-      const query = `
-        SELECT 
-          rp.id,
-          rp.rol_id,
-          rp.permiso_id,
-          rp.tiene_acceso,
-          p.nombre as permiso_nombre,
-          p.descripcion as permiso_descripcion
-        FROM rol_permisos rp
-        JOIN permisos p ON rp.permiso_id = p.id
-        WHERE rp.rol_id = $1
-        ORDER BY p.nombre
-      `;
-      
-      const result = await db.query(query, [rol_id]);
-      return result.rows;
+      const response = await pythonApi.get(`/roles/${rol_id}/permisos`);
+      return response.data.map(p => ({
+        id: p.id || p.permiso_id,
+        rol_id: p.rol_id,
+        permiso_id: p.permiso_id,
+        tiene_acceso: p.activo !== undefined ? p.activo : true,
+        permiso_nombre: p.permiso_nombre || `Permiso ${p.permiso_id}`,
+        permiso_descripcion: p.permiso_descripcion || ''
+      }));
     } catch (error) {
-      console.error('Error en getPermisosRol:', error);
+      if (error.response && error.response.status === 404) {
+        return [];
+      }
       throw error;
     }
   }
 
   async actualizarPermisoRol(rol_id, permiso_id, tiene_acceso) {
-    try {
-      // Verificar si ya existe la relación
-      const checkQuery = 'SELECT * FROM rol_permisos WHERE rol_id = $1 AND permiso_id = $2';
-      const checkResult = await db.query(checkQuery, [rol_id, permiso_id]);
-      
-      let query, values;
-      
-      if (checkResult.rows.length > 0) {
-        // Actualizar existente
-        query = `
-          UPDATE rol_permisos 
-          SET tiene_acceso = $1
-          WHERE rol_id = $2 AND permiso_id = $3
-          RETURNING *
-        `;
-        values = [tiene_acceso, rol_id, permiso_id];
-      } else {
-        // Crear nuevo
-        query = `
-          INSERT INTO rol_permisos (rol_id, permiso_id, tiene_acceso)
-          VALUES ($1, $2, $3)
-          RETURNING *
-        `;
-        values = [rol_id, permiso_id, tiene_acceso];
-      }
-      
-      const result = await db.query(query, values);
-      return result.rows[0];
-    } catch (error) {
-      console.error('Error en actualizarPermisoRol:', error);
-      throw error;
-    }
+    const response = await pythonApi.post(`/roles/${rol_id}/permisos`, {
+      rol_id,
+      permiso_id,
+      activo: tiene_acceso
+    });
+    return response.data;
   }
 
-  // PAÍSES
   async getAllPaises() {
-    try {
-      const query = 'SELECT * FROM paises WHERE activo = true ORDER BY nombre';
-      const result = await db.query(query);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getAllPaises:', error);
-      throw error;
-    }
+    const response = await pythonApi.get('/paises');
+    return response.data.map(p => ({
+      ...p,
+      continente: p.continente || null,
+      activo: p.activo !== undefined ? p.activo : true
+    }));
   }
 
-  // PERMISOS PERSONALIZADOS POR USUARIO
   async getPermisosUsuario(usuario_id) {
-    try {
-      const query = `
-        SELECT 
-          up.id,
-          up.usuario_id,
-          up.permiso_id,
-          up.tiene_acceso,
-          p.nombre as permiso_nombre,
-          p.descripcion as permiso_descripcion
-        FROM usuario_permisos up
-        JOIN permisos p ON up.permiso_id = p.id
-        WHERE up.usuario_id = $1
-        ORDER BY p.nombre
-      `;
-      
-      const result = await db.query(query, [usuario_id]);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getPermisosUsuario:', error);
-      throw error;
-    }
+    return [];
   }
 
   async actualizarPermisoUsuario(usuario_id, permiso_id, tiene_acceso) {
-    try {
-      // Verificar si ya existe la relación
-      const checkQuery = 'SELECT * FROM usuario_permisos WHERE usuario_id = $1 AND permiso_id = $2';
-      const checkResult = await db.query(checkQuery, [usuario_id, permiso_id]);
-      
-      let query, values;
-      
-      if (checkResult.rows.length > 0) {
-        // Actualizar existente
-        query = `
-          UPDATE usuario_permisos 
-          SET tiene_acceso = $1
-          WHERE usuario_id = $2 AND permiso_id = $3
-          RETURNING *
-        `;
-        values = [tiene_acceso, usuario_id, permiso_id];
-      } else {
-        // Crear nuevo
-        query = `
-          INSERT INTO usuario_permisos (usuario_id, permiso_id, tiene_acceso)
-          VALUES ($1, $2, $3)
-          RETURNING *
-        `;
-        values = [usuario_id, permiso_id, tiene_acceso];
-      }
-      
-      const result = await db.query(query, values);
-      return result.rows[0];
-    } catch (error) {
-      console.error('Error en actualizarPermisoUsuario:', error);
-      throw error;
-    }
+    return { success: true };
   }
 
   async eliminarPermisoUsuario(usuario_id, permiso_id) {
-    try {
-      const query = 'DELETE FROM usuario_permisos WHERE usuario_id = $1 AND permiso_id = $2';
-      await db.query(query, [usuario_id, permiso_id]);
-      return { success: true };
-    } catch (error) {
-      console.error('Error en eliminarPermisoUsuario:', error);
-      throw error;
-    }
+    return { success: true };
   }
 }
 

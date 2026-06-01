@@ -1,9 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import traceback
 from app.routers import (
     paises, ciudades, miembros, contactos, reportes,
     cotizaciones, presupuestos, ejecuciones, gastos_reales,
     estadisticas_paises, roles, configuracion, usuarios,
+    ciudades_mision, ingresos, miembros_info_adicional,
+    saldos_caja_banco, traslados, auth, continentes,
+    estudios_diarios, estadisticas,
 )
 
 app = FastAPI(
@@ -22,6 +27,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+    )
+
+
+@app.on_event("startup")
+async def startup():
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("gnit-api")
+    logger.info("=== GNIT API Starting ===")
+    try:
+        from app.database import engine
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            result = await conn.execute(text("SELECT 1"))
+            logger.info(f"=== DB Connection OK: {result.scalar()} ===")
+    except Exception as e:
+        logger.error(f"=== DB Connection FAILED: {e} ===")
+
 # Registrar todos los routers
 app.include_router(paises.router)
 app.include_router(ciudades.router)
@@ -36,6 +66,15 @@ app.include_router(estadisticas_paises.router)
 app.include_router(roles.router)
 app.include_router(configuracion.router)
 app.include_router(usuarios.router)
+app.include_router(ciudades_mision.router)
+app.include_router(ingresos.router)
+app.include_router(miembros_info_adicional.router)
+app.include_router(saldos_caja_banco.router)
+app.include_router(traslados.router)
+app.include_router(auth.router)
+app.include_router(continentes.router)
+app.include_router(estudios_diarios.router)
+app.include_router(estadisticas.router)
 
 
 @app.get("/", tags=["Estado"])

@@ -22,17 +22,22 @@ backend/API/
     └── routers/
         ├── __init__.py
         ├── ciudades.py
+        ├── ciudades_mision.py
         ├── configuracion.py
         ├── contactos.py
         ├── cotizaciones.py
         ├── ejecuciones.py
         ├── estadisticas_paises.py
         ├── gastos_reales.py
+        ├── ingresos.py
         ├── miembros.py
+        ├── miembros_info_adicional.py
         ├── paises.py
         ├── presupuestos.py
         ├── reportes.py
         ├── roles.py
+        ├── saldos_caja_banco.py
+        ├── traslados.py
         └── usuarios.py
 ```
 
@@ -120,12 +125,16 @@ Cliente → FastAPI (CORS) → Router → Schema Pydantic (validacion) → SQLAl
 ### Diagrama de Entidades
 
 ```
-paises ─── ciudades
+paises ─── ciudades ─── ciudades_mision
   ├── miembros ─── contactos
   │            ├── reportes
-  │            └── cotizaciones
+  │            ├── cotizaciones
+  │            └── miembros_info_adicional
   ├── presupuestos ─── ejecuciones ─── gastos_reales
-  └── estadisticas_paises
+  ├── estadisticas_paises
+  ├── ingresos
+  ├── saldos_caja_banco
+  └── traslados
 
 roles ─── rol_permisos
 usuarios (FK a roles)
@@ -138,6 +147,9 @@ configuracion (clave/valor)
 | ------------------------ | ---------------------------------------- |
 | `TipoMiembroEnum`        | `Comprometido`, `Registrado`, `Voluntario` |
 | `CotizacionEstadoEnum`   | `pendiente`, `aprobado`, `rechazado`      |
+| `EstadoPresenciaMisionEnum` | `Con iglesia`, `Evangelizado`, `En proceso` |
+| `CuentaTipoEnum`         | `Banco`, `Caja`                          |
+| `TipoSangreEnum`         | `A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-` |
 
 ### Modelos principales
 
@@ -157,6 +169,11 @@ configuracion (clave/valor)
 | `GastoReal`           | `gastos_reales`       | `id`  | Gastos reales vinculados a ejecuciones            |
 | `EstadisticaPais`    | `estadisticas_paises` | `id` | Estadisticas por pais y periodo                  |
 | `Configuracion`      | `configuracion`      | `id`  | Parametros clave-valor                            |
+| `CiudadMision`       | `ciudades_mision`    | `id`  | Ciudades con mision, estado de presencia y pastor |
+| `Ingreso`            | `ingresos`           | `id`  | Ingresos por pais, tipo y cuenta (caja/banco)     |
+| `MiembroInfoAdicional` | `miembros_info_adicional` | `miembro_id` (str) | Info extendida de miembros (padres, sangre, email) |
+| `SaldoCajaBanco`     | `saldos_caja_banco`  | `id`  | Saldos de caja y banco por pais                   |
+| `Traslado`           | `traslados`           | `id`  | Traslados entre caja y banco por pais             |
 
 ---
 
@@ -308,6 +325,56 @@ Todos los endpoints estan bajo la raiz de la API. La documentacion interactiva e
 | PATCH  | `/configuracion/{clave}` | Actualizar config       | —                        |
 | DELETE | `/configuracion/{clave}` | Eliminar config         | —                        |
 
+### Ciudades Mision `/ciudades-mision`
+
+| Metodo | Path                          | Descripcion               | Filtros                     |
+| ------ | ----------------------------- | ------------------------ | --------------------------- |
+| GET    | `/ciudades-mision`           | Listar ciudades mision   | `ciudad_id`, `estado_presencia` |
+| GET    | `/ciudades-mision/{id}`      | Obtener ciudad mision    | —                           |
+| POST   | `/ciudades-mision`           | Crear ciudad mision      | —                           |
+| PATCH  | `/ciudades-mision/{id}`      | Actualizar ciudad mision | —                           |
+| DELETE | `/ciudades-mision/{id}`      | Eliminar ciudad mision   | —                           |
+
+### Ingresos `/ingresos`
+
+| Metodo | Path             | Descripcion       | Filtros                                        |
+| ------ | ---------------- | ----------------- | ----------------------------------------------- |
+| GET    | `/ingresos`      | Listar ingresos   | `pais_id`, `anio`, `mes`, `tipo`, `donde_ingresa` |
+| GET    | `/ingresos/{id}` | Obtener ingreso   | —                                               |
+| POST   | `/ingresos`      | Crear ingreso     | —                                               |
+| PATCH  | `/ingresos/{id}` | Actualizar ingreso | —                                              |
+| DELETE | `/ingresos/{id}` | Eliminar ingreso   | —                                               |
+
+### Miembros Info Adicional `/miembros-info-adicional`
+
+| Metodo | Path                                  | Descripcion                  | Notas                        |
+| ------ | ------------------------------------- | ---------------------------- | ---------------------------- |
+| GET    | `/miembros-info-adicional`           | Listar info adicional        | Filtro: `miembro_id`        |
+| GET    | `/miembros-info-adicional/{miembro_id}` | Obtener info por miembro | Busca por string `miembro_id` |
+| POST   | `/miembros-info-adicional`           | Crear info adicional         | Valida duplicado por `miembro_id` |
+| PATCH  | `/miembros-info-adicional/{miembro_id}` | Actualizar info        | —                            |
+| DELETE | `/miembros-info-adicional/{miembro_id}` | Eliminar info           | —                            |
+
+### Saldos Caja Banco `/saldos-caja-banco`
+
+| Metodo | Path                       | Descripcion          | Filtros     |
+| ------ | -------------------------- | -------------------- | ----------- |
+| GET    | `/saldos-caja-banco`      | Listar saldos        | `pais_id`   |
+| GET    | `/saldos-caja-banco/{id}`  | Obtener saldo        | —           |
+| POST   | `/saldos-caja-banco`      | Crear saldo          | —           |
+| PATCH  | `/saldos-caja-banco/{id}`  | Actualizar saldo     | —           |
+| DELETE | `/saldos-caja-banco/{id}`  | Eliminar saldo       | —           |
+
+### Traslados `/traslados`
+
+| Metodo | Path              | Descripcion        | Filtros              |
+| ------ | ----------------- | ------------------ | -------------------- |
+| GET    | `/traslados`      | Listar traslados   | `pais_id`, `anio`, `mes` |
+| GET    | `/traslados/{id}` | Obtener traslado   | —                    |
+| POST   | `/traslados`      | Crear traslado     | —                    |
+| PATCH  | `/traslados/{id}` | Actualizar traslado | —                   |
+| DELETE | `/traslados/{id}` | Eliminar traslado  | —                    |
+
 ---
 
 ## Validaciones
@@ -318,7 +385,11 @@ Los schemas de Pydantic aplican estas validaciones:
 - **`tipo_gasto`**: En presupuestos debe ser uno de: `presupuesto_recibido`, `alquiler_local`, `servicios_publicos`, `materiales_evangelizacion`, `alimentacion`, `transporte`, `comunicaciones`, `otros_gastos`.
 - **`email`**: Se valida como email valido en `UsuarioCreate` y `UsuarioUpdate`.
 - **`tipo_miembro`**: Debe ser `Comprometido`, `Registrado` o `Voluntario`.
-- **`estado` de cotizacion**: Debe ser `pendiente`, `aprobado` o `rechazado`.
+- **`estado_presencia` de ciudades mision**: Debe ser `Con iglesia`, `Evangelizado` o `En proceso`.
+- **`donde_ingresa` de ingresos**: Debe ser `Banco` o `Caja`.
+- **`de` y `a` de traslados**: Deben ser `Banco` o `Caja`.
+- **`tipo_sangre` de miembros info adicional**: Debe ser uno de: `A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`.
+- **`mes` en ingresos**: Debe estar entre 1 y 12.
 
 ---
 
@@ -1204,7 +1275,224 @@ curl -X PATCH https://gnit-api-production.up.railway.app/configuracion/moneda_de
 
 ---
 
-### Codigos de Respuesta HTTP
+### Ciudades Mision
+
+#### Listar ciudades mision con filtros
+
+```bash
+# Todas las ciudades mision
+curl https://gnit-api-production.up.railway.app/ciudades-mision
+
+# Filtrar por ciudad
+curl "https://gnit-api-production.up.railway.app/ciudades-mision?ciudad_id=1"
+
+# Filtrar por estado de presencia
+curl "https://gnit-api-production.up.railway.app/ciudades-mision?estado_presencia=Con+iglesia"
+```
+
+#### Crear una ciudad mision
+
+```bash
+curl -X POST https://gnit-api-production.up.railway.app/ciudades-mision \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ciudad_id": 1,
+    "region": "America Central",
+    "estado_presencia": "En proceso",
+    "fecha_inicio_trabajo": "2025-01-15",
+    "pastor_encargado_id": "miem_001",
+    "pastor_encargado_nombre": "Juan Perez",
+    "cantidad_miembros_activos": 12,
+    "notas": "Mision en crecimiento"
+  }'
+```
+
+**Respuesta `201`:**
+```json
+{
+  "id": 1,
+  "ciudad_id": 1,
+  "region": "America Central",
+  "estado_presencia": "En proceso",
+  "fecha_inicio_trabajo": "2025-01-15",
+  "pastor_encargado_id": "miem_001",
+  "pastor_encargado_nombre": "Juan Perez",
+  "cantidad_miembros_activos": 12,
+  "notas": "Mision en crecimiento",
+  "fecha_creacion": "2025-06-01T12:00:00",
+  "fecha_actualizacion": "2025-06-01T12:00:00"
+}
+```
+
+---
+
+### Ingresos
+
+#### Listar ingresos con filtros
+
+```bash
+# Todos los ingresos
+curl https://gnit-api-production.up.railway.app/ingresos
+
+# Filtrar por pais
+curl "https://gnit-api-production.up.railway.app/ingresos?pais_id=1"
+
+# Filtrar por periodo
+curl "https://gnit-api-production.up.railway.app/ingresos?anio=2025&mes=5"
+
+# Filtrar por tipo
+curl "https://gnit-api-production.up.railway.app/ingresos?tipo=donacion"
+
+# Filtrar por donde ingresa
+curl "https://gnit-api-production.up.railway.app/ingresos?donde_ingresa=Banco"
+```
+
+#### Crear un ingreso
+
+```bash
+curl -X POST https://gnit-api-production.up.railway.app/ingresos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pais_id": 1,
+    "mes": 5,
+    "anio": 2025,
+    "tipo": "donacion",
+    "origen": "Iglesia hermana",
+    "donde_ingresa": "Banco",
+    "valor": 5000.00,
+    "observaciones": "Donacion mensual",
+    "fecha": "2025-05-15"
+  }'
+```
+
+---
+
+### Miembros Info Adicional
+
+#### Listar info adicional
+
+```bash
+# Toda la info adicional
+curl https://gnit-api-production.up.railway.app/miembros-info-adicional
+
+# Filtrar por miembro
+curl "https://gnit-api-production.up.railway.app/miembros-info-adicional?miembro_id=miem_001"
+```
+
+#### Obtener info adicional de un miembro
+
+```bash
+curl https://gnit-api-production.up.railway.app/miembros-info-adicional/miem_001
+```
+
+#### Crear info adicional
+
+```bash
+curl -X POST https://gnit-api-production.up.railway.app/miembros-info-adicional \
+  -H "Content-Type: application/json" \
+  -d '{
+    "miembro_id": "miem_001",
+    "nombre_padre": "Carlos Perez",
+    "telefono_padre": "+57 300 1111111",
+    "nombre_madre": "Maria Lopez",
+    "telefono_madre": "+57 300 2222222",
+    "tipo_sangre": "O+",
+    "correo_electronico": "miembro@gnit.org"
+  }'
+```
+
+#### Actualizar info adicional (PATCH parcial)
+
+```bash
+curl -X PATCH https://gnit-api-production.up.railway.app/miembros-info-adicional/miem_001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "correo_electronico": "nuevo@gnit.org"
+  }'
+```
+
+---
+
+### Saldos Caja Banco
+
+#### Listar saldos con filtro
+
+```bash
+# Todos los saldos
+curl https://gnit-api-production.up.railway.app/saldos-caja-banco
+
+# Filtrar por pais
+curl "https://gnit-api-production.up.railway.app/saldos-caja-banco?pais_id=1"
+```
+
+#### Crear un saldo
+
+```bash
+curl -X POST https://gnit-api-production.up.railway.app/saldos-caja-banco \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pais_id": 1,
+    "saldo_caja": 1500.00,
+    "saldo_banco": 5000.00
+  }'
+```
+
+**Respuesta `201`:**
+```json
+{
+  "id": 1,
+  "pais_id": 1,
+  "saldo_caja": "1500.00",
+  "saldo_banco": "5000.00",
+  "updated_at": "2025-06-01T12:00:00"
+}
+```
+
+---
+
+### Traslados
+
+#### Listar traslados con filtros
+
+```bash
+# Todos los traslados
+curl https://gnit-api-production.up.railway.app/traslados
+
+# Filtrar por pais
+curl "https://gnit-api-production.up.railway.app/traslados?pais_id=1"
+
+# Filtrar por periodo
+curl "https://gnit-api-production.up.railway.app/traslados?anio=2025&mes=5"
+```
+
+#### Crear un traslado
+
+```bash
+curl -X POST https://gnit-api-production.up.railway.app/traslados \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pais_id": 1,
+    "de": "Caja",
+    "a": "Banco",
+    "valor": 2000.00,
+    "observaciones": "Traslado de excedente a cuenta bancaria",
+    "fecha": "2025-05-20"
+  }'
+```
+
+**Respuesta `201`:**
+```json
+{
+  "id": 1,
+  "pais_id": 1,
+  "de": "Caja",
+  "a": "Banco",
+  "valor": "2000.00",
+  "observaciones": "Traslado de excedente a cuenta bancaria",
+  "fecha": "2025-05-20",
+  "fecha_creacion": "2025-06-01T12:00:00"
+}
+```
 
 | Codigo | Significado                     | Cuando se usa                                     |
 | ------ | ------------------------------- | ------------------------------------------------ |

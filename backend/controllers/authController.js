@@ -62,45 +62,40 @@ exports.getMisPermisos = async (req, res) => {
     
     const { query } = require('../config/database');
     
-    // Obtener rol del usuario
-    const userQuery = 'SELECT rol_id FROM usuarios WHERE id = $1';
-    const userResult = await query(userQuery, [userId]);
+    // Obtener rol del usuario (GNIT DB usa 'rol' no 'rol_id')
+    const userResult = await query('SELECT rol FROM usuarios WHERE id = $1', [userId]);
     
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
     
-    const rolId = userResult.rows[0].rol_id;
+    const rolId = userResult.rows[0].rol;
     
-    // Obtener permisos del rol
-    const permisosRolQuery = `
+    // Obtener permisos del rol (GNIT DB usa 'activo' no 'tiene_acceso')
+    const permisosRolResult = await query(`
       SELECT p.nombre
       FROM rol_permisos rp
       JOIN permisos p ON rp.permiso_id = p.id
-      WHERE rp.rol_id = $1 AND rp.tiene_acceso = true AND p.activo = true
-    `;
+      WHERE rp.rol_id = $1 AND rp.activo = true AND p.activo = true
+    `, [rolId]);
     
-    const permisosRolResult = await query(permisosRolQuery, [rolId]);
     const permisosRol = permisosRolResult.rows.map(row => row.nombre);
     
     // Obtener permisos personalizados del usuario
-    const permisosUsuarioQuery = `
+    const permisosUsuarioResult = await query(`
       SELECT p.nombre, up.tiene_acceso
       FROM usuario_permisos up
       JOIN permisos p ON up.permiso_id = p.id
       WHERE up.usuario_id = $1 AND p.activo = true
-    `;
+    `, [userId]);
     
-    const permisosUsuarioResult = await query(permisosUsuarioQuery, [userId]);
-    
-    // Combinar permisos: rol + personalizados (los personalizados con tiene_acceso=true se suman)
+    // Combinar permisos: rol + personalizados
     const permisosFinales = new Set(permisosRol);
     
     permisosUsuarioResult.rows.forEach(permiso => {
       if (permiso.tiene_acceso) {
         permisosFinales.add(permiso.nombre);
       } else {
-        // Si tiene_acceso es false, se QUITA el permiso (anula el del rol)
         permisosFinales.delete(permiso.nombre);
       }
     });

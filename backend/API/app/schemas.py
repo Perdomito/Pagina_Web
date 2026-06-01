@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
-from app.models import TipoMiembroEnum, CotizacionEstadoEnum
+from app.models import TipoMiembroEnum, CotizacionEstadoEnum, EstadoPresenciaMisionEnum, CuentaTipoEnum, TipoSangreEnum
 
 
 # ── Paises ─────────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ class PaisUpdate(BaseModel):
 
 class PaisOut(PaisBase):
     id: int
+    continente_id: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
@@ -100,17 +101,18 @@ class UsuarioBase(BaseModel):
     activo: bool = False
 
 class UsuarioCreate(UsuarioBase):
-    password_hash: str
+    password: str
 
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
     email: Optional[EmailStr] = None
-    password_hash: Optional[str] = None
+    password: Optional[str] = None
     rol: Optional[int] = None
     activo: Optional[bool] = None
 
 class UsuarioOut(UsuarioBase):
     fecha_registro: datetime
+    rol_id: int = 0
     model_config = {"from_attributes": True}
 
 
@@ -182,6 +184,7 @@ class ContactoUpdate(BaseModel):
 class ContactoOut(ContactoBase):
     id: int
     fecha_creacion: Optional[datetime] = None
+    pais_nombre: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -438,3 +441,301 @@ class ConfiguracionOut(ConfiguracionBase):
     id: int
     fecha_actualizacion: datetime
     model_config = {"from_attributes": True}
+
+
+# ── Ciudades Mision ────────────────────────────────────────────────────────
+
+class CiudadMisionBase(BaseModel):
+    ciudad_id: int
+    region: Optional[str] = None
+    estado_presencia: EstadoPresenciaMisionEnum = EstadoPresenciaMisionEnum.en_proceso
+    fecha_inicio_trabajo: Optional[date] = None
+    pastor_encargado_id: Optional[str] = None
+    pastor_encargado_nombre: Optional[str] = None
+    cantidad_miembros_activos: int = 0
+    notas: Optional[str] = None
+
+class CiudadMisionCreate(CiudadMisionBase):
+    pass
+
+class CiudadMisionUpdate(BaseModel):
+    ciudad_id: Optional[int] = None
+    region: Optional[str] = None
+    estado_presencia: Optional[EstadoPresenciaMisionEnum] = None
+    fecha_inicio_trabajo: Optional[date] = None
+    pastor_encargado_id: Optional[str] = None
+    pastor_encargado_nombre: Optional[str] = None
+    cantidad_miembros_activos: Optional[int] = None
+    notas: Optional[str] = None
+
+class CiudadMisionOut(CiudadMisionBase):
+    id: int
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Ingresos ───────────────────────────────────────────────────────────────
+
+class IngresoBase(BaseModel):
+    pais_id: Optional[int] = None
+    mes: int
+    anio: int
+    tipo: str
+    origen: Optional[str] = None
+    donde_ingresa: CuentaTipoEnum
+    valor: Decimal
+    observaciones: Optional[str] = None
+    fecha: date
+
+    @field_validator("mes")
+    @classmethod
+    def validar_mes(cls, v):
+        if not (1 <= v <= 12):
+            raise ValueError("El mes debe estar entre 1 y 12")
+        return v
+
+class IngresoCreate(IngresoBase):
+    pass
+
+class IngresoUpdate(BaseModel):
+    pais_id: Optional[int] = None
+    mes: Optional[int] = None
+    anio: Optional[int] = None
+    tipo: Optional[str] = None
+    origen: Optional[str] = None
+    donde_ingresa: Optional[CuentaTipoEnum] = None
+    valor: Optional[Decimal] = None
+    observaciones: Optional[str] = None
+    fecha: Optional[date] = None
+
+class IngresoOut(IngresoBase):
+    id: int
+    fecha_creacion: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Miembros Info Adicional ───────────────────────────────────────────────
+
+class MiembroInfoAdicionalBase(BaseModel):
+    miembro_id: str
+    nombre_padre: Optional[str] = None
+    telefono_padre: Optional[str] = None
+    nombre_madre: Optional[str] = None
+    telefono_madre: Optional[str] = None
+    tipo_sangre: Optional[TipoSangreEnum] = None
+    correo_electronico: Optional[str] = None
+
+class MiembroInfoAdicionalCreate(MiembroInfoAdicionalBase):
+    pass
+
+class MiembroInfoAdicionalUpdate(BaseModel):
+    nombre_padre: Optional[str] = None
+    telefono_padre: Optional[str] = None
+    nombre_madre: Optional[str] = None
+    telefono_madre: Optional[str] = None
+    tipo_sangre: Optional[TipoSangreEnum] = None
+    correo_electronico: Optional[str] = None
+
+class MiembroInfoAdicionalOut(MiembroInfoAdicionalBase):
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Saldos Caja Banco ─────────────────────────────────────────────────────
+
+class SaldoCajaBancoBase(BaseModel):
+    pais_id: Optional[int] = None
+    saldo_caja: Decimal = Decimal("0")
+    saldo_banco: Decimal = Decimal("0")
+
+class SaldoCajaBancoCreate(SaldoCajaBancoBase):
+    pass
+
+class SaldoCajaBancoUpdate(BaseModel):
+    pais_id: Optional[int] = None
+    saldo_caja: Optional[Decimal] = None
+    saldo_banco: Optional[Decimal] = None
+
+class SaldoCajaBancoOut(SaldoCajaBancoBase):
+    id: int
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Traslados ─────────────────────────────────────────────────────────────
+
+class TrasladoBase(BaseModel):
+    pais_id: Optional[int] = None
+    de: CuentaTipoEnum
+    a: CuentaTipoEnum
+    valor: Decimal
+    observaciones: Optional[str] = None
+    fecha: date
+
+class TrasladoCreate(TrasladoBase):
+    pass
+
+class TrasladoUpdate(BaseModel):
+    pais_id: Optional[int] = None
+    de: Optional[CuentaTipoEnum] = None
+    a: Optional[CuentaTipoEnum] = None
+    valor: Optional[Decimal] = None
+    observaciones: Optional[str] = None
+    fecha: Optional[date] = None
+
+class TrasladoOut(TrasladoBase):
+    id: int
+    fecha_creacion: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Continentes ────────────────────────────────────────────────────────────
+
+class ContinenteBase(BaseModel):
+    nombre: str
+
+class ContinenteCreate(ContinenteBase):
+    pass
+
+class ContinenteUpdate(BaseModel):
+    nombre: Optional[str] = None
+
+class ContinenteOut(ContinenteBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+# ── Estudios Diarios ──────────────────────────────────────────────────────
+
+class EstudioDiarioBase(BaseModel):
+    miembro_id: str
+    mes: int
+    anio: int
+    dia: int
+    pais_id: Optional[int] = None
+    contacto_id: Optional[int] = None
+    capitulo: Optional[str] = None
+    horas: Optional[Decimal] = None
+    tipo: Optional[str] = None
+    donde: Optional[str] = None
+    dijeron_si: int = 0
+    nuevos_contactos: int = 0
+
+    @field_validator("mes")
+    @classmethod
+    def validar_mes(cls, v):
+        if not (1 <= v <= 12):
+            raise ValueError("El mes debe estar entre 1 y 12")
+        return v
+
+    @field_validator("dia")
+    @classmethod
+    def validar_dia(cls, v):
+        if not (1 <= v <= 31):
+            raise ValueError("El dia debe estar entre 1 y 31")
+        return v
+
+class EstudioDiarioCreate(EstudioDiarioBase):
+    pass
+
+class EstudioDiarioUpdate(BaseModel):
+    miembro_id: Optional[str] = None
+    mes: Optional[int] = None
+    anio: Optional[int] = None
+    dia: Optional[int] = None
+    pais_id: Optional[int] = None
+    contacto_id: Optional[int] = None
+    capitulo: Optional[str] = None
+    horas: Optional[Decimal] = None
+    tipo: Optional[str] = None
+    donde: Optional[str] = None
+    dijeron_si: Optional[int] = None
+    nuevos_contactos: Optional[int] = None
+
+class EstudioDiarioOut(EstudioDiarioBase):
+    id: int
+    fecha_creacion: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Auth ───────────────────────────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class UsuarioLoginOut(BaseModel):
+    id: str
+    nombre: str
+    email: str
+    rol_id: int
+    rol_nombre: str
+    activo: bool
+    model_config = {"from_attributes": True}
+
+class TokenResponse(BaseModel):
+    token: str
+    usuario: UsuarioLoginOut
+
+
+# ── Estadisticas Agregadas ────────────────────────────────────────────────
+
+class SerieData(BaseModel):
+    etiqueta: str
+    data: list[int]
+
+class ComparacionEstudios(BaseModel):
+    labels: list[str]
+    serie_actual: SerieData
+    serie_anterior: Optional[SerieData] = None
+    crecimiento: Optional[float] = None
+    diferencia: Optional[int] = None
+
+class ProfesorRendimiento(BaseModel):
+    id: str
+    nombre: str
+    total_estudios: int
+    promedio_mensual: float
+    promedio_diario: float
+
+class RendimientoProfesores(BaseModel):
+    anio: int
+    profesores: list[ProfesorRendimiento]
+
+class ProfesorEvangelismo(BaseModel):
+    id: str
+    nombre: str
+    total_horas: float
+
+class EvangelismoProfesores(BaseModel):
+    profesores: list[ProfesorEvangelismo]
+    profesores_comparacion: Optional[list[ProfesorEvangelismo]] = None
+    modo: str = "anual"
+    anio: int
+    anio_comparacion: Optional[int] = None
+    anios_disponibles: list[int] = []
+
+class CrecimientoEstudiantes(BaseModel):
+    serie: list[int]
+    labels: list[str]
+    anio: int
+
+class SeriesPorTipo(BaseModel):
+    series_por_tipo: dict[str, dict[str, list[int]]]
+    tipos_disponibles: list[str]
+    anios_disponibles: list[int]
+
+class EstadisticasOut(BaseModel):
+    total_usuarios: int
+    total_miembros: int
+    total_contactos: int
+    total_estudios: int
+    comparacion_estudios: Optional[ComparacionEstudios] = None
+    rendimiento_profesores: Optional[RendimientoProfesores] = None
+    evangelismo_profesores: Optional[EvangelismoProfesores] = None
+    crecimiento_estudiantes: Optional[CrecimientoEstudiantes] = None
+    crecimiento_miembros: Optional[SeriesPorTipo] = None
+    anio_seleccionado: int
+    anios_disponibles: list[int] = []

@@ -1,8 +1,6 @@
-// ============================================
-// ADMINISTRACION SERVICE
-// ============================================
 const bcrypt = require('bcryptjs');
 const { query } = require('../config/database');
+const pythonApi = require('../config/pythonApi');
 
 class AdministracionService {
   getMonthOrderCase(fieldName = 'mes') {
@@ -35,43 +33,6 @@ class AdministracionService {
 
   redondear(valor, decimales = 2) {
     return Number(Number(valor || 0).toFixed(decimales));
-  }
-
-  async getEvangelismoMemberColumn() {
-    const result = await query(`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'evangelismo'
-        AND column_name IN ('miembro_id', 'misionero_id', 'member_id')
-      ORDER BY CASE column_name
-        WHEN 'miembro_id' THEN 1
-        WHEN 'misionero_id' THEN 2
-        WHEN 'member_id' THEN 3
-        ELSE 99
-      END
-    `);
-
-    return result.rows[0]?.column_name || null;
-  }
-
-  getPreviousMonth(mes, anio) {
-    const meses = [
-      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
-      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
-    ];
-
-    const monthIndex = meses.indexOf(mes);
-    if (monthIndex <= 0) {
-      return {
-        mes: 'DICIEMBRE',
-        anio: anio - 1
-      };
-    }
-
-    return {
-      mes: meses[monthIndex - 1],
-      anio
-    };
   }
 
   getMonthLabels() {
@@ -126,13 +87,170 @@ class AdministracionService {
     return serie;
   }
 
-  // ===== USUARIOS =====
+  getPreviousMonth(mes, anio) {
+    const meses = [
+      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+    ];
+
+    const monthIndex = meses.indexOf(mes);
+    if (monthIndex <= 0) {
+      return {
+        mes: 'DICIEMBRE',
+        anio: anio - 1
+      };
+    }
+
+    return {
+      mes: meses[monthIndex - 1],
+      anio
+    };
+  }
+
+  async getEvangelismoMemberColumn() {
+    const result = await query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'evangelismo'
+        AND column_name IN ('miembro_id', 'misionero_id', 'member_id')
+      ORDER BY CASE column_name
+        WHEN 'miembro_id' THEN 1
+        WHEN 'misionero_id' THEN 2
+        WHEN 'member_id' THEN 3
+        ELSE 99
+      END
+    `);
+
+    return result.rows[0]?.column_name || null;
+  }
+
+  // ===== VIA PYTHON API: PAISES =====
+  async getAllPaises() {
+    const response = await pythonApi.get('/paises');
+    return response.data;
+  }
+
+  async crearPais(datos) {
+    const response = await pythonApi.post('/paises', datos);
+    return response.data;
+  }
+
+  async eliminarPais(id) {
+    const response = await pythonApi.delete(`/paises/${id}`);
+    return response.data;
+  }
+
+  // ===== VIA PYTHON API: ROLES =====
+  async getAllRoles() {
+    const response = await pythonApi.get('/roles');
+    return response.data;
+  }
+
+  // ===== VIA PYTHON API: COTIZACIONES =====
+  async getAllCotizaciones() {
+    const response = await pythonApi.get('/cotizaciones');
+    return response.data;
+  }
+
+  async crearCotizacion(datos) {
+    const response = await pythonApi.post('/cotizaciones', datos);
+    return response.data;
+  }
+
+  async aprobarCotizacion(id, mes_agregado, anio_agregado) {
+    const response = await pythonApi.patch(`/cotizaciones/${id}`, {
+      estado: 'aprobado',
+      agregado_a_gastos: true,
+      mes_agregado,
+      anio_agregado
+    });
+    return response.data;
+  }
+
+  async rechazarCotizacion(id) {
+    const response = await pythonApi.patch(`/cotizaciones/${id}`, {
+      estado: 'rechazado'
+    });
+    return response.data;
+  }
+
+  // ===== VIA PYTHON API: PRESUPUESTOS =====
+  async agregarItemPresupuesto(datos) {
+    const payload = { ...datos };
+    if (payload.tipo && !payload.tipo_gasto) {
+      payload.tipo_gasto = payload.tipo;
+      delete payload.tipo;
+    }
+    const response = await pythonApi.post('/presupuestos', payload);
+    return response.data;
+  }
+
+  async eliminarItemPresupuesto(id) {
+    const response = await pythonApi.delete(`/presupuestos/${id}`);
+    return response.data;
+  }
+
+  // ===== VIA PYTHON API: EJECUCIONES =====
+  async crearEjecucion(datos) {
+    const payload = { ...datos };
+    if (payload.presupuesto_base_id && !payload.presupuesto_id) {
+      payload.presupuesto_id = payload.presupuesto_base_id;
+      delete payload.presupuesto_base_id;
+    }
+    const response = await pythonApi.post('/ejecuciones', payload);
+    return response.data;
+  }
+
+  async actualizarMontoEjecucion(id, monto_recibido_usd) {
+    const response = await pythonApi.patch(`/ejecuciones/${id}`, {
+      monto_recibido_usd
+    });
+    return response.data;
+  }
+
+  // ===== VIA PYTHON API: GASTOS REALES =====
+  async getGastosReales(ejecucion_id) {
+    const response = await pythonApi.get('/gastos-reales', {
+      params: { ejecucion_id }
+    });
+    return response.data;
+  }
+
+  async agregarGastoReal(datos) {
+    const payload = { ...datos };
+    if (payload.tipo && !payload.tipo_gasto) {
+      payload.tipo_gasto = payload.tipo;
+      delete payload.tipo;
+    }
+    const response = await pythonApi.post('/gastos-reales', payload);
+    return response.data;
+  }
+
+  async eliminarGastoReal(id) {
+    const response = await pythonApi.delete(`/gastos-reales/${id}`);
+    return response.data;
+  }
+
+  // ===== VIA PYTHON API: CONFIGURACION =====
+  async getTasaCambio() {
+    const response = await pythonApi.get('/configuracion/tasa_cambio_usd');
+    return response.data;
+  }
+
+  async actualizarTasaCambio(tasa) {
+    const response = await pythonApi.patch('/configuracion/tasa_cambio_usd', {
+      valor: tasa
+    });
+    return response.data;
+  }
+
+  // ===== VIA DIRECT DB: USUARIOS =====
   async getAllUsuarios() {
     const result = await query(`
       SELECT u.id, u.nombre, u.email, u.activo, u.ultimo_acceso, u.created_at,
              r.nombre as rol_nombre, p.nombre as pais_nombre
       FROM usuarios u
-      LEFT JOIN roles r ON u.rol_id = r.id
+      LEFT JOIN roles r ON u.rol = r.id
       LEFT JOIN paises p ON u.pais_id = p.id
       ORDER BY u.created_at DESC
     `);
@@ -140,7 +258,7 @@ class AdministracionService {
   }
 
   async crearUsuario(datos) {
-    const { nombre, email, password, rol_id, pais_id } = datos;
+    const { nombre, email, password, rol, pais_id } = datos;
 
     if (!nombre || !email || !password) {
       throw new Error('Datos incompletos');
@@ -151,31 +269,45 @@ class AdministracionService {
       throw new Error('El email ya existe');
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const password_hash = await bcrypt.hash(password, 10);
 
     const result = await query(`
-      INSERT INTO usuarios (nombre, email, password, rol_id, pais_id)
+      INSERT INTO usuarios (nombre, email, password_hash, rol, pais_id)
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, nombre, email, rol_id, pais_id, created_at
-    `, [nombre, email, passwordHash, rol_id, pais_id]);
+      RETURNING id, nombre, email, rol, pais_id, created_at
+    `, [nombre, email, password_hash, rol, pais_id]);
 
     return result.rows[0];
   }
 
   async actualizarUsuario(id, datos) {
-    const { nombre, email, rol_id, pais_id, activo } = datos;
+    const { nombre, email, rol, pais_id, activo, password } = datos;
+
+    if (password) {
+      const password_hash = await bcrypt.hash(password, 10);
+      const result = await query(`
+        UPDATE usuarios
+        SET nombre = $1, email = $2, rol = $3, pais_id = $4, activo = $5, password_hash = $6
+        WHERE id = $7
+        RETURNING id, nombre, email, rol, pais_id, activo
+      `, [nombre, email, rol, pais_id, activo, password_hash, id]);
+
+      if (result.rows.length === 0) {
+        throw new Error('Usuario no encontrado');
+      }
+      return result.rows[0];
+    }
 
     const result = await query(`
       UPDATE usuarios
-      SET nombre = $1, email = $2, rol_id = $3, pais_id = $4, activo = $5
+      SET nombre = $1, email = $2, rol = $3, pais_id = $4, activo = $5
       WHERE id = $6
-      RETURNING id, nombre, email, rol_id, pais_id, activo
-    `, [nombre, email, rol_id, pais_id, activo, id]);
+      RETURNING id, nombre, email, rol, pais_id, activo
+    `, [nombre, email, rol, pais_id, activo, id]);
 
     if (result.rows.length === 0) {
       throw new Error('Usuario no encontrado');
     }
-
     return result.rows[0];
   }
 
@@ -187,7 +319,7 @@ class AdministracionService {
     return { message: 'Usuario eliminado' };
   }
 
-  // ===== CONTINENTES =====
+  // ===== VIA DIRECT DB: CONTINENTES =====
   async getAllContinentes() {
     const result = await query(`
       SELECT * FROM continentes WHERE activo = TRUE ORDER BY nombre
@@ -218,7 +350,7 @@ class AdministracionService {
 
   async eliminarContinente(id) {
     const paises = await query('SELECT COUNT(*) as total FROM paises WHERE continente = (SELECT nombre FROM continentes WHERE id = $1)', [id]);
-    
+
     if (parseInt(paises.rows[0].total) > 0) {
       throw new Error('No se puede eliminar un continente con países asociados');
     }
@@ -227,18 +359,11 @@ class AdministracionService {
     if (result.rows.length === 0) {
       throw new Error('Continente no encontrado');
     }
-    
+
     return { message: 'Continente eliminado' };
   }
 
-  // ===== PAÍSES =====
-  async getAllPaises() {
-    const result = await query(`
-      SELECT * FROM paises WHERE activo = TRUE ORDER BY nombre
-    `);
-    return result.rows;
-  }
-
+  // ===== VIA DIRECT DB: PAISES POR CONTINENTE =====
   async getPaisesPorContinente(continente) {
     const result = await query(`
       SELECT * FROM paises WHERE continente = $1 AND activo = TRUE ORDER BY nombre
@@ -246,45 +371,7 @@ class AdministracionService {
     return result.rows;
   }
 
-  async crearPais(datos) {
-    const { nombre, continente, codigo_iso } = datos;
-
-    if (!nombre || !continente) {
-      throw new Error('Nombre y continente son requeridos');
-    }
-
-    const result = await query(`
-      INSERT INTO paises (nombre, continente, codigo_iso)
-      VALUES ($1, $2, $3)
-      RETURNING *
-    `, [nombre, continente, codigo_iso]);
-
-    return result.rows[0];
-  }
-
-  async eliminarPais(id) {
-    const contactos = await query('SELECT COUNT(*) as total FROM contactos WHERE pais_id = $1', [id]);
-    const miembros = await query('SELECT COUNT(*) as total FROM miembros WHERE pais_id = $1', [id]);
-    
-    if (parseInt(contactos.rows[0].total) > 0 || parseInt(miembros.rows[0].total) > 0) {
-      throw new Error('No se puede eliminar un país con contactos o miembros asociados');
-    }
-
-    const result = await query('DELETE FROM paises WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      throw new Error('País no encontrado');
-    }
-    
-    return { message: 'País eliminado' };
-  }
-  
-  // ===== ROLES =====
-  async getAllRoles() {
-    const result = await query('SELECT * FROM roles ORDER BY id');
-    return result.rows;
-  }
-
-  // ===== ESTADÍSTICAS GENERALES =====
+  // ===== VIA DIRECT DB: ESTADISTICAS GENERALES =====
   async getEstadisticasGenerales(anioSeleccionado = null, opciones = {}) {
     const [usuarios, miembros, contactos, estudios, estudiosPorAnioMes, estudiantesPorAnioMes, miembrosPorAnioMesTipo] = await Promise.all([
       query('SELECT COUNT(*) as total FROM usuarios WHERE activo = TRUE'),
@@ -402,7 +489,7 @@ class AdministracionService {
       const totalEstudiosProfesor = parseInt(row.total_estudios) || 0;
 
       return {
-        id: parseInt(row.id),
+        id: row.id,
         nombre: row.nombre,
         total_estudios: totalEstudiosProfesor,
         promedio_mensual: this.redondear(totalEstudiosProfesor / 12, 1),
@@ -470,12 +557,12 @@ class AdministracionService {
     }
 
     const evangelismoProfesores = evangelismoProfesoresResult.rows.map((row) => ({
-      id: parseInt(row.id),
+      id: row.id,
       nombre: row.nombre,
       total_horas: this.redondear(parseFloat(row.total_horas || 0), 1)
     }));
     const evangelismoProfesoresComparacion = evangelismoProfesoresComparacionResult.rows.map((row) => ({
-      id: parseInt(row.id),
+      id: row.id,
       nombre: row.nombre,
       total_horas: this.redondear(parseFloat(row.total_horas || 0), 1)
     }));
@@ -534,29 +621,27 @@ class AdministracionService {
     };
   }
 
-  // ===== PRESUPUESTOS =====
+  // ===== VIA DIRECT DB: PRESUPUESTOS =====
   async getPresupuestosPorPais(pais_id, anio) {
     const result = await query(`
-      SELECT 
+      SELECT
         mes,
         anio,
-        tipo,
-        SUM(CASE WHEN tipo = 'gasto_fijo' THEN monto ELSE 0 END) as total_gastos_fijos,
-        SUM(CASE WHEN tipo = 'pago_misionero' THEN monto ELSE 0 END) as total_misioneros,
-        SUM(CASE WHEN tipo = 'otro_gasto' THEN monto ELSE 0 END) as total_otros,
+        SUM(CASE WHEN tipo_gasto = 'presupuesto_recibido' THEN monto ELSE 0 END) as total_presupuesto_recibido,
+        SUM(CASE WHEN tipo_gasto = 'alquiler_local' THEN monto ELSE 0 END) as total_alquiler_local,
+        SUM(CASE WHEN tipo_gasto = 'servicios_publicos' THEN monto ELSE 0 END) as total_servicios_publicos,
+        SUM(CASE WHEN tipo_gasto = 'materiales_evangelizacion' THEN monto ELSE 0 END) as total_materiales_evangelizacion,
+        SUM(CASE WHEN tipo_gasto = 'alimentacion' THEN monto ELSE 0 END) as total_alimentacion,
+        SUM(CASE WHEN tipo_gasto = 'transporte' THEN monto ELSE 0 END) as total_transporte,
+        SUM(CASE WHEN tipo_gasto = 'comunicaciones' THEN monto ELSE 0 END) as total_comunicaciones,
+        SUM(CASE WHEN tipo_gasto = 'otros_gastos' THEN monto ELSE 0 END) as total_otros,
         SUM(monto) as total_general
       FROM presupuestos
       WHERE pais_id = $1 AND anio = $2
-      GROUP BY mes, anio, tipo
-      ORDER BY 
-        CASE mes
-          WHEN 'ENERO' THEN 1 WHEN 'FEBRERO' THEN 2 WHEN 'MARZO' THEN 3
-          WHEN 'ABRIL' THEN 4 WHEN 'MAYO' THEN 5 WHEN 'JUNIO' THEN 6
-          WHEN 'JULIO' THEN 7 WHEN 'AGOSTO' THEN 8 WHEN 'SEPTIEMBRE' THEN 9
-          WHEN 'OCTUBRE' THEN 10 WHEN 'NOVIEMBRE' THEN 11 WHEN 'DICIEMBRE' THEN 12
-        END
+      GROUP BY mes, anio
+      ORDER BY mes
     `, [pais_id, anio]);
-    
+
     return result.rows;
   }
 
@@ -564,158 +649,21 @@ class AdministracionService {
     const result = await query(`
       SELECT * FROM presupuestos
       WHERE pais_id = $1 AND mes = $2 AND anio = $3
-      ORDER BY tipo, concepto
+      ORDER BY tipo_gasto, concepto
     `, [pais_id, mes, anio]);
-    
+
     return result.rows;
   }
 
-  async agregarItemPresupuesto(datos) {
-    const { pais_id, mes, anio, tipo, concepto, monto, moneda, tasa_cambio } = datos;
-    
-    const result = await query(`
-      INSERT INTO presupuestos (pais_id, mes, anio, tipo, concepto, monto, moneda, tasa_cambio)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *
-    `, [pais_id, mes, anio, tipo, concepto, monto, moneda || 'DOP', tasa_cambio]);
-    
-    return result.rows[0];
-  }
-
-  async eliminarItemPresupuesto(id) {
-    const result = await query('DELETE FROM presupuestos WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      throw new Error('Item no encontrado');
-    }
-    return { message: 'Item eliminado' };
-  }
-
-  // ===== EJECUCIONES =====
+  // ===== VIA DIRECT DB: EJECUCIONES =====
   async getEjecucionesPorPais(pais_id, anio) {
     const result = await query(`
       SELECT * FROM ejecuciones
       WHERE pais_id = $1 AND anio = $2
-      ORDER BY 
-        CASE mes
-          WHEN 'ENERO' THEN 1 WHEN 'FEBRERO' THEN 2 WHEN 'MARZO' THEN 3
-          WHEN 'ABRIL' THEN 4 WHEN 'MAYO' THEN 5 WHEN 'JUNIO' THEN 6
-          WHEN 'JULIO' THEN 7 WHEN 'AGOSTO' THEN 8 WHEN 'SEPTIEMBRE' THEN 9
-          WHEN 'OCTUBRE' THEN 10 WHEN 'NOVIEMBRE' THEN 11 WHEN 'DICIEMBRE' THEN 12
-        END
+      ORDER BY mes
     `, [pais_id, anio]);
-    
+
     return result.rows;
-  }
-
-  async crearEjecucion(datos) {
-    const { pais_id, mes, anio, monto_recibido_usd, presupuesto_base_id } = datos;
-    
-    const result = await query(`
-      INSERT INTO ejecuciones (pais_id, mes, anio, monto_recibido_usd, presupuesto_base_id)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [pais_id, mes, anio, monto_recibido_usd || 0, presupuesto_base_id]);
-    
-    return result.rows[0];
-  }
-
-  async actualizarMontoEjecucion(id, monto_recibido_usd) {
-    const result = await query(`
-      UPDATE ejecuciones SET monto_recibido_usd = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2 RETURNING *
-    `, [monto_recibido_usd, id]);
-    
-    return result.rows[0];
-  }
-
-  async getGastosReales(ejecucion_id) {
-    const result = await query(`
-      SELECT * FROM gastos_reales WHERE ejecucion_id = $1 ORDER BY concepto
-    `, [ejecucion_id]);
-    
-    return result.rows;
-  }
-
-  async agregarGastoReal(datos) {
-    const { ejecucion_id, concepto, monto, tipo } = datos;
-    
-    const result = await query(`
-      INSERT INTO gastos_reales (ejecucion_id, concepto, monto, tipo)
-      VALUES ($1, $2, $3, $4) RETURNING *
-    `, [ejecucion_id, concepto, monto, tipo]);
-    
-    return result.rows[0];
-  }
-
-  async eliminarGastoReal(id) {
-    const result = await query('DELETE FROM gastos_reales WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      throw new Error('Gasto no encontrado');
-    }
-    return { message: 'Gasto eliminado' };
-  }
-
-  // ===== COTIZACIONES =====
-  async getAllCotizaciones() {
-    const result = await query(`
-      SELECT * FROM cotizaciones ORDER BY fecha DESC, created_at DESC
-    `);
-    return result.rows;
-  }
-
-  async crearCotizacion(datos) {
-    const { fecha, solicitante, concepto, monto } = datos;
-    
-    const result = await query(`
-      INSERT INTO cotizaciones (fecha, solicitante, concepto, monto)
-      VALUES ($1, $2, $3, $4) RETURNING *
-    `, [fecha, solicitante, concepto, monto]);
-    
-    return result.rows[0];
-  }
-
-  async aprobarCotizacion(id, mes_agregado, anio_agregado) {
-    const result = await query(`
-      UPDATE cotizaciones 
-      SET estado = 'aprobado', agregado_a_gastos = TRUE, 
-          mes_agregado = $2, anio_agregado = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 RETURNING *
-    `, [id, mes_agregado, anio_agregado]);
-    
-    return result.rows[0];
-  }
-
-  async rechazarCotizacion(id) {
-    const result = await query(`
-      UPDATE cotizaciones SET estado = 'rechazado', updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 RETURNING *
-    `, [id]);
-    
-    return result.rows[0];
-  }
-
-  // ===== CONFIGURACIÓN =====
-  async getTasaCambio() {
-    const result = await query(`
-      SELECT valor FROM configuracion WHERE clave = 'tasa_cambio_usd'
-    `);
-    
-    if (result.rows.length === 0) {
-      return '58.00';
-    }
-    
-    return result.rows[0].valor;
-  }
-
-  async actualizarTasaCambio(nuevaTasa) {
-    const result = await query(`
-      UPDATE configuracion 
-      SET valor = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE clave = 'tasa_cambio_usd'
-      RETURNING valor
-    `, [nuevaTasa.toString()]);
-    
-    return result.rows[0];
   }
 }
 

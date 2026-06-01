@@ -1,48 +1,37 @@
-// ============================================
-// AUTH SERVICE
-// ============================================
-// Lógica de negocio para autenticación
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/database');
 
 class AuthService {
-  // Login
   async login(email, password) {
-    // Validación
     if (!email || !password) {
-      throw new Error('Email y contraseña son requeridos');
+      throw new Error('Email y contrasena son requeridos');
     }
 
-    // Buscar usuario con rol
     const result = await query(`
       SELECT u.*, r.nombre as rol_nombre, p.nombre as pais_nombre
       FROM usuarios u
-      LEFT JOIN roles r ON u.rol_id = r.id
+      LEFT JOIN roles r ON u.rol = r.id
       LEFT JOIN paises p ON u.pais_id = p.id
       WHERE u.email = $1 AND u.activo = TRUE
     `, [email]);
 
     if (result.rows.length === 0) {
-      throw new Error('Credenciales inválidas');
+      throw new Error('Credenciales invalidas');
     }
 
     const usuario = result.rows[0];
 
-    // Verificar contraseña
-    const passwordValida = await bcrypt.compare(password, usuario.password);
+    const passwordValida = await bcrypt.compare(password, usuario.password_hash);
     if (!passwordValida) {
-      throw new Error('Credenciales inválidas');
+      throw new Error('Credenciales invalidas');
     }
 
-    // Actualizar último acceso
     await query(
       'UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE id = $1',
       [usuario.id]
     );
 
-    // Generar token
     const token = jwt.sign(
       {
         id: usuario.id,
@@ -54,9 +43,8 @@ class AuthService {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    // Retornar datos sin password
-    delete usuario.password;
-    
+    delete usuario.password_hash;
+
     return {
       token,
       usuario: {
@@ -67,76 +55,67 @@ class AuthService {
     };
   }
 
-  // Registro
   async register(datos) {
     const { nombre, email, password, rol_id, pais_id } = datos;
 
-    // Validaciones
     if (!nombre || !email || !password) {
-      throw new Error('Nombre, email y contraseña son requeridos');
+      throw new Error('Nombre, email y contrasena son requeridos');
     }
 
     if (password.length < 4) {
-      throw new Error('La contraseña debe tener al menos 4 caracteres');
+      throw new Error('La contrasena debe tener al menos 4 caracteres');
     }
 
-    // Verificar si el email ya existe
     const existente = await query(
       'SELECT id FROM usuarios WHERE email = $1',
       [email]
     );
 
     if (existente.rows.length > 0) {
-      throw new Error('El email ya está registrado');
+      throw new Error('El email ya esta registrado');
     }
 
-    // Hashear contraseña
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Crear usuario
     const result = await query(`
-      INSERT INTO usuarios (nombre, email, password, rol_id, pais_id)
+      INSERT INTO usuarios (nombre, email, password_hash, rol, pais_id)
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, nombre, email, rol_id, pais_id, created_at
+      RETURNING id, nombre, email, rol, pais_id, fecha_registro
     `, [nombre, email, passwordHash, rol_id || 3, pais_id]);
 
     return result.rows[0];
   }
 
-  // Verificar token
   async verifyToken(token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Verificar que el usuario aún existe y está activo
+
       const result = await query(
-        'SELECT id, nombre, email, rol_id FROM usuarios WHERE id = $1 AND activo = TRUE',
+        'SELECT id, nombre, email, rol FROM usuarios WHERE id = $1 AND activo = TRUE',
         [decoded.id]
       );
 
       if (result.rows.length === 0) {
-        throw new Error('Usuario no válido');
+        throw new Error('Usuario no valido');
       }
 
       return decoded;
     } catch (error) {
-      throw new Error('Token inválido');
+      throw new Error('Token invalido');
     }
   }
 
-  // Cambiar contraseña
   async changePassword(userId, passwordActual, passwordNueva) {
     if (!passwordActual || !passwordNueva) {
-      throw new Error('Contraseñas requeridas');
+      throw new Error('Contrasenas requeridas');
     }
 
     if (passwordNueva.length < 4) {
-      throw new Error('La contraseña debe tener al menos 4 caracteres');
+      throw new Error('La contrasena debe tener al menos 4 caracteres');
     }
 
-    // Obtener usuario
     const result = await query(
-      'SELECT password FROM usuarios WHERE id = $1',
+      'SELECT password_hash FROM usuarios WHERE id = $1',
       [userId]
     );
 
@@ -144,22 +123,19 @@ class AuthService {
       throw new Error('Usuario no encontrado');
     }
 
-    // Verificar contraseña actual
-    const passwordValida = await bcrypt.compare(passwordActual, result.rows[0].password);
+    const passwordValida = await bcrypt.compare(passwordActual, result.rows[0].password_hash);
     if (!passwordValida) {
-      throw new Error('Contraseña actual incorrecta');
+      throw new Error('Contrasena actual incorrecta');
     }
 
-    // Hashear nueva contraseña
     const passwordHash = await bcrypt.hash(passwordNueva, 10);
 
-    // Actualizar
     await query(
-      'UPDATE usuarios SET password = $1 WHERE id = $2',
+      'UPDATE usuarios SET password_hash = $1 WHERE id = $2',
       [passwordHash, userId]
     );
 
-    return { message: 'Contraseña actualizada exitosamente' };
+    return { message: 'Contrasena actualizada exitosamente' };
   }
 }
 

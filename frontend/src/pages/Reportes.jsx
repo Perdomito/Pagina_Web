@@ -82,15 +82,7 @@ export default function Reportes() {
     const cargarContinentes = async () => {
       try {
         const continentesData = await administracionService.getAllContinentes();
-        const paisesData = await administracionService.getAllPaises();
-        
-        const continentesConPaises = continentesData.map(cont => ({
-          id: cont.id,
-          nombre: cont.nombre,
-          paises: paisesData.filter(p => p.continente === cont.nombre)
-        }));
-        
-        setContinentes(continentesConPaises);
+        setContinentes(continentesData);
       } catch (error) {
         console.error('Error al cargar continentes:', error);
       }

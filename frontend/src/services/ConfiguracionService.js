@@ -1,133 +1,84 @@
 import axios from '../api/axios';
 
 const ConfiguracionService = {
-  // USUARIOS
   getAllUsuarios: async () => {
-    try {
-      const response = await axios.get('/configuracion/usuarios');
-      return response.data;
-    } catch (error) {
-      console.error('Error en getAllUsuarios:', error);
-      throw error;
-    }
+    const response = await axios.get('/usuarios');
+    return response.data;
   },
 
   crearUsuario: async (datos) => {
-    try {
-      const response = await axios.post('/configuracion/usuarios', datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error en crearUsuario:', error);
-      throw error;
-    }
+    const response = await axios.post('/usuarios', datos);
+    return response.data;
   },
 
   actualizarUsuario: async (id, datos) => {
-    try {
-      const response = await axios.put(`/configuracion/usuarios/${id}`, datos);
-      return response.data;
-    } catch (error) {
-      console.error('Error en actualizarUsuario:', error);
-      throw error;
-    }
+    const response = await axios.patch(`/usuarios/${id}`, datos);
+    return response.data;
   },
 
   eliminarUsuario: async (id) => {
-    try {
-      const response = await axios.delete(`/configuracion/usuarios/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error en eliminarUsuario:', error);
-      throw error;
-    }
+    const response = await axios.delete(`/usuarios/${id}`);
+    return response.data;
   },
 
-  // ROLES
   getAllRoles: async () => {
-    try {
-      const response = await axios.get('/configuracion/roles');
-      return response.data;
-    } catch (error) {
-      console.error('Error en getAllRoles:', error);
-      throw error;
-    }
+    const response = await axios.get('/roles');
+    return response.data;
   },
 
-  // PERMISOS
   getAllPermisos: async () => {
-    try {
-      const response = await axios.get('/configuracion/permisos');
-      return response.data;
-    } catch (error) {
-      console.error('Error en getAllPermisos:', error);
-      throw error;
+    const response = await axios.get('/roles');
+    const roles = response.data;
+    const todosPermisos = new Map();
+    for (const rol of roles) {
+      try {
+        const permisosRol = await axios.get(`/roles/${rol.id}/permisos`).then(r => r.data);
+        permisosRol.forEach(p => {
+          if (!todosPermisos.has(p.permiso_id)) {
+            todosPermisos.set(p.permiso_id, {
+              id: p.permiso_id,
+              nombre: p.nombre || `Permiso ${p.permiso_id}`,
+              descripcion: p.descripcion || ''
+            });
+          }
+        });
+      } catch {}
     }
+    return Array.from(todosPermisos.values());
   },
 
   getPermisosRol: async (rol_id) => {
-    try {
-      const response = await axios.get(`/configuracion/roles/${rol_id}/permisos`);
-      return response.data;
-    } catch (error) {
-      console.error('Error en getPermisosRol:', error);
-      throw error;
-    }
+    const response = await axios.get(`/roles/${rol_id}/permisos`);
+    return response.data;
   },
 
   actualizarPermisoRol: async (rol_id, permiso_id, tiene_acceso) => {
-    try {
-      const response = await axios.put(`/configuracion/roles/${rol_id}/permisos/${permiso_id}`, {
-        tiene_acceso
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error en actualizarPermisoRol:', error);
-      throw error;
-    }
+    const response = await axios.patch(`/roles/${rol_id}/permisos/${permiso_id}`, {
+      tiene_acceso
+    });
+    return response.data;
   },
 
-  // PAÍSES
   getAllPaises: async () => {
-    try {
-      const response = await axios.get('/configuracion/paises');
-      return response.data;
-    } catch (error) {
-      console.error('Error en getAllPaises:', error);
-      throw error;
-    }
+    const response = await axios.get('/paises');
+    return response.data;
   },
 
-  // PERMISOS PERSONALIZADOS POR USUARIO
   getPermisosUsuario: async (usuario_id) => {
-    try {
-      const response = await axios.get(`/configuracion/usuarios/${usuario_id}/permisos`);
-      return response.data;
-    } catch (error) {
-      console.error('Error en getPermisosUsuario:', error);
-      throw error;
-    }
+    const response = await axios.get(`/usuarios/${usuario_id}/permisos`);
+    return response.data;
   },
 
   actualizarPermisoUsuario: async (usuario_id, permiso_id, tiene_acceso) => {
-    try {
-      const response = await axios.put(`/configuracion/usuarios/${usuario_id}/permisos/${permiso_id}`, {
-        tiene_acceso
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error en actualizarPermisoUsuario:', error);
-      throw error;
-    }
+    const response = await axios.patch(`/usuarios/${usuario_id}/permisos/${permiso_id}`, {
+      tiene_acceso
+    });
+    return response.data;
   },
 
   eliminarPermisoUsuario: async (usuario_id, permiso_id) => {
-    try {
-      const response = await axios.delete(`/configuracion/usuarios/${usuario_id}/permisos/${permiso_id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error en eliminarPermisoUsuario:', error);
-      throw error;
-    }
+    const response = await axios.delete(`/usuarios/${usuario_id}/permisos/${permiso_id}`);
+    return response.data;
   }
 };
 

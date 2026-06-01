@@ -1,59 +1,51 @@
 import API from '../api/axios';
 
 const estudiosService = {
-  // Guardar estudio
   guardarEstudio: async (datos) => {
-    const response = await API.post('/estudios/estudio', datos);
+    const response = await API.post('/estudios-diarios', datos);
     return response.data;
   },
 
-  // Obtener estudios por país y mes
   getEstudiosPorPaisYMes: async (pais_id, mes, anio) => {
-    const response = await API.get('/estudios/estudios', {
+    const response = await API.get('/estudios-diarios', {
       params: { pais_id, mes, anio }
     });
     return response.data;
   },
 
-  // Guardar evangelismo
   guardarEvangelismo: async (datos) => {
-    const response = await API.post('/estudios/evangelismo', datos);
+    const response = await API.post('/estudios-diarios', datos);
     return response.data;
   },
 
-  // Obtener evangelismo
   getEvangelismoPorPaisYMes: async (pais_id, mes, anio) => {
-    const response = await API.get('/estudios/evangelismo', {
+    const response = await API.get('/estudios-diarios', {
       params: { pais_id, mes, anio }
     });
     return response.data;
   },
 
-  // Guardar nuevos estudiantes
   guardarNuevosEstudiantes: async (datos) => {
-    const response = await API.post('/estudios/nuevos-estudiantes', datos);
+    const response = await API.post('/estudios-diarios', datos);
     return response.data;
   },
 
-  // Obtener nuevos estudiantes
   getNuevosEstudiantesPorPaisYMes: async (pais_id, mes, anio) => {
-    const response = await API.get('/estudios/nuevos-estudiantes', {
+    const response = await API.get('/estudios-diarios', {
       params: { pais_id, mes, anio }
     });
     return response.data;
   },
 
-  // Obtener resumen completo
   getResumenCompleto: async (pais_id, mes, anio) => {
-    const response = await API.get('/estudios/resumen', {
+    const response = await API.get('/estudios-diarios', {
       params: { pais_id, mes, anio }
     });
     return response.data;
   },
 
-  // Obtener reporte completo
   getReporteCompleto: async (pais_id, mes, anio, tipo = 'mensual') => {
-    const response = await API.get('/estudios/reporte', {
+    const response = await API.get('/reportes', {
       params: { pais_id, mes, anio, tipo }
     });
     return response.data;

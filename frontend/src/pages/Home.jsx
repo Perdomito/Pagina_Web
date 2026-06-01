@@ -34,7 +34,10 @@ export default function Home() {
   const cargarPermisos = async () => {
     try {
       const response = await axios.get('/auth/mis-permisos');
-      setPermisosUsuario(response.data.permisos);
+      const permisosActivos = (response.data.permisos || [])
+        .filter(p => p.activo)
+        .map(p => p.nombre);
+      setPermisosUsuario(permisosActivos);
     } catch (error) {
       console.error('Error loading permissions:', error);
       setPermisosUsuario(['estudios_biblicos', 'reportes', 'administracion', 'miembros', 'contactos', 'configuracion']);
