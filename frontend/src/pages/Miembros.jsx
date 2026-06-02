@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes } from "react-icons/fa";
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes, FaInfoCircle } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
@@ -29,6 +29,29 @@ export default function Miembros() {
     ministerio_of: ''
   });
 
+  const [mostrarModalInfo, setMostrarModalInfo] = useState(false);
+  const [miembroParaInfo, setMiembroParaInfo] = useState(null);
+  const [infoAdicional, setInfoAdicional] = useState(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [guardandoInfo, setGuardandoInfo] = useState(false);
+  const [infoFormData, setInfoFormData] = useState({
+    nombre_padre: '',
+    telefono_padre: '',
+    nombre_madre: '',
+    telefono_madre: '',
+    tipo_sangre: '',
+    correo_electronico: ''
+  });
+
+  const infoFormVacio = {
+    nombre_padre: '',
+    telefono_padre: '',
+    nombre_madre: '',
+    telefono_madre: '',
+    tipo_sangre: '',
+    correo_electronico: ''
+  };
+
   // Cargar países y miembros al inicio
   useEffect(() => {
     cargarDatos();
@@ -51,10 +74,20 @@ export default function Miembros() {
     }
   };
 
+  const paisesMap = useMemo(() => {
+    const m = new Map();
+    paises.forEach(p => m.set(p.id, p));
+    return m;
+  }, [paises]);
+
   const miembrosFiltrados = miembros.filter(m =>
     m.nombre?.toLowerCase().includes(filtro.toLowerCase()) ||
-    m.pais_nombre?.toLowerCase().includes(filtro.toLowerCase()) ||
-    m.ciudad?.toLowerCase().includes(filtro.toLowerCase())
+    m.ciudad?.toLowerCase().includes(filtro.toLowerCase()) ||
+    (() => {
+      const p = paisesMap.get(m.pais_id);
+      const label = (p?.iso || p?.nombre || '').toLowerCase();
+      return label.includes(filtro.toLowerCase());
+    })()
   );
 
   const handleSubmit = async (e) => {
@@ -133,6 +166,68 @@ export default function Miembros() {
     setMiembroEditando(null);
   };
 
+  const abrirModalInfo = async (miembro) => {
+    setMiembroParaInfo(miembro);
+    setInfoAdicional(null);
+    setInfoFormData(infoFormVacio);
+    setMostrarModalInfo(true);
+    setLoadingInfo(true);
+    try {
+      const data = await miembrosService.getInfoAdicional(miembro.id);
+      if (data) {
+        setInfoAdicional(data);
+        setInfoFormData({
+          nombre_padre: data.nombre_padre || '',
+          telefono_padre: data.telefono_padre || '',
+          nombre_madre: data.nombre_madre || '',
+          telefono_madre: data.telefono_madre || '',
+          tipo_sangre: data.tipo_sangre || '',
+          correo_electronico: data.correo_electronico || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error al cargar info adicional:', error);
+      toast.error('Error al cargar info adicional');
+    } finally {
+      setLoadingInfo(false);
+    }
+  };
+
+  const cerrarModalInfo = () => {
+    setMostrarModalInfo(false);
+    setMiembroParaInfo(null);
+    setInfoAdicional(null);
+    setInfoFormData(infoFormVacio);
+  };
+
+  const handleGuardarInfoAdicional = async (e) => {
+    e.preventDefault();
+    if (!miembroParaInfo) return;
+
+    try {
+      setGuardandoInfo(true);
+      const payload = {
+        miembro_id: miembroParaInfo.id,
+        ...infoFormData
+      };
+
+      if (infoAdicional) {
+        const { miembro_id, ...updatePayload } = payload;
+        await miembrosService.updateInfoAdicional(miembroParaInfo.id, updatePayload);
+        toast.success('Info adicional actualizada');
+      } else {
+        await miembrosService.createInfoAdicional(payload);
+        toast.success('Info adicional creada');
+      }
+      cerrarModalInfo();
+    } catch (error) {
+      console.error('Error al guardar info adicional:', error);
+      toast.error(error.response?.data?.detail || 'Error al guardar info adicional');
+    } finally {
+      setGuardandoInfo(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0E5A61, #15777F)", padding: "20px" }}>
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
@@ -186,7 +281,7 @@ export default function Miembros() {
                       <tr key={miembro.id} style={{ borderTop: "1px solid #eee" }}>
                         <td style={{ padding: "15px" }}>{miembro.nombre}</td>
                         <td style={{ padding: "15px" }}>{miembro.identidad || '-'}</td>
-                        <td style={{ padding: "15px" }}>{miembro.pais_nombre || '-'}</td>
+                        <td style={{ padding: "15px" }}>{paisesMap.get(miembro.pais_id)?.iso || '-'}</td>
                         <td style={{ padding: "15px" }}>{miembro.ciudad || '-'}</td>
                         <td style={{ padding: "15px" }}>{miembro.edad || '-'}</td>
                         <td style={{ padding: "15px" }}>
@@ -195,6 +290,9 @@ export default function Miembros() {
                           </span>
                         </td>
                         <td style={{ padding: "15px", textAlign: "center" }}>
+                          <button onClick={() => abrirModalInfo(miembro)} title="Info adicional" style={{ background: "#009688", border: "none", borderRadius: "6px", padding: "6px 12px", color: "white", cursor: "pointer", marginRight: "8px" }}>
+                            <FaInfoCircle />
+                          </button>
                           <button onClick={() => abrirModal(miembro)} style={{ background: "#2196F3", border: "none", borderRadius: "6px", padding: "6px 12px", color: "white", cursor: "pointer", marginRight: "8px" }}>
                             <FaEdit />
                           </button>
@@ -337,6 +435,89 @@ export default function Miembros() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Info Adicional */}
+      {mostrarModalInfo && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
+          <div style={{ background: "white", borderRadius: "12px", padding: "30px", width: "90%", maxWidth: "600px", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h2 style={{ margin: 0 }}>
+                Info adicional {miembroParaInfo ? `de ${miembroParaInfo.nombre}` : ''}
+              </h2>
+              <button onClick={cerrarModalInfo} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer", color: "#666" }}>
+                <FaTimes />
+              </button>
+            </div>
+
+            {loadingInfo ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Cargando...</div>
+            ) : (
+              <form onSubmit={handleGuardarInfoAdicional}>
+                {!infoAdicional && (
+                  <div style={{ marginBottom: "15px", padding: "12px", background: "#fff8e1", borderRadius: "8px", color: "#856404", fontSize: "13px" }}>
+                    Aún no hay info adicional para este miembro. Completá los campos para crearla.
+                  </div>
+                )}
+
+                <h3 style={{ margin: "0 0 12px 0", color: "#0E5A61", fontSize: "15px" }}>Padre</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "20px" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Nombre</label>
+                    <input type="text" value={infoFormData.nombre_padre} onChange={(e) => setInfoFormData({...infoFormData, nombre_padre: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Teléfono</label>
+                    <input type="tel" value={infoFormData.telefono_padre} onChange={(e) => setInfoFormData({...infoFormData, telefono_padre: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
+                  </div>
+                </div>
+
+                <h3 style={{ margin: "0 0 12px 0", color: "#0E5A61", fontSize: "15px" }}>Madre</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "20px" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Nombre</label>
+                    <input type="text" value={infoFormData.nombre_madre} onChange={(e) => setInfoFormData({...infoFormData, nombre_madre: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Teléfono</label>
+                    <input type="tel" value={infoFormData.telefono_madre} onChange={(e) => setInfoFormData({...infoFormData, telefono_madre: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
+                  </div>
+                </div>
+
+                <h3 style={{ margin: "0 0 12px 0", color: "#0E5A61", fontSize: "15px" }}>Datos personales</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "20px" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Tipo de sangre</label>
+                    <select value={infoFormData.tipo_sangre} onChange={(e) => setInfoFormData({...infoFormData, tipo_sangre: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }}>
+                      <option value="">Seleccionar...</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Correo electrónico</label>
+                    <input type="email" value={infoFormData.correo_electronico} onChange={(e) => setInfoFormData({...infoFormData, correo_electronico: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button type="submit" disabled={guardandoInfo} style={{ flex: 1, padding: "12px", background: guardandoInfo ? "#9E9E9E" : "#009688", color: "white", border: "none", borderRadius: "6px", fontWeight: "600", cursor: guardandoInfo ? "not-allowed" : "pointer" }}>
+                    {guardandoInfo ? 'Guardando...' : (infoAdicional ? 'Actualizar' : 'Crear')}
+                  </button>
+                  <button type="button" onClick={cerrarModalInfo} style={{ flex: 1, padding: "12px", background: "#999", color: "white", border: "none", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

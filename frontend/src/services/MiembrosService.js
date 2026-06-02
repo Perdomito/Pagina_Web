@@ -25,6 +25,26 @@ const miembrosService = {
   delete: async (id) => {
     const response = await API.delete(`/miembros/${id}`);
     return response.data;
+  },
+
+  getInfoAdicional: async (miembroId) => {
+    try {
+      const response = await API.get(`/miembros-info-adicional/${miembroId}`);
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 404) return null;
+      throw err;
+    }
+  },
+
+  createInfoAdicional: async (data) => {
+    const response = await API.post('/miembros-info-adicional', data);
+    return response.data;
+  },
+
+  updateInfoAdicional: async (miembroId, data) => {
+    const response = await API.patch(`/miembros-info-adicional/${miembroId}`, data);
+    return response.data;
   }
 };
 

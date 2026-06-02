@@ -2,7 +2,6 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
-from app.models import TipoMiembroEnum, CotizacionEstadoEnum, EstadoPresenciaMisionEnum, CuentaTipoEnum, TipoSangreEnum
 
 
 # ── Paises ─────────────────────────────────────────────────────────────────
@@ -129,7 +128,7 @@ class MiembroBase(BaseModel):
     estado_civil: Optional[str] = None
     profesion: Optional[str] = None
     comentarios: Optional[str] = None
-    tipo_miembro: TipoMiembroEnum
+    tipo_miembro: str
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
 
@@ -146,7 +145,7 @@ class MiembroUpdate(BaseModel):
     estado_civil: Optional[str] = None
     profesion: Optional[str] = None
     comentarios: Optional[str] = None
-    tipo_miembro: Optional[TipoMiembroEnum] = None
+    tipo_miembro: Optional[str] = None
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
 
@@ -233,7 +232,7 @@ class CotizacionBase(BaseModel):
     concepto: str
     monto: Decimal
     moneda: str = "USD"
-    estado: CotizacionEstadoEnum = CotizacionEstadoEnum.pendiente
+    estado: str = "pendiente"
     agregado_a_gastos: bool = False
     mes_agregado: Optional[int] = None
     anio_agregado: Optional[int] = None
@@ -256,7 +255,7 @@ class CotizacionUpdate(BaseModel):
     concepto: Optional[str] = None
     monto: Optional[Decimal] = None
     moneda: Optional[str] = None
-    estado: Optional[CotizacionEstadoEnum] = None
+    estado: Optional[str] = None
     agregado_a_gastos: Optional[bool] = None
     mes_agregado: Optional[int] = None
     anio_agregado: Optional[int] = None
@@ -448,7 +447,7 @@ class ConfiguracionOut(ConfiguracionBase):
 class CiudadMisionBase(BaseModel):
     ciudad_id: int
     region: Optional[str] = None
-    estado_presencia: EstadoPresenciaMisionEnum = EstadoPresenciaMisionEnum.en_proceso
+    estado_presencia: str = "En proceso"
     fecha_inicio_trabajo: Optional[date] = None
     pastor_encargado_id: Optional[str] = None
     pastor_encargado_nombre: Optional[str] = None
@@ -461,7 +460,7 @@ class CiudadMisionCreate(CiudadMisionBase):
 class CiudadMisionUpdate(BaseModel):
     ciudad_id: Optional[int] = None
     region: Optional[str] = None
-    estado_presencia: Optional[EstadoPresenciaMisionEnum] = None
+    estado_presencia: Optional[str] = None
     fecha_inicio_trabajo: Optional[date] = None
     pastor_encargado_id: Optional[str] = None
     pastor_encargado_nombre: Optional[str] = None
@@ -483,7 +482,7 @@ class IngresoBase(BaseModel):
     anio: int
     tipo: str
     origen: Optional[str] = None
-    donde_ingresa: CuentaTipoEnum
+    donde_ingresa: str
     valor: Decimal
     observaciones: Optional[str] = None
     fecha: date
@@ -504,7 +503,7 @@ class IngresoUpdate(BaseModel):
     anio: Optional[int] = None
     tipo: Optional[str] = None
     origen: Optional[str] = None
-    donde_ingresa: Optional[CuentaTipoEnum] = None
+    donde_ingresa: Optional[str] = None
     valor: Optional[Decimal] = None
     observaciones: Optional[str] = None
     fecha: Optional[date] = None
@@ -523,7 +522,7 @@ class MiembroInfoAdicionalBase(BaseModel):
     telefono_padre: Optional[str] = None
     nombre_madre: Optional[str] = None
     telefono_madre: Optional[str] = None
-    tipo_sangre: Optional[TipoSangreEnum] = None
+    tipo_sangre: Optional[str] = None
     correo_electronico: Optional[str] = None
 
 class MiembroInfoAdicionalCreate(MiembroInfoAdicionalBase):
@@ -534,7 +533,7 @@ class MiembroInfoAdicionalUpdate(BaseModel):
     telefono_padre: Optional[str] = None
     nombre_madre: Optional[str] = None
     telefono_madre: Optional[str] = None
-    tipo_sangre: Optional[TipoSangreEnum] = None
+    tipo_sangre: Optional[str] = None
     correo_electronico: Optional[str] = None
 
 class MiembroInfoAdicionalOut(MiembroInfoAdicionalBase):
@@ -568,8 +567,8 @@ class SaldoCajaBancoOut(SaldoCajaBancoBase):
 
 class TrasladoBase(BaseModel):
     pais_id: Optional[int] = None
-    de: CuentaTipoEnum
-    a: CuentaTipoEnum
+    de: str
+    a: str
     valor: Decimal
     observaciones: Optional[str] = None
     fecha: date
@@ -579,8 +578,8 @@ class TrasladoCreate(TrasladoBase):
 
 class TrasladoUpdate(BaseModel):
     pais_id: Optional[int] = None
-    de: Optional[CuentaTipoEnum] = None
-    a: Optional[CuentaTipoEnum] = None
+    de: Optional[str] = None
+    a: Optional[str] = None
     valor: Optional[Decimal] = None
     observaciones: Optional[str] = None
     fecha: Optional[date] = None
