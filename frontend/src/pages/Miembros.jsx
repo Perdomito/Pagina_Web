@@ -84,7 +84,7 @@ export default function Miembros() {
     nombre_madre: '',
     telefono_madre: '',
     tipo_sangre: '',
-    correo: ''
+    correo_electronico: ''
   };
 
   const [formData, setFormData] = useState(emptyForm);
@@ -180,7 +180,7 @@ export default function Miembros() {
         nombre_madre: miembro.nombre_madre || '',
         telefono_madre: miembro.telefono_madre || '',
         tipo_sangre: miembro.tipo_sangre || '',
-        correo: miembro.correo || ''
+        correo_electronico: miembro.correo_electronico || ''
       });
     } else {
       setMiembroEditando(null);
@@ -254,8 +254,7 @@ export default function Miembros() {
     }
   };
 
-  const set = (field) => (e) => setFormData({ ...formData, [field]: e.target.value });
-
+const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }));
   const tipoBadge = (tipo) => {
     const map = {
       Comprometido: '#4CAF50',
@@ -585,7 +584,7 @@ export default function Miembros() {
                       </div>
                       <div>
                         <label style={labelStyle}>Email</label>
-                        <input className="mbr-input" type="email" value={formData.correo} onChange={set('correo')} style={inputStyle} placeholder="email@example.com" />
+                        <input className="mbr-input" type="email" value={formData.correo_electronico} onChange={set('correo_electronico')} style={inputStyle} placeholder="email@example.com" />
                       </div>
                     </div>
                   </>

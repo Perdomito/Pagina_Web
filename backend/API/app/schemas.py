@@ -148,6 +148,9 @@ class MiembroUpdate(BaseModel):
     tipo_miembro: Optional[str] = None
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
+    cargo_funcion: Optional[str] = None
+    avance_audio: Optional[str] = None
+    ministerio_of: Optional[str] = None
 
 class MiembroOut(MiembroBase):
     model_config = {"from_attributes": True}
