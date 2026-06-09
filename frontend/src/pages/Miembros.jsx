@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes } from "react-icons/fa";
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes, FaInfoCircle } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
@@ -39,6 +39,29 @@ export default function Miembros() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [miembroEditando, setMiembroEditando] = useState(null);
   const [pestanaActiva, setPestanaActiva] = useState('basic');
+
+  const [mostrarModalInfo, setMostrarModalInfo] = useState(false);
+  const [miembroParaInfo, setMiembroParaInfo] = useState(null);
+  const [infoAdicional, setInfoAdicional] = useState(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [guardandoInfo, setGuardandoInfo] = useState(false);
+  const [infoFormData, setInfoFormData] = useState({
+    nombre_padre: '',
+    telefono_padre: '',
+    nombre_madre: '',
+    telefono_madre: '',
+    tipo_sangre: '',
+    correo_electronico: ''
+  });
+
+  const infoFormVacio = {
+    nombre_padre: '',
+    telefono_padre: '',
+    nombre_madre: '',
+    telefono_madre: '',
+    tipo_sangre: '',
+    correo_electronico: ''
+  };
 
   const emptyForm = {
     // Básicos
@@ -87,11 +110,22 @@ export default function Miembros() {
     }
   };
 
-  const miembrosFiltrados = miembros.filter(m =>
-    m.nombre?.toLowerCase().includes(filtro.toLowerCase()) ||
-    m.pais_nombre?.toLowerCase().includes(filtro.toLowerCase()) ||
-    m.ciudad?.toLowerCase().includes(filtro.toLowerCase())
-  );
+  const paisesMap = useMemo(() => {
+    const m = new Map();
+    paises.forEach(p => m.set(p.id, p));
+    return m;
+  }, [paises]);
+
+  const miembrosFiltrados = miembros.filter(m => {
+    const p = paisesMap.get(m.pais_id);
+    const paisLabel = (p?.iso || p?.nombre || '').toLowerCase();
+    const t = filtro.toLowerCase();
+    return (
+      m.nombre?.toLowerCase().includes(t) ||
+      m.ciudad?.toLowerCase().includes(t) ||
+      paisLabel.includes(t)
+    );
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -159,6 +193,65 @@ export default function Miembros() {
     setMostrarModal(false);
     setMiembroEditando(null);
     setPestanaActiva('basic');
+  };
+
+  const abrirModalInfo = async (miembro) => {
+    setMiembroParaInfo(miembro);
+    setInfoAdicional(null);
+    setInfoFormData(infoFormVacio);
+    setMostrarModalInfo(true);
+    setLoadingInfo(true);
+    try {
+      const data = await miembrosService.getInfoAdicional(miembro.id);
+      if (data) {
+        setInfoAdicional(data);
+        setInfoFormData({
+          nombre_padre: data.nombre_padre || '',
+          telefono_padre: data.telefono_padre || '',
+          nombre_madre: data.nombre_madre || '',
+          telefono_madre: data.telefono_madre || '',
+          tipo_sangre: data.tipo_sangre || '',
+          correo_electronico: data.correo_electronico || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error loading additional info:', error);
+      toast.error('Error loading additional info');
+    } finally {
+      setLoadingInfo(false);
+    }
+  };
+
+  const cerrarModalInfo = () => {
+    setMostrarModalInfo(false);
+    setMiembroParaInfo(null);
+    setInfoAdicional(null);
+    setInfoFormData(infoFormVacio);
+  };
+
+  const handleGuardarInfoAdicional = async (e) => {
+    e.preventDefault();
+    if (!miembroParaInfo) return;
+
+    try {
+      setGuardandoInfo(true);
+      if (infoAdicional) {
+        await miembrosService.updateInfoAdicional(miembroParaInfo.id, infoFormData);
+        toast.success('Additional info updated');
+      } else {
+        await miembrosService.createInfoAdicional({
+          miembro_id: miembroParaInfo.id,
+          ...infoFormData
+        });
+        toast.success('Additional info created');
+      }
+      cerrarModalInfo();
+    } catch (error) {
+      console.error('Error saving additional info:', error);
+      toast.error(error.response?.data?.detail || 'Error saving additional info');
+    } finally {
+      setGuardandoInfo(false);
+    }
   };
 
   const set = (field) => (e) => setFormData({ ...formData, [field]: e.target.value });
@@ -277,7 +370,7 @@ export default function Miembros() {
                       <tr key={miembro.id} className="row-hover" style={{ borderBottom: "1px solid #eef2f7", background: i % 2 === 0 ? "white" : "#fafbfd" }}>
                         <td style={{ padding: "14px 16px", fontWeight: "600", color: "#1a2d5a", fontFamily: "'Lato', sans-serif" }}>{miembro.nombre}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85", fontSize: "13px" }}>{miembro.identidad}</td>
-                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.pais_nombre}</td>
+                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{paisesMap.get(miembro.pais_id)?.iso || '-'}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.ciudad}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.edad}</td>
                         <td style={{ padding: "14px 16px" }}>
@@ -286,6 +379,9 @@ export default function Miembros() {
                           </span>
                         </td>
                         <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                          <button onClick={() => abrirModalInfo(miembro)} title="Additional info" style={{ background: "#009688", border: "none", borderRadius: "7px", padding: "7px 13px", color: "white", cursor: "pointer", marginRight: "8px" }}>
+                            <FaInfoCircle />
+                          </button>
                           <button onClick={() => abrirModal(miembro)} style={{ background: PRIMARY, border: "none", borderRadius: "7px", padding: "7px 13px", color: "white", cursor: "pointer", marginRight: "8px" }}>
                             <FaEdit />
                           </button>
@@ -513,6 +609,94 @@ export default function Miembros() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL INFO ADICIONAL ── */}
+      {mostrarModalInfo && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000, padding: "20px" }}>
+          <div style={{ background: "white", borderRadius: "16px", width: "100%", maxWidth: "640px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px 28px 16px", borderBottom: "1px solid #eef2f7" }}>
+              <h2 style={{ margin: 0, fontFamily: "'Cinzel', serif", fontSize: "20px", color: PRIMARY }}>
+                Additional Info {miembroParaInfo ? `of ${miembroParaInfo.nombre}` : ''}
+              </h2>
+              <button onClick={cerrarModalInfo} style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#8a97b0" }}>
+                <FaTimes />
+              </button>
+            </div>
+
+            {loadingInfo ? (
+              <div style={{ padding: "60px", textAlign: "center", color: "#8a97b0" }}>Loading...</div>
+            ) : (
+              <form onSubmit={handleGuardarInfoAdicional}>
+                <div style={{ padding: "24px 28px" }}>
+                  {!infoAdicional && (
+                    <div style={{ marginBottom: "20px", padding: "14px 16px", background: "#fff8e1", borderRadius: "10px", borderLeft: "4px solid #FF9800", color: "#856404", fontSize: "13px", fontFamily: "'Lato', sans-serif" }}>
+                      No additional info yet. Fill in the fields to create it.
+                    </div>
+                  )}
+
+                  <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>— Father's Information</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                    <div>
+                      <label style={labelStyle}>Father's Name</label>
+                      <input className="mbr-input" type="text" value={infoFormData.nombre_padre} onChange={(e) => setInfoFormData({...infoFormData, nombre_padre: e.target.value})} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Father's Phone</label>
+                      <input className="mbr-input" type="tel" value={infoFormData.telefono_padre} onChange={(e) => setInfoFormData({...infoFormData, telefono_padre: e.target.value})} style={inputStyle} />
+                    </div>
+                  </div>
+
+                  <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>— Mother's Information</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                    <div>
+                      <label style={labelStyle}>Mother's Name</label>
+                      <input className="mbr-input" type="text" value={infoFormData.nombre_madre} onChange={(e) => setInfoFormData({...infoFormData, nombre_madre: e.target.value})} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Mother's Phone</label>
+                      <input className="mbr-input" type="tel" value={infoFormData.telefono_madre} onChange={(e) => setInfoFormData({...infoFormData, telefono_madre: e.target.value})} style={inputStyle} />
+                    </div>
+                  </div>
+
+                  <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>— Health & Contact</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={labelStyle}>Blood Type</label>
+                      <select value={infoFormData.tipo_sangre} onChange={(e) => setInfoFormData({...infoFormData, tipo_sangre: e.target.value})} style={inputStyle} className="mbr-input">
+                        <option value="">Select...</option>
+                        {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Email</label>
+                      <input className="mbr-input" type="email" value={infoFormData.correo_electronico} onChange={(e) => setInfoFormData({...infoFormData, correo_electronico: e.target.value})} style={inputStyle} placeholder="email@example.com" />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", padding: "0 28px 24px" }}>
+                  <button
+                    type="submit"
+                    disabled={guardandoInfo}
+                    style={{ flex: 1, padding: "13px", background: guardandoInfo ? "#9E9E9E" : "#009688", color: "white", border: "none", borderRadius: "10px", fontWeight: "700", fontFamily: "'Lato', sans-serif", fontSize: "14px", cursor: guardandoInfo ? "not-allowed" : "pointer", boxShadow: guardandoInfo ? "none" : "0 4px 14px rgba(0,150,136,0.3)" }}
+                  >
+                    {guardandoInfo ? 'Saving...' : (infoAdicional ? 'Update' : 'Create')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cerrarModalInfo}
+                    style={{ flex: 1, padding: "13px", background: "#f0f4fa", color: "#5a6a85", border: "none", borderRadius: "10px", fontWeight: "700", fontFamily: "'Lato', sans-serif", fontSize: "14px", cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

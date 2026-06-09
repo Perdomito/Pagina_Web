@@ -3,7 +3,7 @@ from datetime import datetime, date
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, Numeric,
     DateTime, Date, BigInteger, ForeignKey, Interval,
-    Enum as SAEnum, CheckConstraint
+    CheckConstraint
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -137,7 +137,7 @@ class Miembro(Base):
     estado_civil = Column(Text)
     profesion = Column(Text)
     comentarios = Column(Text)
-    tipo_miembro = Column(SAEnum(TipoMiembroEnum, name="tipo_miembro_enum"), nullable=False)
+    tipo_miembro = Column(String(20), nullable=False)
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
     ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"))
 
@@ -201,11 +201,7 @@ class Cotizacion(Base):
     concepto = Column(Text, nullable=False)
     monto = Column(Numeric(15, 2), nullable=False)
     moneda = Column(String(10), default="USD", nullable=False)
-    estado = Column(
-        SAEnum(CotizacionEstadoEnum, name="cotizacion_estado_enum"),
-        default=CotizacionEstadoEnum.pendiente,
-        nullable=False,
-    )
+    estado = Column(String(20), default="pendiente", nullable=False)
     agregado_a_gastos = Column(Boolean, default=False, nullable=False)
     mes_agregado = Column(Integer)
     anio_agregado = Column(Integer)
@@ -303,7 +299,7 @@ class CiudadMision(Base):
     id = Column(Integer, primary_key=True)
     ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"), nullable=False)
     region = Column(String(150))
-    estado_presencia = Column(SAEnum(EstadoPresenciaMisionEnum, name="estado_presencia_mision_enum"), nullable=False, default=EstadoPresenciaMisionEnum.en_proceso)
+    estado_presencia = Column(String(30), nullable=False, default="En proceso")
     fecha_inicio_trabajo = Column(Date)
     pastor_encargado_id = Column(String(30))
     pastor_encargado_nombre = Column(Text)
@@ -324,7 +320,7 @@ class Ingreso(Base):
     anio = Column(Integer, nullable=False)
     tipo = Column(String(100), nullable=False)
     origen = Column(Text)
-    donde_ingresa = Column(SAEnum(CuentaTipoEnum, name="cuenta_tipo_enum"), nullable=False)
+    donde_ingresa = Column(String(10), nullable=False)
     valor = Column(Numeric(15, 2), nullable=False)
     observaciones = Column(Text)
     fecha = Column(Date, nullable=False)
@@ -341,7 +337,7 @@ class MiembroInfoAdicional(Base):
     telefono_padre = Column(String(30))
     nombre_madre = Column(Text)
     telefono_madre = Column(String(30))
-    tipo_sangre = Column(SAEnum(TipoSangreEnum, name="tipo_sangre_enum"))
+    tipo_sangre = Column(String(5))
     correo_electronico = Column(String(255))
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -366,8 +362,8 @@ class Traslado(Base):
 
     id = Column(Integer, primary_key=True)
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
-    de = Column(SAEnum(CuentaTipoEnum, name="cuenta_tipo_enum"), nullable=False)
-    a = Column(SAEnum(CuentaTipoEnum, name="cuenta_tipo_enum"), nullable=False)
+    de = Column(String(10), nullable=False)
+    a = Column(String(10), nullable=False)
     valor = Column(Numeric(15, 2), nullable=False)
     observaciones = Column(Text)
     fecha = Column(Date, nullable=False)
