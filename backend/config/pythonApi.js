@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const pythonApi = axios.create({
-  baseURL: process.env.PYTHON_API_URL || 'https://gnit-api-production.up.railway.app',
+  baseURL: process.env.PYTHON_API_URL || 'https://laevateinn707-gnit-api.hf.space',
   headers: {
     'Content-Type': 'application/json'
   },
