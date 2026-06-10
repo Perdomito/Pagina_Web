@@ -44,11 +44,14 @@ async def startup():
     logger = logging.getLogger("gnit-api")
     logger.info("=== GNIT API Starting ===")
     try:
-        from app.database import engine
+        from app.database import engine, Base
         from sqlalchemy import text
         async with engine.connect() as conn:
             result = await conn.execute(text("SELECT 1"))
             logger.info(f"=== DB Connection OK: {result.scalar()} ===")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            logger.info("=== Tables sync OK ===")
     except Exception as e:
         logger.error(f"=== DB Connection FAILED: {e} ===")
 
