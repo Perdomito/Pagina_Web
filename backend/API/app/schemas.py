@@ -98,6 +98,7 @@ class UsuarioBase(BaseModel):
     email: EmailStr
     rol: int
     activo: bool = False
+    region: Optional[str] = None
 
 class UsuarioCreate(UsuarioBase):
     password: str
@@ -108,6 +109,7 @@ class UsuarioUpdate(BaseModel):
     password: Optional[str] = None
     rol: Optional[int] = None
     activo: Optional[bool] = None
+    region: Optional[str] = None
 
 class UsuarioOut(UsuarioBase):
     fecha_registro: datetime
@@ -148,9 +150,6 @@ class MiembroUpdate(BaseModel):
     tipo_miembro: Optional[str] = None
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
-    cargo_funcion: Optional[str] = None
-    avance_audio: Optional[str] = None
-    ministerio_of: Optional[str] = None
 
 class MiembroOut(MiembroBase):
     model_config = {"from_attributes": True}

@@ -120,6 +120,7 @@ class Usuario(Base):
     rol = Column(Integer, ForeignKey("roles.id"), nullable=False)
     fecha_registro = Column(DateTime, default=datetime.utcnow, nullable=False)
     activo = Column(Boolean, default=False, nullable=False)
+    region = Column(String(20), nullable=True)
 
     rol_rel = relationship("Rol", back_populates="usuarios")
 
