@@ -8,7 +8,7 @@ from app.schemas import IngresoCreate, IngresoUpdate, IngresoOut
 router = APIRouter(prefix="/ingresos", tags=["Ingresos"])
 
 
-@router.get("/", response_model=list[IngresoOut])
+@router.get("", response_model=list[IngresoOut])
 async def listar(
     pais_id: int | None = Query(None),
     anio: int | None = Query(None),
@@ -40,7 +40,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=IngresoOut, status_code=201)
+@router.post("", response_model=IngresoOut, status_code=201)
 async def crear(data: IngresoCreate, db: AsyncSession = Depends(get_db)):
     obj = Ingreso(**data.model_dump())
     db.add(obj)

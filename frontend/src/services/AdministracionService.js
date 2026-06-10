@@ -72,14 +72,21 @@ const administracionService = {
   },
 
   getDetallePresupuesto: async (pais_id, mes, anio) => {
+    const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+    const mesNum = typeof mes === 'string' ? MESES.indexOf(mes) + 1 : mes;
     const response = await axios.get('/presupuestos', {
-      params: { pais_id, mes, anio }
+      params: { pais_id, mes: mesNum, anio }
     });
     return response.data;
   },
 
   agregarItemPresupuesto: async (datos) => {
-    const response = await axios.post('/presupuestos', datos);
+    const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+    const datosFixed = { ...datos };
+    if (typeof datosFixed.mes === 'string') {
+      datosFixed.mes = MESES.indexOf(datosFixed.mes) + 1;
+    }
+    const response = await axios.post('/presupuestos', datosFixed);
     return response.data;
   },
 
@@ -151,14 +158,82 @@ const administracionService = {
   },
 
   getTasaCambio: async () => {
-    const response = await axios.get('/configuracion/tasa_cambio');
-    return response.data.valor;
+    try {
+      const response = await axios.get('/configuracion/tasa_cambio');
+      return response.data.valor;
+    } catch {
+      return 58.00; // valor por defecto si no existe
+    }
   },
 
   actualizarTasaCambio: async (tasa) => {
-    const response = await axios.patch('/configuracion/tasa_cambio', { valor: tasa });
+    try {
+      const response = await axios.patch('/configuracion/tasa_cambio', { valor: String(tasa) });
+      return response.data;
+    } catch {
+      // Si no existe la clave, la creamos
+      try {
+        const response = await axios.post('/configuracion', { clave: 'tasa_cambio', valor: String(tasa) });
+        return response.data;
+      } catch {}
+    }
+  }
+,
+
+  // Ingresos
+  getIngresos: async (pais_id, mes, anio) => {
+    const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+    const mesNum = typeof mes === 'string' ? MESES.indexOf(mes) + 1 : mes;
+    const response = await axios.get('/ingresos', {
+      params: { pais_id, mes: mesNum, anio }
+    });
+    return response.data;
+  },
+
+  crearIngreso: async (datos) => {
+    const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+    const datosFixed = { ...datos };
+    if (typeof datosFixed.mes === 'string') {
+      datosFixed.mes = MESES.indexOf(datosFixed.mes) + 1;
+    }
+    const response = await axios.post('/ingresos', datosFixed);
+    return response.data;
+  },
+
+  eliminarIngreso: async (id) => {
+    const response = await axios.delete(`/ingresos/${id}`);
+    return response.data;
+  },
+
+  // Traslados
+  getTraslados: async (pais_id) => {
+    const response = await axios.get('/traslados', { params: { pais_id } });
+    return response.data;
+  },
+
+  crearTraslado: async (datos) => {
+    const response = await axios.post('/traslados', datos);
+    return response.data;
+  },
+
+  // Saldos caja/banco
+  getSaldos: async (pais_id) => {
+    try {
+      const response = await axios.get('/saldos-caja-banco', { params: { pais_id } });
+      return response.data;
+    } catch { return []; }
+  },
+
+  actualizarSaldos: async (id, datos) => {
+    const response = await axios.patch(`/saldos-caja-banco/${id}`, datos);
+    return response.data;
+  },
+
+  crearSaldos: async (datos) => {
+    const response = await axios.post('/saldos-caja-banco', datos);
     return response.data;
   }
+
 };
 
 export default administracionService;

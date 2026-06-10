@@ -8,7 +8,7 @@ from app.schemas import ConfiguracionCreate, ConfiguracionUpdate, ConfiguracionO
 router = APIRouter(prefix="/configuracion", tags=["Configuración"])
 
 
-@router.get("/", response_model=list[ConfiguracionOut])
+@router.get("", response_model=list[ConfiguracionOut])
 async def listar(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Configuracion).order_by(Configuracion.clave))
     return result.scalars().all()
@@ -23,7 +23,7 @@ async def obtener_por_clave(clave: str, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=ConfiguracionOut, status_code=201)
+@router.post("", response_model=ConfiguracionOut, status_code=201)
 async def crear(data: ConfiguracionCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(Configuracion).where(Configuracion.clave == data.clave))
     if existing.scalar_one_or_none():

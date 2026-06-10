@@ -8,7 +8,7 @@ from app.schemas import PaisCreate, PaisUpdate, PaisOut
 router = APIRouter(prefix="/paises", tags=["Países"])
 
 
-@router.get("/", response_model=list[PaisOut])
+@router.get("", response_model=list[PaisOut])
 async def listar(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Pais).order_by(Pais.nombre))
     return result.scalars().all()
@@ -22,7 +22,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=PaisOut, status_code=201)
+@router.post("", response_model=PaisOut, status_code=201)
 async def crear(data: PaisCreate, db: AsyncSession = Depends(get_db)):
     obj = Pais(**data.model_dump())
     db.add(obj)

@@ -8,7 +8,7 @@ from app.schemas import CotizacionCreate, CotizacionUpdate, CotizacionOut
 router = APIRouter(prefix="/cotizaciones", tags=["Cotizaciones"])
 
 
-@router.get("/", response_model=list[CotizacionOut])
+@router.get("", response_model=list[CotizacionOut])
 async def listar(
     estado: CotizacionEstadoEnum | None = Query(None),
     miembro_id: str | None = Query(None),
@@ -37,7 +37,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=CotizacionOut, status_code=201)
+@router.post("", response_model=CotizacionOut, status_code=201)
 async def crear(data: CotizacionCreate, db: AsyncSession = Depends(get_db)):
     obj = Cotizacion(**data.model_dump())
     db.add(obj)

@@ -8,7 +8,7 @@ from app.schemas import PresupuestoCreate, PresupuestoUpdate, PresupuestoOut
 router = APIRouter(prefix="/presupuestos", tags=["Presupuestos"])
 
 
-@router.get("/", response_model=list[PresupuestoOut])
+@router.get("", response_model=list[PresupuestoOut])
 async def listar(
     pais_id: int | None = Query(None),
     anio: int | None = Query(None),
@@ -37,7 +37,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=PresupuestoOut, status_code=201)
+@router.post("", response_model=PresupuestoOut, status_code=201)
 async def crear(data: PresupuestoCreate, db: AsyncSession = Depends(get_db)):
     obj = Presupuesto(**data.model_dump())
     db.add(obj)

@@ -8,7 +8,7 @@ from app.schemas import SaldoCajaBancoCreate, SaldoCajaBancoUpdate, SaldoCajaBan
 router = APIRouter(prefix="/saldos-caja-banco", tags=["Saldos Caja Banco"])
 
 
-@router.get("/", response_model=list[SaldoCajaBancoOut])
+@router.get("", response_model=list[SaldoCajaBancoOut])
 async def listar(
     pais_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -28,7 +28,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=SaldoCajaBancoOut, status_code=201)
+@router.post("", response_model=SaldoCajaBancoOut, status_code=201)
 async def crear(data: SaldoCajaBancoCreate, db: AsyncSession = Depends(get_db)):
     obj = SaldoCajaBanco(**data.model_dump())
     db.add(obj)

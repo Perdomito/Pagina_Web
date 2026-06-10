@@ -8,7 +8,7 @@ from app.schemas import ContinenteCreate, ContinenteUpdate, ContinenteOut
 router = APIRouter(prefix="/continentes", tags=["Continentes"])
 
 
-@router.get("/", response_model=list[ContinenteOut])
+@router.get("", response_model=list[ContinenteOut])
 async def listar(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Continente).order_by(Continente.nombre))
     return result.scalars().all()
@@ -22,7 +22,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=ContinenteOut, status_code=201)
+@router.post("", response_model=ContinenteOut, status_code=201)
 async def crear(data: ContinenteCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(
         select(Continente).where(Continente.nombre == data.nombre)
