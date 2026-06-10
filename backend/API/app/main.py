@@ -50,7 +50,15 @@ async def startup():
             result = await conn.execute(text("SELECT 1"))
             logger.info(f"=== DB Connection OK: {result.scalar()} ===")
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS usuario_permisos (
+                    id SERIAL PRIMARY KEY,
+                    usuario_id VARCHAR(30) NOT NULL REFERENCES public.usuarios(id) ON DELETE CASCADE,
+                    permiso_id INTEGER NOT NULL REFERENCES public.permisos(id) ON DELETE CASCADE,
+                    tiene_acceso BOOLEAN DEFAULT TRUE,
+                    UNIQUE(usuario_id, permiso_id)
+                )
+            """))
             logger.info("=== Tables sync OK ===")
     except Exception as e:
         logger.error(f"=== DB Connection FAILED: {e} ===")
