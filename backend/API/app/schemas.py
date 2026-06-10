@@ -92,6 +92,24 @@ class RolPermisoOut(RolPermisoBase):
     model_config = {"from_attributes": True}
 
 
+# ── UsuarioPermisos ─────────────────────────────────────────────────────────
+
+class UsuarioPermisoBase(BaseModel):
+    usuario_id: str
+    permiso_id: int
+    tiene_acceso: bool = True
+
+class UsuarioPermisoCreate(UsuarioPermisoBase):
+    pass
+
+class UsuarioPermisoUpdate(BaseModel):
+    tiene_acceso: Optional[bool] = None
+
+class UsuarioPermisoOut(UsuarioPermisoBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+
 # ── Usuarios ───────────────────────────────────────────────────────────────
 
 class UsuarioBase(BaseModel):

@@ -110,6 +110,15 @@ class RolPermiso(Base):
     rol = relationship("Rol", back_populates="permisos")
 
 
+class UsuarioPermiso(Base):
+    __tablename__ = "usuario_permisos"
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(String(30), ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    permiso_id = Column(Integer, ForeignKey("permisos.id", ondelete="CASCADE"), nullable=False)
+    tiene_acceso = Column(Boolean, default=True)
+
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 
