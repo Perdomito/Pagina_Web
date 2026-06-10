@@ -47,7 +47,8 @@ const administracionService = {
   crearPaisConContinente: async (datos) => {
     const response = await axios.post('/paises', {
       nombre: datos.nombre,
-      iso: datos.codigo_iso || ''
+      iso: datos.codigo_iso || '',
+      continente_id: datos.continente_id
     });
     return { ...response.data, continente: datos.continente };
   },

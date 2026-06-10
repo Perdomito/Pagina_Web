@@ -75,7 +75,7 @@ const cargarDatosIniciales = async () => {
     const continentesConPaises = continentesData.map(cont => ({
       id: cont.id,
       nombre: cont.nombre,
-      paises: paisesData.filter(p => p.continente === cont.nombre)
+      paises: paisesData.filter(p => p.continente_id === cont.id)
     }));
     
     setContinentes(continentesConPaises);
@@ -638,7 +638,7 @@ const agregarPais = async () => {
     // Crear país en la BD
 const nuevoPais = await administracionService.crearPaisConContinente({
       nombre: nuevoNombrePais.trim(),
-      continente: continente.nombre,
+      continente_id: continenteParaPais,
       codigo_iso: '',
     });
     

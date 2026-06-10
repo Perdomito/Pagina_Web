@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 class PaisBase(BaseModel):
     iso: Optional[str] = None
     nombre: str
+    continente_id: Optional[int] = None
 
 class PaisCreate(PaisBase):
     pass
@@ -16,6 +17,7 @@ class PaisCreate(PaisBase):
 class PaisUpdate(BaseModel):
     iso: Optional[str] = None
     nombre: Optional[str] = None
+    continente_id: Optional[int] = None
 
 class PaisOut(PaisBase):
     id: int
