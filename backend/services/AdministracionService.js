@@ -1,4 +1,3 @@
-const bcrypt = require('bcryptjs');
 const { query } = require('../config/database');
 const pythonApi = require('../config/pythonApi');
 
@@ -244,78 +243,52 @@ class AdministracionService {
     return response.data;
   }
 
-  // ===== VIA DIRECT DB: USUARIOS =====
+  // ===== VIA PYTHON API: USUARIOS =====
   async getAllUsuarios() {
-    const result = await query(`
-      SELECT u.id, u.nombre, u.email, u.activo, u.ultimo_acceso, u.created_at,
-             r.nombre as rol_nombre, p.nombre as pais_nombre
-      FROM usuarios u
-      LEFT JOIN roles r ON u.rol = r.id
-      LEFT JOIN paises p ON u.pais_id = p.id
-      ORDER BY u.created_at DESC
-    `);
-    return result.rows;
+    const response = await pythonApi.get('/usuarios/');
+    return response.data;
   }
 
   async crearUsuario(datos) {
-    const { nombre, email, password, rol, pais_id } = datos;
+    const { nombre, email, password, rol_id, pais_id } = datos;
 
     if (!nombre || !email || !password) {
       throw new Error('Datos incompletos');
     }
 
-    const existente = await query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    if (existente.rows.length > 0) {
-      throw new Error('El email ya existe');
-    }
+    const id = datos.id || nombre.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const payload = {
+      id,
+      nombre,
+      email,
+      password,
+      rol: rol_id,
+      activo: true,
+      region: pais_id ? String(pais_id) : null
+    };
 
-    const result = await query(`
-      INSERT INTO usuarios (nombre, email, password_hash, rol, pais_id)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, nombre, email, rol, pais_id, created_at
-    `, [nombre, email, password_hash, rol, pais_id]);
-
-    return result.rows[0];
+    const response = await pythonApi.post('/usuarios/', payload);
+    return response.data;
   }
 
   async actualizarUsuario(id, datos) {
-    const { nombre, email, rol, pais_id, activo, password } = datos;
+    const { nombre, email, rol_id, pais_id, activo, password } = datos;
 
-    if (password) {
-      const password_hash = await bcrypt.hash(password, 10);
-      const result = await query(`
-        UPDATE usuarios
-        SET nombre = $1, email = $2, rol = $3, pais_id = $4, activo = $5, password_hash = $6
-        WHERE id = $7
-        RETURNING id, nombre, email, rol, pais_id, activo
-      `, [nombre, email, rol, pais_id, activo, password_hash, id]);
+    const payload = {};
+    if (nombre !== undefined) payload.nombre = nombre;
+    if (email !== undefined) payload.email = email;
+    if (rol_id !== undefined) payload.rol = rol_id;
+    if (pais_id !== undefined) payload.region = String(pais_id);
+    if (activo !== undefined) payload.activo = activo;
+    if (password) payload.password = password;
 
-      if (result.rows.length === 0) {
-        throw new Error('Usuario no encontrado');
-      }
-      return result.rows[0];
-    }
-
-    const result = await query(`
-      UPDATE usuarios
-      SET nombre = $1, email = $2, rol = $3, pais_id = $4, activo = $5
-      WHERE id = $6
-      RETURNING id, nombre, email, rol, pais_id, activo
-    `, [nombre, email, rol, pais_id, activo, id]);
-
-    if (result.rows.length === 0) {
-      throw new Error('Usuario no encontrado');
-    }
-    return result.rows[0];
+    const response = await pythonApi.patch(`/usuarios/${id}`, payload);
+    return response.data;
   }
 
   async eliminarUsuario(id) {
-    const result = await query('DELETE FROM usuarios WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      throw new Error('Usuario no encontrado');
-    }
+    await pythonApi.delete(`/usuarios/${id}`);
     return { message: 'Usuario eliminado' };
   }
 

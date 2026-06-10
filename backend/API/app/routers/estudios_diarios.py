@@ -8,7 +8,7 @@ from app.schemas import EstudioDiarioCreate, EstudioDiarioUpdate, EstudioDiarioO
 router = APIRouter(prefix="/estudios-diarios", tags=["Estudios Diarios"])
 
 
-@router.get("/", response_model=list[EstudioDiarioOut])
+@router.get("", response_model=list[EstudioDiarioOut])
 async def listar(
     miembro_id: str | None = Query(None),
     pais_id: int | None = Query(None),
@@ -37,7 +37,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=EstudioDiarioOut, status_code=201)
+@router.post("", response_model=EstudioDiarioOut, status_code=201)
 async def crear(data: EstudioDiarioCreate, db: AsyncSession = Depends(get_db)):
     obj = EstudioDiario(**data.model_dump())
     db.add(obj)

@@ -13,7 +13,7 @@ def _hash_password(plain: str) -> str:
     return _bcrypt.hashpw(plain.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
 
 
-@router.get("/", response_model=list[UsuarioOut])
+@router.get("", response_model=list[UsuarioOut])
 async def listar(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Usuario).order_by(Usuario.nombre))
     return result.scalars().all()
@@ -27,7 +27,7 @@ async def obtener(id: str, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=UsuarioOut, status_code=201)
+@router.post("", response_model=UsuarioOut, status_code=201)
 async def crear(data: UsuarioCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.get(Usuario, data.id)
     if existing:

@@ -8,7 +8,7 @@ from app.schemas import EjecucionCreate, EjecucionUpdate, EjecucionOut
 router = APIRouter(prefix="/ejecuciones", tags=["Ejecuciones"])
 
 
-@router.get("/", response_model=list[EjecucionOut])
+@router.get("", response_model=list[EjecucionOut])
 async def listar(
     pais_id: int | None = Query(None),
     anio: int | None = Query(None),
@@ -34,7 +34,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=EjecucionOut, status_code=201)
+@router.post("", response_model=EjecucionOut, status_code=201)
 async def crear(data: EjecucionCreate, db: AsyncSession = Depends(get_db)):
     obj = Ejecucion(**data.model_dump())
     db.add(obj)

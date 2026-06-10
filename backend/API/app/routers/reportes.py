@@ -8,7 +8,7 @@ from app.schemas import ReporteCreate, ReporteUpdate, ReporteOut
 router = APIRouter(prefix="/reportes", tags=["Reportes"])
 
 
-@router.get("/", response_model=list[ReporteOut])
+@router.get("", response_model=list[ReporteOut])
 async def listar(
     miembro_id: str | None = Query(None),
     pais_id: int | None = Query(None),
@@ -34,7 +34,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=ReporteOut, status_code=201)
+@router.post("", response_model=ReporteOut, status_code=201)
 async def crear(data: ReporteCreate, db: AsyncSession = Depends(get_db)):
     obj = Reporte(**data.model_dump())
     db.add(obj)

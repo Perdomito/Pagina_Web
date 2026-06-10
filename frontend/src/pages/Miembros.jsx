@@ -127,14 +127,34 @@ export default function Miembros() {
     );
   });
 
+  const buildPayload = (data) => {
+    const id = data.nombre.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.') || 'unknown';
+    return {
+      id: data.identidad?.trim() || id,
+      nombre: data.nombre,
+      identidad: data.identidad || null,
+      pais: null,
+      ciudad: data.ciudad || null,
+      edad: data.edad === '' || data.edad === null ? null : Number(data.edad),
+      evangelizado_por: data.evangelizado_por || null,
+      estado_civil: data.estado_civil || null,
+      profesion: data.profesion || null,
+      comentarios: data.comentarios || null,
+      tipo_miembro: data.tipo_miembro,
+      pais_id: data.pais_id === '' || data.pais_id === null ? null : Number(data.pais_id),
+      ciudad_id: null
+    };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = buildPayload(formData);
       if (miembroEditando) {
-        await miembrosService.update(miembroEditando.id, formData);
+        await miembrosService.update(miembroEditando.id, payload);
         toast.success('Member updated');
       } else {
-        await miembrosService.create(formData);
+        await miembrosService.create(payload);
         toast.success('Member created');
       }
       cargarDatos();

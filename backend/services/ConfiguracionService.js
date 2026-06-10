@@ -1,5 +1,4 @@
 const pythonApi = require('../config/pythonApi');
-const bcrypt = require('bcryptjs');
 
 class ConfiguracionService {
   async getAllUsuarios() {
@@ -9,20 +8,22 @@ class ConfiguracionService {
 
   async crearUsuario(datos) {
     const { nombre, email, password, rol_id, pais_id } = datos;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const userId = `usr_${Date.now()}`;
+
+    if (!nombre || !email || !password) {
+      throw new Error('Datos incompletos');
+    }
+
+    const id = datos.id || nombre.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
 
     const payload = {
-      id: userId,
+      id,
       nombre,
       email,
-      password_hash: hashedPassword,
+      password,
       rol: rol_id || 3,
-      activo: false
+      activo: true,
+      region: pais_id ? String(pais_id) : null
     };
-    if (pais_id !== undefined && pais_id !== null) {
-      payload.pais_id = pais_id;
-    }
 
     const response = await pythonApi.post('/usuarios', payload);
     return response.data;
@@ -34,12 +35,9 @@ class ConfiguracionService {
     if (datos.nombre !== undefined) payload.nombre = datos.nombre;
     if (datos.email !== undefined) payload.email = datos.email;
     if (datos.rol_id !== undefined) payload.rol = datos.rol_id;
-    if (datos.pais_id !== undefined) payload.pais_id = datos.pais_id;
+    if (datos.pais_id !== undefined) payload.region = String(datos.pais_id);
     if (datos.activo !== undefined) payload.activo = datos.activo;
-
-    if (datos.password) {
-      payload.password_hash = await bcrypt.hash(datos.password, 10);
-    }
+    if (datos.password) payload.password = datos.password;
 
     const response = await pythonApi.patch(`/usuarios/${id}`, payload);
     return response.data;

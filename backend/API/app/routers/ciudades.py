@@ -8,7 +8,7 @@ from app.schemas import CiudadCreate, CiudadUpdate, CiudadOut
 router = APIRouter(prefix="/ciudades", tags=["Ciudades"])
 
 
-@router.get("/", response_model=list[CiudadOut])
+@router.get("", response_model=list[CiudadOut])
 async def listar(
     pais_iso2: str | None = Query(None, description="Filtrar por código ISO del país"),
     limit: int = Query(50, le=500),
@@ -30,7 +30,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=CiudadOut, status_code=201)
+@router.post("", response_model=CiudadOut, status_code=201)
 async def crear(data: CiudadCreate, db: AsyncSession = Depends(get_db)):
     obj = Ciudad(**data.model_dump())
     db.add(obj)

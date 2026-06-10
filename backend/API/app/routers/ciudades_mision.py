@@ -8,7 +8,7 @@ from app.schemas import CiudadMisionCreate, CiudadMisionUpdate, CiudadMisionOut
 router = APIRouter(prefix="/ciudades-mision", tags=["Ciudades Mision"])
 
 
-@router.get("/", response_model=list[CiudadMisionOut])
+@router.get("", response_model=list[CiudadMisionOut])
 async def listar(
     ciudad_id: int | None = Query(None),
     estado_presencia: str | None = Query(None),
@@ -31,7 +31,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=CiudadMisionOut, status_code=201)
+@router.post("", response_model=CiudadMisionOut, status_code=201)
 async def crear(data: CiudadMisionCreate, db: AsyncSession = Depends(get_db)):
     obj = CiudadMision(**data.model_dump())
     db.add(obj)

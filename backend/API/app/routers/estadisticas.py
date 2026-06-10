@@ -15,7 +15,7 @@ router = APIRouter(prefix="/estadisticas", tags=["Estadisticas Generales"])
 MESES_LABELS = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
 
 
-@router.get("/", response_model=EstadisticasOut)
+@router.get("", response_model=EstadisticasOut)
 async def obtener_estadisticas(
     anio: int | None = Query(None),
     db: AsyncSession = Depends(get_db),

@@ -8,7 +8,7 @@ from app.schemas import GastoRealCreate, GastoRealUpdate, GastoRealOut
 router = APIRouter(prefix="/gastos-reales", tags=["Gastos Reales"])
 
 
-@router.get("/", response_model=list[GastoRealOut])
+@router.get("", response_model=list[GastoRealOut])
 async def listar(
     ejecucion_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -28,7 +28,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=GastoRealOut, status_code=201)
+@router.post("", response_model=GastoRealOut, status_code=201)
 async def crear(data: GastoRealCreate, db: AsyncSession = Depends(get_db)):
     obj = GastoReal(**data.model_dump())
     db.add(obj)

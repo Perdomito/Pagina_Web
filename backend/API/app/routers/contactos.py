@@ -27,7 +27,7 @@ def _enrich_contacto(obj: Contacto) -> dict:
     return data
 
 
-@router.get("/", response_model=list[ContactoOut])
+@router.get("", response_model=list[ContactoOut])
 async def listar(
     miembro_responsable_id: str | None = Query(None),
     pais_id: int | None = Query(None),
@@ -53,7 +53,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return ContactoOut.model_validate(_enrich_contacto(obj))
 
 
-@router.post("/", response_model=ContactoOut, status_code=201)
+@router.post("", response_model=ContactoOut, status_code=201)
 async def crear(data: ContactoCreate, db: AsyncSession = Depends(get_db)):
     obj = Contacto(**data.model_dump())
     db.add(obj)

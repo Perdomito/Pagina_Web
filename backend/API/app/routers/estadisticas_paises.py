@@ -8,7 +8,7 @@ from app.schemas import EstadisticaPaisCreate, EstadisticaPaisUpdate, Estadistic
 router = APIRouter(prefix="/estadisticas-paises", tags=["Estadísticas por País"])
 
 
-@router.get("/", response_model=list[EstadisticaPaisOut])
+@router.get("", response_model=list[EstadisticaPaisOut])
 async def listar(
     pais_id: int | None = Query(None),
     anio: int | None = Query(None),
@@ -34,7 +34,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=EstadisticaPaisOut, status_code=201)
+@router.post("", response_model=EstadisticaPaisOut, status_code=201)
 async def crear(data: EstadisticaPaisCreate, db: AsyncSession = Depends(get_db)):
     obj = EstadisticaPais(**data.model_dump())
     db.add(obj)

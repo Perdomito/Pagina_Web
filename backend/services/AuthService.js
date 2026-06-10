@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/database');
+const pythonApi = require('../config/pythonApi');
 
 class AuthService {
   async login(email, password) {
@@ -8,51 +9,8 @@ class AuthService {
       throw new Error('Email y contrasena son requeridos');
     }
 
-    const result = await query(`
-      SELECT u.*, r.nombre as rol_nombre, p.nombre as pais_nombre
-      FROM usuarios u
-      LEFT JOIN roles r ON u.rol = r.id
-      LEFT JOIN paises p ON u.pais_id = p.id
-      WHERE u.email = $1 AND u.activo = TRUE
-    `, [email]);
-
-    if (result.rows.length === 0) {
-      throw new Error('Credenciales invalidas');
-    }
-
-    const usuario = result.rows[0];
-
-    const passwordValida = await bcrypt.compare(password, usuario.password_hash);
-    if (!passwordValida) {
-      throw new Error('Credenciales invalidas');
-    }
-
-    await query(
-      'UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE id = $1',
-      [usuario.id]
-    );
-
-    const token = jwt.sign(
-      {
-        id: usuario.id,
-        email: usuario.email,
-        rol: usuario.rol_nombre,
-        pais_id: usuario.pais_id
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
-
-    delete usuario.password_hash;
-
-    return {
-      token,
-      usuario: {
-        ...usuario,
-        rol: usuario.rol_nombre,
-        pais: usuario.pais_nombre
-      }
-    };
+    const response = await pythonApi.post('/auth/login', { email, password });
+    return response.data;
   }
 
   async register(datos) {
@@ -66,24 +24,20 @@ class AuthService {
       throw new Error('La contrasena debe tener al menos 4 caracteres');
     }
 
-    const existente = await query(
-      'SELECT id FROM usuarios WHERE email = $1',
-      [email]
-    );
+    const id = datos.id || nombre.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
 
-    if (existente.rows.length > 0) {
-      throw new Error('El email ya esta registrado');
-    }
+    const payload = {
+      id,
+      nombre,
+      email,
+      password,
+      rol: rol_id || 3,
+      activo: true,
+      region: pais_id ? String(pais_id) : null
+    };
 
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const result = await query(`
-      INSERT INTO usuarios (nombre, email, password_hash, rol, pais_id)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, nombre, email, rol, pais_id, fecha_registro
-    `, [nombre, email, passwordHash, rol_id || 3, pais_id]);
-
-    return result.rows[0];
+    const response = await pythonApi.post('/usuarios/', payload);
+    return response.data;
   }
 
   async verifyToken(token) {

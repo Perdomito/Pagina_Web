@@ -8,7 +8,7 @@ from app.schemas import MiembroCreate, MiembroUpdate, MiembroOut
 router = APIRouter(prefix="/miembros", tags=["Miembros"])
 
 
-@router.get("/", response_model=list[MiembroOut])
+@router.get("", response_model=list[MiembroOut])
 async def listar(
     tipo: TipoMiembroEnum | None = Query(None, description="Filtrar por tipo de miembro"),
     pais_id: int | None = Query(None),
@@ -31,7 +31,7 @@ async def obtener(id: str, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=MiembroOut, status_code=201)
+@router.post("", response_model=MiembroOut, status_code=201)
 async def crear(data: MiembroCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.get(Miembro, data.id)
     if existing:

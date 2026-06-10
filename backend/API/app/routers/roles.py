@@ -8,7 +8,7 @@ from app.schemas import RolCreate, RolUpdate, RolOut, RolPermisoCreate, RolPermi
 router = APIRouter(prefix="/roles", tags=["Roles y Permisos"])
 
 
-@router.get("/", response_model=list[RolOut])
+@router.get("", response_model=list[RolOut])
 async def listar(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Rol).order_by(Rol.nombre))
     return result.scalars().all()
@@ -22,7 +22,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     return obj
 
 
-@router.post("/", response_model=RolOut, status_code=201)
+@router.post("", response_model=RolOut, status_code=201)
 async def crear(data: RolCreate, db: AsyncSession = Depends(get_db)):
     obj = Rol(**data.model_dump())
     db.add(obj)
