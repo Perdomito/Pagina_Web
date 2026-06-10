@@ -21,7 +21,6 @@ export default function StudiesBiblicos() {
   const [mostrandoModalEstudiante, setMostrandoModalEstudiante] = useState(false);
   const [mostrandoModalMissionary, setMostrandoModalMissionary] = useState(false);
   const [mostrandoEstadisticas, setMostrandoEstadisticas] = useState(false);
-  const [mostrandoPromptContinente, setMostrandoPromptContinente] = useState(false);
   const [mostrandoPromptPais, setMostrandoPromptPais] = useState(false);
   
   const [fechaActual] = useState(new Date());
@@ -52,7 +51,6 @@ const [, setCargandoDatos] = useState(false);
     pais: ""
   });
   const [nuevoMissionary, setNuevoMissionary] = useState("");
-  const [nuevoNombreContinente, setNuevoNombreContinente] = useState("");
   const [nuevoNombrePais, setNuevoNombrePais] = useState("");
   const [continenteParaPais, setContinenteParaPais] = useState(null);
   
@@ -563,39 +561,6 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
       capitulo: capituloActual,
       horas: parseFloat(horasActual || 0)
     }).catch(err => console.error('Error autoguardando:', err));
-  }
-};
-  
-const agregarContinente = async () => {
-  if (!nuevoNombreContinente.trim()) {
-    toast.error("El nombre del continente es requerido");
-    return;
-  }
-  
-  try {
-    setCargandoDatos(true);
-    
-    // Crear continente en la BD
-    const nuevoContinente = await administracionService.crearContinente({
-      nombre: nuevoNombreContinente.trim()
-    });
-
-    // Actualizar lista local
-    setContinentes(prev => [...prev, { 
-      id: nuevoContinente.id, 
-      nombre: nuevoContinente.nombre, 
-      paises: [] 
-    }]);
-    
-    setNuevoNombreContinente("");
-    setMostrandoPromptContinente(false);
-    toast.success("✅ Continente guardado en la base de datos");
-    
-  } catch (error) {
-    console.error('Error:', error);
-    toast.error(error.response?.data?.error || 'Error al crear continente');
-  } finally {
-    setCargandoDatos(false);
   }
 };
   
@@ -1132,16 +1097,7 @@ const eliminarPais = async (continenteId, paisId) => {
                 </div>
               </div>
             ))}
-            <div
-              className="card-item"
-              onClick={() => setMostrandoPromptContinente(true)}
-              style={{ borderStyle: "dashed", borderColor: "#FF9800", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "120px" }}
-            >
-              <div style={{ textAlign: "center", color: "#FF9800" }}>
-                <FaPlus size={32} style={{ marginBottom: "10px" }} />
-                <div style={{ fontSize: "16px", fontWeight: "700" }}>New Continent</div>
-              </div>
-            </div>
+
           </div>
         </div>
       )}
@@ -2202,34 +2158,6 @@ const eliminarPais = async (continenteId, paisId) => {
               </button>
               <button onClick={() => setMostrandoModalMissionary(false)} className="btn-secondary" style={{ flex: 1, fontSize: "16px", padding: "14px" }}>
                 <FaTimes /> Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {mostrandoPromptContinente && (
-        <div className="modal-overlay" onClick={() => setMostrandoPromptContinente(false)}>
-          <div className="modal-prompt" onClick={(e) => e.stopPropagation()}>
-            <h4 style={{ margin: "0 0 20px 0", color: "#333", fontSize: "18px" }}>
-              Name of new continent:
-            </h4>
-
-            <input
-              type="text"
-              value={nuevoNombreContinente}
-              onChange={(e) => setNuevoNombreContinente(e.target.value)}
-              className="input-modern"
-              placeholder="Ej: Europa"
-              autoFocus
-            />
-
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button onClick={agregarContinente} className="btn-prompt-aceptar">
-                Accept
-              </button>
-              <button onClick={() => setMostrandoPromptContinente(false)} className="btn-prompt-cancelar">
-                Cancel
               </button>
             </div>
           </div>
