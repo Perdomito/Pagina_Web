@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'https://gnit-api-production.up.railway.app',
+  baseURL: 'https://laevateinn707-gnit-api.hf.space',
   headers: {
     'Content-Type': 'application/json'
   }
