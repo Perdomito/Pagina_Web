@@ -260,7 +260,7 @@ export default function Miembros() {
         toast.success('Additional info updated');
       } else {
         await miembrosService.createInfoAdicional({
-          miembro_id: miembroParaInfo.id,
+          id: miembroParaInfo.id,
           ...infoFormData
         });
         toast.success('Additional info created');
