@@ -539,7 +539,7 @@ class IngresoOut(IngresoBase):
 # ── Miembros Info Adicional ───────────────────────────────────────────────
 
 class MiembroInfoAdicionalBase(BaseModel):
-    miembro_id: str
+    id: str
     nombre_padre: Optional[str] = None
     telefono_padre: Optional[str] = None
     nombre_madre: Optional[str] = None

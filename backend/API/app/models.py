@@ -342,7 +342,7 @@ class Ingreso(Base):
 class MiembroInfoAdicional(Base):
     __tablename__ = "miembros_info_adicional"
 
-    miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="CASCADE"), primary_key=True)
+    id = Column(String(30), ForeignKey("miembros.id", ondelete="CASCADE"), primary_key=True)
     nombre_padre = Column(Text)
     telefono_padre = Column(String(30))
     nombre_madre = Column(Text)
