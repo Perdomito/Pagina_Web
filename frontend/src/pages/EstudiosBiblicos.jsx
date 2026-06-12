@@ -37,16 +37,6 @@ const [, setCargandoDatos] = useState(false);
     "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
   ];
   
-
-  const paisEnIngles = {"Afganistán": "Afghanistan", "Albania": "Albania", "Alemania": "Germany", "Andorra": "Andorra", "Angola": "Angola", "Antigua y Barbuda": "Antigua and Barbuda", "Arabia Saudita": "Saudi Arabia", "Argelia": "Algeria", "Argentina": "Argentina", "Armenia": "Armenia", "Australia": "Australia", "Austria": "Austria", "Azerbaiyán": "Azerbaijan", "Bahamas": "Bahamas", "Bangladés": "Bangladesh", "Barbados": "Barbados", "Baréin": "Bahrain", "Belice": "Belize", "Benín": "Benin", "Bielorrusia": "Belarus", "Bolivia": "Bolivia", "Bosnia y Herzegovina": "Bosnia and Herzegovina", "Botsuana": "Botswana", "Brasil": "Brazil", "Brunéi": "Brunei", "Bulgaria": "Bulgaria", "Burkina Faso": "Burkina Faso", "Burundi": "Burundi", "Bután": "Bhutan", "Bélgica": "Belgium", "Cabo Verde": "Cape Verde", "Camboya": "Cambodia", "Camerún": "Cameroon", "Canadá": "Canada", "Catar": "Qatar", "Chad": "Chad", "Chile": "Chile", "China": "China", "Chipre": "Cyprus", "Colombia": "Colombia", "Comoras": "Comoros", "Corea del Norte": "North Korea", "Corea del Sur": "South Korea", "Costa Rica": "Costa Rica", "Costa de Marfil": "Ivory Coast", "Croacia": "Croatia", "Cuba": "Cuba", "Dinamarca": "Denmark", "Dominica": "Dominica", "Ecuador": "Ecuador", "Egipto": "Egypt", "El Salvador": "El Salvador", "Emiratos Árabes Unidos": "United Arab Emirates", "Eritrea": "Eritrea", "Eslovaquia": "Slovakia", "Eslovenia": "Slovenia", "España": "Spain", "Estados Unidos": "United States", "Estonia": "Estonia", "Etiopía": "Ethiopia", "Filipinas": "Philippines", "Finlandia": "Finland", "Fiyi": "Fiji", "Francia": "France", "Gabón": "Gabon", "Gambia": "Gambia", "Georgia": "Georgia", "Ghana": "Ghana", "Granada": "Grenada", "Grecia": "Greece", "Guatemala": "Guatemala", "Guinea": "Guinea", "Guinea Ecuatorial": "Equatorial Guinea", "Guinea-Bisáu": "Guinea-Bissau", "Guyana": "Guyana", "Haití": "Haiti", "Honduras": "Honduras", "Hungría": "Hungary", "India": "India", "Indonesia": "Indonesia", "Irak": "Iraq", "Irlanda": "Ireland", "Irán": "Iran", "Islandia": "Iceland", "Israel": "Israel", "Italia": "Italy", "Jamaica": "Jamaica", "Japón": "Japan", "Jordania": "Jordan", "Kazajistán": "Kazakhstan", "Kenia": "Kenya", "Kirguistán": "Kyrgyzstan", "Kiribati": "Kiribati", "Kuwait": "Kuwait", "Laos": "Laos", "Lesoto": "Lesotho", "Letonia": "Latvia", "Liberia": "Liberia", "Libia": "Libya", "Liechtenstein": "Liechtenstein", "Lituania": "Lithuania", "Luxemburgo": "Luxembourg", "Líbano": "Lebanon", "Madagascar": "Madagascar", "Malasia": "Malaysia", "Malaui": "Malawi", "Maldivas": "Maldives", "Malta": "Malta", "Malí": "Mali", "Marruecos": "Morocco", "Mauricio": "Mauritius", "Mauritania": "Mauritania", "Micronesia": "Micronesia", "Moldavia": "Moldova", "Mongolia": "Mongolia", "Montenegro": "Montenegro", "Mozambique": "Mozambique", "Myanmar": "Myanmar", "México": "Mexico", "Mónaco": "Monaco", "Namibia": "Namibia", "Nauru": "Nauru", "Nepal": "Nepal", "Nicaragua": "Nicaragua", "Nigeria": "Nigeria", "Noruega": "Norway", "Nueva Zelanda": "New Zealand", "Níger": "Niger", "Omán": "Oman", "Pakistán": "Pakistan", "Palaos": "Palau", "Panamá": "Panama", "Papúa Nueva Guinea": "Papua New Guinea", "Paraguay": "Paraguay", "Países Bajos": "Netherlands", "Perú": "Peru", "Polonia": "Poland", "Portugal": "Portugal", "Reino Unido": "United Kingdom", "República Centroafricana": "Central African Republic", "República Checa": "Czech Republic", "República Democrática del Congo": "Democratic Republic of the Congo", "República Dominicana": "Dominican Republic", "República del Congo": "Republic of the Congo", "Ruanda": "Rwanda", "Rumania": "Romania", "Rusia": "Russia", "Samoa": "Samoa", "San Cristóbal y Nieves": "Saint Kitts and Nevis", "San Marino": "San Marino", "San Vicente y las Granadinas": "Saint Vincent and the Grenadines", "Santa Lucía": "Saint Lucia", "Santo Tomé y Príncipe": "São Tomé and Príncipe", "Senegal": "Senegal", "Serbia": "Serbia", "Seychelles": "Seychelles", "Sierra Leona": "Sierra Leone", "Singapur": "Singapore", "Siria": "Syria", "Somalia": "Somalia", "Sri Lanka": "Sri Lanka", "Suazilandia": "Eswatini", "Sudáfrica": "South Africa", "Sudán": "Sudan", "Sudán del Sur": "South Sudan", "Suecia": "Sweden", "Suiza": "Switzerland", "Surinam": "Suriname", "Tailandia": "Thailand", "Tanzania": "Tanzania", "Tayikistán": "Tajikistan", "Timor Oriental": "East Timor", "Togo": "Togo", "Tonga": "Tonga", "Trinidad y Tobago": "Trinidad and Tobago", "Turkmenistán": "Turkmenistan", "Turquía": "Turkey", "Tuvalu": "Tuvalu", "Túnez": "Tunisia", "Ucrania": "Ukraine", "Uganda": "Uganda", "Uruguay": "Uruguay", "Uzbekistán": "Uzbekistan", "Vanuatu": "Vanuatu", "Vaticano": "Vatican", "Venezuela": "Venezuela", "Vietnam": "Vietnam", "Yemen": "Yemen", "Yibuti": "Djibouti", "Zambia": "Zambia", "Zimbabue": "Zimbabwe", "Antillas Holandesas": "Netherlands Antilles", "Aruba": "Aruba", "Anguilla": "Anguilla", "Guadalupe": "Guadeloupe", "Islas Caimán": "Cayman Islands", "Islas Turcas y Caicos": "Turks and Caicos Islands", "Islas Vírgenes Británicas": "British Virgin Islands", "Islas Vírgenes de los Estados Unidos": "U.S. Virgin Islands", "Martinica": "Martinique", "Montserrat": "Montserrat", "Puerto Rico": "Puerto Rico"};
-
-  const mesEnIngles = {
-    "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
-    "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
-    "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
-    "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
-  };
-  
  const [misioneros, setMissionarys] = useState([]);
   
   const [datosStudies, setDatosStudies] = useState({});
@@ -187,7 +177,7 @@ try {
         
         const resumen = await estudiosService.getResumenCompleto(pais.id, mesSeleccionado, añoActual);
         
-        console.log('Data loaded:', resumen);
+        console.log('Datos cargados:', resumen);
         
         const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
         
@@ -273,7 +263,7 @@ try {
         }
         
       } catch (error) {
-        console.error('Error loading saved data:', error);
+        console.error('Error al cargar datos guardados:', error);
       }
     };
     
@@ -461,7 +451,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   
   const agregarEstudiante = () => {
     if (!nuevoEstudiante.nombre || !misioneroSeleccionado) {
-      toast.error("Please complete at least the name");
+      toast.error("Complete al menos el nombre");
       return;
     }
     
@@ -493,7 +483,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   };
   
   const eliminarEstudiante = (misioneroId, estudianteId) => {
-    if (!window.confirm("Are you sure you want to delete this student?")) return;
+    if (!window.confirm("¿Está seguro de eliminar este estudiante?")) return;
     
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
     
@@ -505,7 +495,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
       }
     }));
     
-    toast.success("Student deleted");
+    toast.success("Estudiante eliminado");
   };
   
   const actualizarEstudiante = (misioneroId, estudianteId, campo, valor) => {
@@ -574,27 +564,15 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
   }
 };
   
-const eliminarContinente = async (id) => {
-    if (!window.confirm("Delete this continent?")) return;
-    
-    try {
-      await administracionService.eliminarContinente(id);
-      setContinentes(continentes.filter(c => c.id !== id));
-      toast.success("✅ Continente eliminado de la BD");
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error(error.response?.data?.error || 'Error al eliminar continente');
-    }
-  };
   
 const agregarPais = async () => {
   if (!nuevoNombrePais.trim()) {
-    toast.error("Country name is required");
+    toast.error("El nombre del país es requerido");
     return;
   }
   
   if (!continenteParaPais) {
-    toast.error("Select a continent first");
+    toast.error("Selecciona un continente primero");
     return;
   }
   
@@ -606,7 +584,7 @@ const agregarPais = async () => {
     const yaExiste = continente?.paises.some(p => p.nombre.toLowerCase() === nuevoNombrePais.trim().toLowerCase());
     
     if (yaExiste) {
-      toast.error("This country already exists in this continent");
+      toast.error("Este país ya existe en este continente");
       return;
     }
     
@@ -630,7 +608,7 @@ const nuevoPais = await administracionService.crearPaisConContinente({
     setNuevoNombrePais("");
     setMostrandoPromptPais(false);
     setContinenteParaPais(null);
-    toast.success("Country created successfully");
+    toast.success("País creado exitosamente en la base de datos");
     
   } catch (error) {
     console.error('Error al crear país:', error);
@@ -641,7 +619,7 @@ const nuevoPais = await administracionService.crearPaisConContinente({
 };
   
 const eliminarPais = async (continenteId, paisId) => {
-    if (!window.confirm("Delete this country?")) return;
+    if (!window.confirm("¿Eliminar este país?")) return;
     
     try {
       await administracionService.eliminarPais(paisId);
@@ -665,7 +643,7 @@ const eliminarPais = async (continenteId, paisId) => {
   
   const agregarMissionary = () => {
     if (!nuevoMissionary.trim()) {
-      toast.error("Enter a name");
+      toast.error("Ingrese un nombre");
       return;
     }
     
@@ -681,9 +659,9 @@ const eliminarPais = async (continenteId, paisId) => {
   };
   
   const eliminarMissionary = (id) => {
-    if (!window.confirm("Delete this missionary?")) return;
+    if (!window.confirm("¿Eliminar este misionero?")) return;
     setMissionarys(misioneros.filter(m => m.id !== id));
-    toast.success("Missionary deleted");
+    toast.success("Missionary eliminado");
   };
   
   const obtenerDiaSemana = (dia, mes, año) => {
@@ -1070,7 +1048,7 @@ const eliminarPais = async (continenteId, paisId) => {
             )}
             <div style={{ flex: 1 }}></div>
             <div style={{ color: "white", fontSize: "16px", fontWeight: "600" }}>
-              {({'Centroamerica': 'Central America', 'America del Norte': 'North America', 'America del Sur': 'South America', 'Sudamérica': 'South America', 'África': 'Africa', 'Oceanía': 'Oceania'})[continentes.find(c => c.id === continenteSeleccionado)?.nombre] || continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisEnIngles?.[paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre] || paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}
+              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesSeleccionado}
             </div>
           </div>
         )}
@@ -1090,17 +1068,9 @@ const eliminarPais = async (continenteId, paisId) => {
                 className="card-item"
                 onClick={() => setContinenteSeleccionado(cont.id)}
               >
-                <button
-                  className="card-delete-btn no-print"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    eliminarContinente(cont.id);
-                  }}
-                >
-                  <FaTrash size={14} />
-                </button>
+
                 <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a5490", marginBottom: "10px" }}>
-                  {({'Centroamerica': 'Central America & Caribbean', 'America del Norte': 'North America', 'America del Sur': 'South America', 'Sudamérica': 'South America', 'Europa': 'Europe', 'África': 'Africa', 'Oceanía': 'Oceania', 'Asia': 'Asia'})[cont.nombre] || cont.nombre}
+                  {cont.nombre}
                 </div>
                 <div style={{ fontSize: "14px", color: "#666" }}>
                   {cont.paises.length} countries
@@ -1135,7 +1105,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   <FaTrash size={14} />
                 </button>
                 <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a5490" }}>
-                  {paisEnIngles[pais.nombre] || pais.nombre}
+                  {pais.nombre}
                 </div>
               </div>
             ))}
@@ -1149,7 +1119,7 @@ const eliminarPais = async (continenteId, paisId) => {
             >
               <div style={{ textAlign: "center", color: "#FF9800" }}>
                 <FaPlus size={32} style={{ marginBottom: "10px" }} />
-                <div style={{ fontSize: "16px", fontWeight: "700" }}>New Country</div>
+                <div style={{ fontSize: "16px", fontWeight: "700" }}>Nuevo País</div>
               </div>
             </div>
           </div>
@@ -1161,7 +1131,7 @@ const eliminarPais = async (continenteId, paisId) => {
         <div>
           <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
             <FaCalendarAlt style={{ marginRight: "10px" }} />
-            Select a Month
+            Seleccione un Mes
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "15px" }}>
             {meses.map((mes, index) => {
@@ -1187,7 +1157,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   }}
                 >
                   <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "6px" }}>
-                    {mesEnIngles[mes] || mes}
+                    {mes}
                   </div>
                   {esActual && (
                     <div style={{ fontSize: "12px", opacity: 0.9 }}>
@@ -1234,7 +1204,7 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "resumen" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                Report Control - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                Report Control - {mesSeleccionado} {añoActual}
               </h2>
               
               <div className="scroll-container">
@@ -1327,7 +1297,7 @@ const eliminarPais = async (continenteId, paisId) => {
               </div>
 
               {/* Evangelismo */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>{mesEnIngles?.[mesSeleccionado] || mesSeleccionado} Evangelism</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>Evangelism {mesSeleccionado}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
@@ -1523,12 +1493,12 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "nuevosEstudiantes" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                New Students - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                New Students - {mesSeleccionado} {añoActual}
               </h2>
               
               {/* ESTUDIANTES QUE SAID YES */}
               <h3 style={{ margin: "0 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
-                Students Who Said "YES"
+                Estudiantes que Dijeron "SÍ"
               </h3>
               <div className="scroll-container">
                 <table className="tabla-estudios">
@@ -1594,7 +1564,7 @@ const eliminarPais = async (continenteId, paisId) => {
 
               {/* NUEVOS CONTACTS */}
               <h3 style={{ margin: "40px 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
-                New Contacts
+                Nuevos Contactos
               </h3>
               <div className="scroll-container">
                 <table className="tabla-estudios">
@@ -1667,7 +1637,7 @@ const eliminarPais = async (continenteId, paisId) => {
         <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
             <h2 style={{ margin: 0, color: "#1a5490", fontSize: "24px" }}>
-              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {mesSeleccionado} {añoActual}
             </h2>
             <button
               onClick={() => {
@@ -1796,7 +1766,7 @@ const eliminarPais = async (continenteId, paisId) => {
                     });
                     
                     fila.querySelectorAll('input[data-campo="hr"]').forEach(input => {
-                     console.log('Capturing day:', input.dataset.dia, 'horas:', input.value);
+                     console.log('Capturando día:', input.dataset.dia, 'horas:', input.value);
                       const dia = input.dataset.dia;
                       const hr = input.value.trim();
                       if (hr) {
@@ -1807,13 +1777,14 @@ const eliminarPais = async (continenteId, paisId) => {
 
                   // Primero crear el contacto en la BD
                     try {
+                      const misionero = misioneros.find(m => m.id === misioneroSeleccionado);
                       const nuevoContacto = await contactosService.create({
                         nombre: nombre,
+                        miembro_responsable: misionero?.nombre || '',
+                        miembro_responsable_id: misioneroSeleccionado,
                         pais_id: paisSeleccionado,
-                        miembro_id: misioneroSeleccionado,
                         telefono: '',
                         notas: '',
-                        estado: 'Activo'
                       });
                       
                       const nuevoEst = {
@@ -1866,8 +1837,8 @@ const eliminarPais = async (continenteId, paisId) => {
                     }
                     toast.success('✅ Estudiante guardado en BD');
                   } catch (error) {
-                    console.error('Error saving contact:', error);
-                    toast.error('Error saving student');
+                    console.error('Error al guardar contacto:', error);
+                    toast.error('Error al guardar estudiante');
                   }
                 }
               };  
@@ -1904,7 +1875,7 @@ const eliminarPais = async (continenteId, paisId) => {
                       <input 
                         type="text" 
                         data-campo="nombre" 
-                        placeholder="Name" 
+                        placeholder="Nombre" 
                         style={{ width: "210px" }}
                         onKeyDown={handleKeyDown}
                       />
@@ -1966,7 +1937,7 @@ const eliminarPais = async (continenteId, paisId) => {
               }}
               className="btn-add-new"
             >
-              <FaPlus size={18} /> Add Student
+              <FaPlus size={18} /> Añadir Estudiante
             </button>
           </div>
 
@@ -2009,7 +1980,7 @@ const eliminarPais = async (continenteId, paisId) => {
                           <td>
                             <input
                               type="text"
-                              placeholder="Location"
+                              placeholder="Lugar"
                               value={evang.virtual?.[dia]?.donde || ""}
                               onChange={(e) => actualizarEvangelismo(misioneroSeleccionado, 'virtual', dia, 'donde', e.target.value)}
                               style={{ width: "100px" }}
@@ -2041,7 +2012,7 @@ const eliminarPais = async (continenteId, paisId) => {
                           <td>
                             <input
                               type="text"
-                              placeholder="Location"
+                              placeholder="Lugar"
                               value={evang.presencial?.[dia]?.donde || ""}
                               onChange={(e) => actualizarEvangelismo(misioneroSeleccionado, 'presencial', dia, 'donde', e.target.value)}
                               style={{ width: "100px" }}
@@ -2101,7 +2072,7 @@ const eliminarPais = async (continenteId, paisId) => {
 
             <input
               type="text"
-              placeholder="Number (optional)"
+              placeholder="Número (opcional)"
               value={nuevoEstudiante.numero}
               onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, numero: e.target.value})}
               className="input-modern"
@@ -2109,7 +2080,7 @@ const eliminarPais = async (continenteId, paisId) => {
 
             <input
               type="text"
-              placeholder="Name *"
+              placeholder="Nombre *"
               value={nuevoEstudiante.nombre}
               onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, nombre: e.target.value})}
               className="input-modern"
@@ -2186,7 +2157,7 @@ const eliminarPais = async (continenteId, paisId) => {
               value={nuevoNombrePais}
               onChange={(e) => setNuevoNombrePais(e.target.value)}
               className="input-modern"
-              placeholder="e.g. Panama"
+              placeholder="Ej: Panamá"
               autoFocus
             />
 
