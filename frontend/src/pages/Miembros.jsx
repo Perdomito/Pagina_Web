@@ -442,9 +442,7 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
               <button className={`tab-btn ${pestanaActiva === 'basic' ? 'active' : ''}`} onClick={() => setPestanaActiva('basic')}>
                 Basic Info
               </button>
-              <button className={`tab-btn ${pestanaActiva === 'extra' ? 'active' : ''}`} onClick={() => setPestanaActiva('extra')}>
-                Extra Info
-              </button>
+
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -549,66 +547,6 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                   </>
                 )}
 
-                {/* ── PESTAÑA EXTRA INFO ── */}
-                {pestanaActiva === 'extra' && (
-                  <>
-                    <div style={{ marginBottom: "20px", padding: "14px 16px", background: "#eef2fb", borderRadius: "10px", borderLeft: `4px solid ${PRIMARY}` }}>
-                      <p style={{ margin: 0, fontSize: "13px", color: "#5a6a85", fontFamily: "'Lato', sans-serif" }}>
-                        Additional information.
-                      </p>
-                    </div>
-
-                    {/* Padre */}
-                    <div style={{ marginBottom: "8px" }}>
-                      <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>— Father's Information</p>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                      <div>
-                        <label style={labelStyle}>Father's Name</label>
-                        <input className="mbr-input" type="text" value={formData.nombre_padre} onChange={set('nombre_padre')} style={inputStyle} placeholder="Father's full name" />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Father's Phone</label>
-                        <input className="mbr-input" type="text" value={formData.telefono_padre} onChange={set('telefono_padre')} style={inputStyle} placeholder="+1 809 000 0000" />
-                      </div>
-                    </div>
-
-                    {/* Madre */}
-                    <div style={{ marginBottom: "8px" }}>
-                      <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>— Mother's Information</p>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                      <div>
-                        <label style={labelStyle}>Mother's Name</label>
-                        <input className="mbr-input" type="text" value={formData.nombre_madre} onChange={set('nombre_madre')} style={inputStyle} placeholder="Mother's full name" />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Mother's Phone</label>
-                        <input className="mbr-input" type="text" value={formData.telefono_madre} onChange={set('telefono_madre')} style={inputStyle} placeholder="+1 809 000 0000" />
-                      </div>
-                    </div>
-
-                    {/* Salud y contacto */}
-                    <div style={{ marginBottom: "8px" }}>
-                      <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>— Health & Contact</p>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                      <div>
-                        <label style={labelStyle}>Blood Type</label>
-                        <select value={formData.tipo_sangre} onChange={set('tipo_sangre')} style={inputStyle} className="mbr-input">
-                          <option value="">Select...</option>
-                          {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Email</label>
-                        <input className="mbr-input" type="email" value={formData.correo_electronico} onChange={set('correo_electronico')} style={inputStyle} placeholder="email@example.com" />
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
 
               {/* Botones */}

@@ -1402,7 +1402,7 @@ const eliminarPais = async (continenteId, paisId) => {
               </table>
 
               {/* NUEVOS ESTUDIANTES - RESUMEN */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>New Students {mesSeleccionado}</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>New Students {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
