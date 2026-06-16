@@ -4,6 +4,12 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
 
+def blank_to_none(v):
+    if v == "" or v is None:
+        return None
+    return int(v)
+
+
 # ── Paises ─────────────────────────────────────────────────────────────────
 
 class PaisBase(BaseModel):
@@ -153,6 +159,14 @@ class MiembroBase(BaseModel):
     tipo_miembro: str
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
+    cargo_funcion: Optional[str] = None
+    ministerio_of: Optional[str] = None
+    avance_audio: Optional[str] = None
+
+    @field_validator("pais_id", "ciudad_id", "edad", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
 
 class MiembroCreate(MiembroBase):
     pass
@@ -170,6 +184,14 @@ class MiembroUpdate(BaseModel):
     tipo_miembro: Optional[str] = None
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
+    cargo_funcion: Optional[str] = None
+    ministerio_of: Optional[str] = None
+    avance_audio: Optional[str] = None
+
+    @field_validator("pais_id", "ciudad_id", "edad", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
 
 class MiembroOut(MiembroBase):
     model_config = {"from_attributes": True}
@@ -188,6 +210,11 @@ class ContactoBase(BaseModel):
     miembro_responsable_id: Optional[str] = None
     ciudad_id: Optional[int] = None
 
+    @field_validator("pais_id", "ciudad_id", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
+
 class ContactoCreate(ContactoBase):
     pass
 
@@ -201,6 +228,11 @@ class ContactoUpdate(BaseModel):
     pais_id: Optional[int] = None
     miembro_responsable_id: Optional[str] = None
     ciudad_id: Optional[int] = None
+
+    @field_validator("pais_id", "ciudad_id", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
 
 class ContactoOut(ContactoBase):
     id: int

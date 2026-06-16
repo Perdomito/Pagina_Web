@@ -50,14 +50,26 @@ async def startup():
             result = await conn.execute(text("SELECT 1"))
             logger.info(f"=== DB Connection OK: {result.scalar()} ===")
         async with engine.begin() as conn:
+            try:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS usuario_permisos (
+                        id SERIAL PRIMARY KEY,
+                        usuario_id VARCHAR(30) NOT NULL REFERENCES public.usuarios(id) ON DELETE CASCADE,
+                        permiso_id INTEGER NOT NULL,
+                        tiene_acceso BOOLEAN DEFAULT TRUE,
+                        UNIQUE(usuario_id, permiso_id)
+                    )
+                """))
+            except Exception as e:
+                logger.warning(f"Could not create usuario_permisos table: {e}")
             await conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS usuario_permisos (
-                    id SERIAL PRIMARY KEY,
-                    usuario_id VARCHAR(30) NOT NULL REFERENCES public.usuarios(id) ON DELETE CASCADE,
-                    permiso_id INTEGER NOT NULL REFERENCES public.permisos(id) ON DELETE CASCADE,
-                    tiene_acceso BOOLEAN DEFAULT TRUE,
-                    UNIQUE(usuario_id, permiso_id)
-                )
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS cargo_funcion TEXT
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS ministerio_of TEXT
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS avance_audio TEXT
             """))
             logger.info("=== Tables sync OK ===")
     except Exception as e:

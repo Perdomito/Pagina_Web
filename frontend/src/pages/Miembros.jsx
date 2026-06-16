@@ -142,7 +142,10 @@ export default function Miembros() {
       comentarios: data.comentarios || null,
       tipo_miembro: data.tipo_miembro,
       pais_id: data.pais_id === '' || data.pais_id === null ? null : Number(data.pais_id),
-      ciudad_id: null
+      ciudad_id: null,
+      cargo_funcion: data.cargo_funcion || null,
+      ministerio_of: data.ministerio_of || null,
+      avance_audio: data.avance_audio || null
     };
   };
 
@@ -547,6 +550,10 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                   </>
                 )}
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1342b50a0cff33503a36745ace202f8028bfbb2f
               </div>
 
               {/* Botones */}

@@ -113,9 +113,9 @@ class RolPermiso(Base):
 class UsuarioPermiso(Base):
     __tablename__ = "usuario_permisos"
 
-    id = Column(Integer, primary_key=True)
-    usuario_id = Column(String(30), ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
-    permiso_id = Column(Integer, ForeignKey("permisos.id", ondelete="CASCADE"), nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(30), ForeignKey("public.usuarios.id", ondelete="CASCADE"), nullable=False)
+    permiso_id = Column(Integer, nullable=False)
     tiene_acceso = Column(Boolean, default=True)
 
 
@@ -150,6 +150,9 @@ class Miembro(Base):
     tipo_miembro = Column(String(20), nullable=False)
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
     ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"))
+    cargo_funcion = Column(Text, nullable=True)
+    ministerio_of = Column(Text, nullable=True)
+    avance_audio = Column(Text, nullable=True)
 
     pais_rel = relationship("Pais", back_populates="miembros")
     ciudad_rel = relationship("Ciudad", back_populates="miembros")
