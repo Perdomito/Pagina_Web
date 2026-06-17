@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 // 
 import contactosService from '../services/ContactosService';
 import miembrosService from '../services/MiembrosService';
-import estudiosService from '../services/EstudiosService';
+import estudiosService, { MESES } from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
 
 export default function StudiesBiblicos() {
@@ -555,12 +555,15 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
       contacto_id: estudianteId,
       miembro_id: misioneroId,
       pais_id: paisSeleccionado,
-      mes: mesSeleccionado,
+      mes: MESES[mesSeleccionado] ?? Number(mesSeleccionado),
       anio: añoActual,
       dia: parseInt(dia),
       capitulo: capituloActual,
       horas: parseFloat(horasActual || 0)
-    }).catch(err => console.error('Error autoguardando:', err));
+    }).catch(err => {
+      console.error('Error autoguardando:', err);
+      toast.error('Error al guardar el estudio');
+    });
   }
 };
   
@@ -1822,11 +1825,13 @@ const eliminarPais = async (continenteId, paisId) => {
                             contacto_id: nuevoContacto.id,
                             miembro_id: misioneroSeleccionado,
                             pais_id: paisSeleccionado,
-                            mes: mesSeleccionado,
+                            mes: MESES[mesSeleccionado] ?? Number(mesSeleccionado),
                             anio: añoActual,
                             dia: parseInt(dia),
                             capitulo: datos.capitulo || '',
                             horas: parseFloat(datos.horas)
+                          }).catch(err => {
+                            console.error('Error guardando estudio:', err);
                           })
                         );
                       }
