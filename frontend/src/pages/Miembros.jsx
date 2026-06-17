@@ -549,11 +549,6 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                     </div>
                   </>
                 )}
-
-<<<<<<< HEAD
-=======
-
->>>>>>> 1342b50a0cff33503a36745ace202f8028bfbb2f
               </div>
 
               {/* Botones */}

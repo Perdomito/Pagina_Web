@@ -31,7 +31,12 @@ export default function StudiesBiblicos() {
 const [, setCargandoDatos] = useState(false);
 
  const [continentes, setContinentes] = useState([]);
-  
+  const mesEnIngles = {
+  "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
+  "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
+  "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
+  "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
+};
   const meses = [
     "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
     "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
@@ -380,10 +385,11 @@ const actualizarEvangelismo = (misioneroId, tipo, dia, campo, valor) => {
     const horas = campo === 'horas' ? valor : (datosActuales[tipo]?.[dia]?.horas || 0);
     
     if (horas > 0 || donde) {
+      const _MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
       estudiosService.guardarEvangelismo({
         miembro_id: misioneroId,
         pais_id: paisSeleccionado,
-        mes: mesSeleccionado,
+        mes: typeof mesSeleccionado === 'string' ? _MESES.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
         anio: añoActual,
         dia: parseInt(dia),
         tipo: tipo === 'virtual' ? 'Virtual' : 'Presencial',
@@ -410,10 +416,11 @@ const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
   // Autoguardar en BD
   const contactosCantidad = nuevosContactos[clave]?.[misioneroId]?.[dia] || 0;
   
+  const _MESES2 = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
-    mes: mesSeleccionado,
+    mes: typeof mesSeleccionado === 'string' ? _MESES2.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(cantidad || 0),
@@ -438,10 +445,11 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   // Autoguardar en BD
   const dijeronSiCantidad = studentsQueDigeronSi[clave]?.[misioneroId]?.[dia] || 0;
   
+  const _MESES2 = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
-    mes: mesSeleccionado,
+    mes: typeof mesSeleccionado === 'string' ? _MESES2.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(dijeronSiCantidad || 0),
@@ -555,7 +563,7 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
       contacto_id: estudianteId,
       miembro_id: misioneroId,
       pais_id: paisSeleccionado,
-      mes: mesSeleccionado,
+      mes: typeof mesSeleccionado === 'string' ? _MESES3.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
       anio: añoActual,
       dia: parseInt(dia),
       capitulo: capituloActual,
@@ -1022,30 +1030,36 @@ const eliminarPais = async (continenteId, paisId) => {
             >
               <FaGlobe size={12} /> Change Region
             </button>
-            {misioneroSeleccionado && (
-              <>
-                <button
-                  onClick={() => {
-                    setMissionarySeleccionado(null);
-                    setVistaActual("resumen");
-                  }}
-                  className="btn-secondary"
-                  style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-                >
-                  <FaChartBar size={12} /> Summary
-                </button>
-                <button
-                  onClick={() => {
-                    setMissionarySeleccionado(null);
-                    setVistaActual("misioneros");
-                  }}
-                  className="btn-secondary"
-                  style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-                >
-                  <FaUser size={12} /> By Missionary
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => {
+                setMissionarySeleccionado(null);
+                setVistaActual("resumen");
+              }}
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
+            >
+              <FaChartBar size={12} /> Summary
+            </button>
+            <button
+              onClick={() => {
+                setMissionarySeleccionado(null);
+                setVistaActual("misioneros");
+              }}
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
+            >
+              <FaUser size={12} /> By Missionary
+            </button>
+            <button
+              onClick={() => {
+                setMissionarySeleccionado(null);
+                setVistaActual("nuevosEstudiantes");
+              }}
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
+            >
+              <FaUserPlus size={12} /> New Students
+            </button>
             <div style={{ flex: 1 }}></div>
             <div style={{ color: "white", fontSize: "16px", fontWeight: "600" }}>
               {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesSeleccionado}
@@ -1818,11 +1832,12 @@ const eliminarPais = async (continenteId, paisId) => {
                     Object.entries(estudiosCapturados).forEach(([dia, datos]) => {
                       if (datos.horas && datos.horas > 0) {
                         promesasStudies.push(
-                          estudiosService.guardarEstudio({
+                          const _MESES3 = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+      estudiosService.guardarEstudio({
                             contacto_id: nuevoContacto.id,
                             miembro_id: misioneroSeleccionado,
                             pais_id: paisSeleccionado,
-                            mes: mesSeleccionado,
+                            mes: typeof mesSeleccionado === 'string' ? _MESES4.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
                             anio: añoActual,
                             dia: parseInt(dia),
                             capitulo: datos.capitulo || '',
