@@ -157,8 +157,22 @@ export default function Miembros() {
         await miembrosService.update(miembroEditando.id, payload);
         toast.success('Member updated');
       } else {
-        await miembrosService.create(payload);
-        toast.success('Member created');
+        // Verificar si el ID ya existe
+        const existing = miembros.find(m => m.id === formData.id);
+        if (existing) {
+          const confirm = window.confirm(
+            `This member (${existing.nombre}) is already registered${existing.pais ? ' in ' + existing.pais : ''}. Do you want to update their information?`
+          );
+          if (confirm) {
+            await miembrosService.update(formData.id, payload);
+            toast.success('Member updated');
+          } else {
+            return;
+          }
+        } else {
+          await miembrosService.create(payload);
+          toast.success('Member created');
+        }
       }
       cargarDatos();
       cerrarModal();
@@ -518,15 +532,65 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
 
                     {formData.tipo_miembro === 'Comprometido' && (
                       <div style={{ marginBottom: "16px", padding: "16px", background: "#e8f5e9", borderRadius: "10px", border: "1px solid #a5d6a7" }}>
-                        <label style={{ ...labelStyle, color: "#2e7d32" }}>Role / Function</label>
-                        <input className="mbr-input" type="text" value={formData.cargo_funcion} onChange={set('cargo_funcion')} style={{ ...inputStyle, border: "1.5px solid #a5d6a7" }} placeholder="e.g. Pastor, Cell Leader..." />
+                        <div style={{ marginBottom: "12px" }}>
+                          <label style={{ ...labelStyle, color: "#2e7d32" }}>Role / Function</label>
+                          <input className="mbr-input" type="text" value={formData.cargo_funcion} onChange={set('cargo_funcion')} style={{ ...inputStyle, border: "1.5px solid #a5d6a7" }} placeholder="e.g. Pastor, Cell Leader..." />
+                        </div>
+                        <div>
+                          <label style={{ ...labelStyle, color: "#2e7d32" }}>Ministry OF</label>
+                          <select className="mbr-input" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #a5d6a7" }}>
+                            <option value="">-- Select Ministry --</option>
+                            <option value="N/A">N/A</option>
+                            <option value="Olivet Academy">Olivet Academy</option>
+                            <option value="Olivet Leadership Institute">Olivet Leadership Institute</option>
+                            <option value="Jubilee World">Jubilee World</option>
+                            <option value="Faith & Family Foundation">Faith &amp; Family Foundation</option>
+                            <option value="Elim Center">Elim Center</option>
+                            <option value="Youth Evangelical Fellowship">Youth Evangelical Fellowship</option>
+                            <option value="Apostolos Missions International">Apostolos Missions International</option>
+                            <option value="Young Disciples International">Young Disciples International</option>
+                            <option value="Saint Luke Society">Saint Luke Society</option>
+                            <option value="Gospel & Information Technology">Gospel &amp; Information Technology</option>
+                            <option value="Creatio International">Creatio International</option>
+                            <option value="Olivet Teen Mission">Olivet Teen Mission</option>
+                            <option value="Veritas Society">Veritas Society</option>
+                            <option value="Barnabas Relief">Barnabas Relief</option>
+                            <option value="Nehemiah Project">Nehemiah Project</option>
+                            <option value="Holy Bible Society">Holy Bible Society</option>
+                          </select>
+                        </div>
                       </div>
                     )}
 
                     {formData.tipo_miembro === 'Registrado' && (
                       <div style={{ marginBottom: "16px", padding: "16px", background: "#e3f2fd", borderRadius: "10px", border: "1px solid #90caf9" }}>
-                        <label style={{ ...labelStyle, color: "#1565c0" }}>Audio Progress</label>
-                        <input className="mbr-input" type="text" value={formData.avance_audio} onChange={set('avance_audio')} style={{ ...inputStyle, border: "1.5px solid #90caf9" }} placeholder="e.g. Audio 5, Lesson 3..." />
+                        <div style={{ marginBottom: "12px" }}>
+                          <label style={{ ...labelStyle, color: "#1565c0" }}>Audio Progress</label>
+                          <input className="mbr-input" type="text" value={formData.avance_audio} onChange={set('avance_audio')} style={{ ...inputStyle, border: "1.5px solid #90caf9" }} placeholder="e.g. Audio 5, Lesson 3..." />
+                        </div>
+                        <div>
+                          <label style={{ ...labelStyle, color: "#1565c0" }}>Ministry OF</label>
+                          <select className="mbr-input" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #90caf9" }}>
+                            <option value="">-- Select Ministry --</option>
+                            <option value="N/A">N/A</option>
+                            <option value="Olivet Academy">Olivet Academy</option>
+                            <option value="Olivet Leadership Institute">Olivet Leadership Institute</option>
+                            <option value="Jubilee World">Jubilee World</option>
+                            <option value="Faith & Family Foundation">Faith &amp; Family Foundation</option>
+                            <option value="Elim Center">Elim Center</option>
+                            <option value="Youth Evangelical Fellowship">Youth Evangelical Fellowship</option>
+                            <option value="Apostolos Missions International">Apostolos Missions International</option>
+                            <option value="Young Disciples International">Young Disciples International</option>
+                            <option value="Saint Luke Society">Saint Luke Society</option>
+                            <option value="Gospel & Information Technology">Gospel &amp; Information Technology</option>
+                            <option value="Creatio International">Creatio International</option>
+                            <option value="Olivet Teen Mission">Olivet Teen Mission</option>
+                            <option value="Veritas Society">Veritas Society</option>
+                            <option value="Barnabas Relief">Barnabas Relief</option>
+                            <option value="Nehemiah Project">Nehemiah Project</option>
+                            <option value="Holy Bible Society">Holy Bible Society</option>
+                          </select>
+                        </div>
                       </div>
                     )}
 
@@ -534,7 +598,26 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                       <div style={{ marginBottom: "16px", padding: "16px", background: "#fff3e0", borderRadius: "10px", border: "1px solid #ffcc80" }}>
                         <div style={{ marginBottom: "12px" }}>
                           <label style={{ ...labelStyle, color: "#e65100" }}>Ministry OF</label>
-                          <input className="mbr-input" type="text" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #ffcc80" }} placeholder="e.g. Worship, Multimedia..." />
+                          <select className="mbr-input" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #ffcc80" }}>
+                            <option value="">-- Select Ministry --</option>
+                            <option value="N/A">N/A</option>
+                            <option value="Olivet Academy">Olivet Academy</option>
+                            <option value="Olivet Leadership Institute">Olivet Leadership Institute</option>
+                            <option value="Jubilee World">Jubilee World</option>
+                            <option value="Faith & Family Foundation">Faith &amp; Family Foundation</option>
+                            <option value="Elim Center">Elim Center</option>
+                            <option value="Youth Evangelical Fellowship">Youth Evangelical Fellowship</option>
+                            <option value="Apostolos Missions International">Apostolos Missions International</option>
+                            <option value="Young Disciples International">Young Disciples International</option>
+                            <option value="Saint Luke Society">Saint Luke Society</option>
+                            <option value="Gospel & Information Technology">Gospel &amp; Information Technology</option>
+                            <option value="Creatio International">Creatio International</option>
+                            <option value="Olivet Teen Mission">Olivet Teen Mission</option>
+                            <option value="Veritas Society">Veritas Society</option>
+                            <option value="Barnabas Relief">Barnabas Relief</option>
+                            <option value="Nehemiah Project">Nehemiah Project</option>
+                            <option value="Holy Bible Society">Holy Bible Society</option>
+                          </select>
                         </div>
                         <div>
                           <label style={{ ...labelStyle, color: "#e65100" }}>Audio Progress</label>
@@ -549,12 +632,7 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                     </div>
                   </>
                 )}
-
-<<<<<<< HEAD
-=======
-
->>>>>>> 1342b50a0cff33503a36745ace202f8028bfbb2f
-              </div>
+               </div>
 
               {/* Botones */}
               <div style={{ display: "flex", gap: "12px", padding: "0 28px 24px" }}>

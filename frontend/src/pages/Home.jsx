@@ -13,7 +13,8 @@ import {
   FaChartLine,
   FaHammer,
   //FaBook, 
-  FaBars
+  FaBars,
+  FaBell
 } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import axios from '../api/axios';
@@ -26,10 +27,39 @@ export default function Home() {
   const { user, logout } = useAuth();
   const [permisosUsuario, setPermisosUsuario] = useState([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [mostrarNotif, setMostrarNotif] = useState(false);
 
   useEffect(() => {
     cargarPermisos();
+    if (user?.rol_id === 2) {
+      cargarNotificaciones();
+    }
   }, []);
+
+  const cargarNotificaciones = async () => {
+    try {
+      const response = await axios.get('/notificaciones');
+      setNotificaciones(response.data || []);
+    } catch (error) {
+      // Backend pendiente — mock temporal
+      setNotificaciones([
+        { id: 1, mensaje: 'New member registered: Luis Perdomo', fecha: new Date().toISOString(), leida: false },
+        { id: 2, mensaje: 'Member changed mission city: Ana García → Santo Domingo', fecha: new Date().toISOString(), leida: false },
+      ]);
+    }
+  };
+
+  const marcarLeida = async (id) => {
+    try {
+        await axios.patch('/notificaciones/' + id + '/leer');
+    } catch (e) {}
+    setNotificaciones(prev => prev.map(n => n.id === id ? { ...n, leida: true } : n));
+  };
+
+  const marcarTodasLeidas = () => {
+    notificaciones.forEach(n => marcarLeida(n.id));
+  };
 
   const cargarPermisos = async () => {
     try {
@@ -305,6 +335,113 @@ export default function Home() {
 
         {/* Derecha: idioma + usuario + sign out */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {true && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setMostrarNotif(!mostrarNotif)}
+                style={{
+                  background: "rgba(255,255,255,0.15)",
+                  backdropFilter: "blur(10px)",
+                  border: "none",
+                  borderRadius: "12px",
+                  width: "48px",
+                  height: "48px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
+                  cursor: "pointer",
+                  position: "relative"
+                }}
+              >
+                <FaBell size={18} />
+                {notificaciones.filter(n => !n.leida).length > 0 && (
+                  <span style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "#E24B4A",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "16px",
+                    height: "16px",
+                    fontSize: "10px",
+                    fontWeight: "700",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    {notificaciones.filter(n => !n.leida).length}
+                  </span>
+                )}
+              </button>
+
+              {mostrarNotif && (
+                <div style={{
+                  position: "absolute",
+                  top: "56px",
+                  right: 0,
+                  width: "320px",
+                  background: "white",
+                  borderRadius: "14px",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                  zIndex: 1000,
+                  overflow: "hidden"
+                }}>
+                  <div style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #eee",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <span style={{ fontWeight: "700", fontSize: "14px", color: "#1a5490" }}>Notifications</span>
+                    {notificaciones.filter(n => !n.leida).length > 0 && (
+                      <button onClick={marcarTodasLeidas} style={{ background: "none", border: "none", color: "#1a5490", fontSize: "12px", cursor: "pointer", fontWeight: "600" }}>
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  {notificaciones.length === 0 ? (
+                    <div style={{ padding: "24px", textAlign: "center", color: "#999", fontSize: "13px" }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notificaciones.map(n => (
+                      <div
+                        key={n.id}
+                        onClick={() => marcarLeida(n.id)}
+                        style={{
+                          padding: "12px 18px",
+                          borderBottom: "1px solid #f5f5f5",
+                          background: n.leida ? "white" : "#f0f6ff",
+                          cursor: "pointer",
+                          display: "flex",
+                          gap: "10px",
+                          alignItems: "flex-start"
+                        }}
+                      >
+                        <div style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: n.leida ? "#ccc" : "#1a5490",
+                          marginTop: "5px",
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <div style={{ fontSize: "13px", color: "#333", lineHeight: "1.4" }}>{n.mensaje}</div>
+                          <div style={{ fontSize: "11px", color: "#999", marginTop: "3px" }}>
+                            {new Date(n.fecha).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <SelectorIdiomaGoogle />
 
           <div style={{

@@ -9,7 +9,17 @@ import miembrosService from '../services/MiembrosService';
 import estudiosService, { MESES } from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
 
-export default function StudiesBiblicos() {
+const mesEnIngles = {
+  "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
+  "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
+  "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
+  "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
+};
+
+const MESES_ARR = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+const toMesNum = (mes) => typeof mes === 'string' ? MESES_ARR.indexOf(mes) + 1 : mes;
+
+export default function EstudiosBiblicos() {
   const navigate = useNavigate();
   
   const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
@@ -175,9 +185,14 @@ try {
         const pais = continentes.find(c => c.id === continenteSeleccionado)?.paises.find(p => p.id === paisSeleccionado);
         if (!pais) return;
         
-        const resumen = await estudiosService.getResumenCompleto(pais.id, mesSeleccionado, añoActual);
-        
-        console.log('Datos cargados:', resumen);
+        const resumenRaw = await estudiosService.getResumenCompleto(pais.id, mesSeleccionado, añoActual);
+              
+        // Separar array plano en categorías
+        const resumen = {
+          evangelismo: resumenRaw.filter(r => r.tipo !== null && r.contacto_id === null),
+          nuevosEstudiantes: resumenRaw.filter(r => r.tipo === null && r.contacto_id === null && (r.dijeron_si > 0 || r.nuevos_contactos > 0)),
+          estudios: resumenRaw.filter(r => r.contacto_id !== null)
+        };
         
         const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
         
@@ -231,7 +246,7 @@ try {
           const studentsPorMissionary = {};
           
           resumen.estudios.forEach(est => {
-            const misioneroId = est.miembro_responsable_id;
+            const misioneroId = est.miembro_id;
             if (!studentsPorMissionary[misioneroId]) {
               studentsPorMissionary[misioneroId] = [];
             }
@@ -239,10 +254,19 @@ try {
             // Buscar si el estudiante ya existe
             let estudiante = studentsPorMissionary[misioneroId].find(e => e.id === est.contacto_id);
             if (!estudiante) {
+              // Buscar en students ya cargados para obtener nombre y teléfono
+              const claveBusqueda = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+              const studentsExistentes = students[claveBusqueda] || {};
+              let nombreContacto = est.contacto_nombre || '';
+              let telefonoContacto = '';
+              Object.values(studentsExistentes).forEach(lista => {
+                const found = lista.find(e => e.id === est.contacto_id);
+                if (found) { nombreContacto = found.nombre || nombreContacto; telefonoContacto = found.numero || ''; }
+              });
               estudiante = {
                 id: est.contacto_id,
-                numero: est.contacto_id,
-                nombre: est.contacto_nombre,
+                numero: telefonoContacto,
+                nombre: nombreContacto,
                 pais: '',
                 estudios: {}
               };
