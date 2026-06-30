@@ -65,6 +65,9 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | fecha_registro| DateTime                 | NO        | utcnow     |
 | activo        | Boolean                  | NO        | false      |
 | region        | String(20)               | SI        |            |
+| pais_id       | Integer FK → paises      | SI        | SET NULL   |
+| ciudad_id     | Integer FK → ciudades    | SI        | SET NULL   |
+| miembro_id    | String(30) FK → miembros | SI        | SET NULL   |
 
 #### `roles`
 
@@ -225,6 +228,8 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | fecha_creacion     | DateTime                   | NO        | utcnow      |
 | fecha_actualizacion| DateTime                   | NO        | utcnow      |
 | miembro_id         | String(30) FK → miembros   | SI        | SET NULL    |
+| pais_id            | Integer FK → paises        | SI        | SET NULL    |
+| ciudad_id          | Integer FK → ciudades      | SI        | SET NULL    |
 
 #### `presupuestos`
 
@@ -612,6 +617,17 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | DELETE | `/configuracion/{clave}` | Eliminar clave                 |                                |
 
 ---
+
+## Integridad y migraciones automáticas
+
+El `startup()` de `app/main.py` se ejecuta en cada arranque y es **idempotente** (seguro de re-ejecutar):
+
+- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` para columnas nuevas (`usuarios.pais_id/ciudad_id/miembro_id`, `cotizaciones.pais_id/ciudad_id`, `miembros.cargo_funcion/ministerio_of/avance_audio`).
+- `CREATE TABLE IF NOT EXISTS` para las tablas financieras (`ingresos`, `traslados`, `saldos_caja_banco`) y `usuario_permisos` — definición espejo de `app/migrations/schema.sql`.
+- Claves foráneas idempotentes (vía `DO $$ ... pg_constraint`): `usuarios.rol/pais_id/ciudad_id/miembro_id`, `cotizaciones.pais_id/ciudad_id`, `rol_permisos.rol_id`.
+- Normalización de `ON DELETE SET NULL` en `saldos_caja_banco.pais_id` y `paises.continente_id`.
+
+No se necesita migración manual: al desplegar, la base se sincroniza sola con el esquema declarado en los modelos.
 
 ## Setup
 
