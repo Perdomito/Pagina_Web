@@ -62,6 +62,54 @@ async def startup():
                 """))
             except Exception as e:
                 logger.warning(f"Could not create usuario_permisos table: {e}")
+
+            # ── Tablas financieras (esquema versionado, idempotente) ───────
+            # Definicion espejo de app/migrations/schema.sql. CREATE IF NOT
+            # EXISTS: no-op si ya existen, las crea en un deploy nuevo.
+            financial_tables = {
+                "ingresos": """
+                    CREATE TABLE IF NOT EXISTS public.ingresos (
+                        id             SERIAL PRIMARY KEY,
+                        pais_id        INTEGER REFERENCES public.paises(id) ON DELETE SET NULL,
+                        mes            INTEGER NOT NULL,
+                        anio           INTEGER NOT NULL,
+                        tipo           VARCHAR(100) NOT NULL,
+                        origen         TEXT,
+                        donde_ingresa  VARCHAR(20) NOT NULL,
+                        valor          NUMERIC(15,2) NOT NULL,
+                        observaciones  TEXT,
+                        fecha          DATE NOT NULL,
+                        fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """,
+                "traslados": """
+                    CREATE TABLE IF NOT EXISTS public.traslados (
+                        id             SERIAL PRIMARY KEY,
+                        pais_id        INTEGER REFERENCES public.paises(id) ON DELETE SET NULL,
+                        de             VARCHAR(20) NOT NULL,
+                        a              VARCHAR(20) NOT NULL,
+                        valor          NUMERIC(15,2) NOT NULL,
+                        observaciones  TEXT,
+                        fecha          DATE NOT NULL,
+                        fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """,
+                "saldos_caja_banco": """
+                    CREATE TABLE IF NOT EXISTS public.saldos_caja_banco (
+                        id          SERIAL PRIMARY KEY,
+                        pais_id     INTEGER REFERENCES public.paises(id) ON DELETE SET NULL,
+                        saldo_caja  NUMERIC(15,2) NOT NULL DEFAULT 0,
+                        saldo_banco NUMERIC(15,2) NOT NULL DEFAULT 0,
+                        updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """,
+            }
+            for table_name, ddl in financial_tables.items():
+                try:
+                    await conn.execute(text(ddl))
+                except Exception as e:
+                    logger.warning(f"Could not create {table_name} table: {e}")
+
             await conn.execute(text("""
                 ALTER TABLE miembros ADD COLUMN IF NOT EXISTS cargo_funcion TEXT
             """))
@@ -86,6 +134,50 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE cotizaciones ADD COLUMN IF NOT EXISTS ciudad_id INTEGER
             """))
+
+            # ── Claves foraneas (idempotentes) ─────────────────────────────
+            # Postgres no soporta ADD CONSTRAINT IF NOT EXISTS para FK, por eso
+            # cada una se guarda con un bloque DO que revisa pg_constraint.
+            fk_definitions = [
+                ("fk_usuarios_rol", "usuarios", "FOREIGN KEY (rol) REFERENCES roles(id)"),
+                ("fk_usuarios_pais", "usuarios", "FOREIGN KEY (pais_id) REFERENCES paises(id) ON DELETE SET NULL"),
+                ("fk_usuarios_ciudad", "usuarios", "FOREIGN KEY (ciudad_id) REFERENCES ciudades(id) ON DELETE SET NULL"),
+                ("fk_usuarios_miembro", "usuarios", "FOREIGN KEY (miembro_id) REFERENCES miembros(id) ON DELETE SET NULL"),
+                ("fk_cotizaciones_pais", "cotizaciones", "FOREIGN KEY (pais_id) REFERENCES paises(id) ON DELETE SET NULL"),
+                ("fk_cotizaciones_ciudad", "cotizaciones", "FOREIGN KEY (ciudad_id) REFERENCES ciudades(id) ON DELETE SET NULL"),
+                ("fk_rol_permisos_rol", "rol_permisos", "FOREIGN KEY (rol_id) REFERENCES roles(id)"),
+            ]
+            for cname, table, definition in fk_definitions:
+                await conn.execute(text(f"""
+                    DO $$ BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='{cname}') THEN
+                            ALTER TABLE {table} ADD CONSTRAINT {cname} {definition};
+                        END IF;
+                    END $$
+                """))
+
+            # ── Normalizar ON DELETE (recrea la FK existente como SET NULL) ──
+            for table, column, cname in [
+                ("saldos_caja_banco", "pais_id", "fk_saldos_pais"),
+                ("paises", "continente_id", "fk_paises_continente"),
+            ]:
+                ref_table = "paises" if column == "pais_id" else "continentes"
+                await conn.execute(text(f"""
+                    DO $$ DECLARE existing text; BEGIN
+                        SELECT conname INTO existing FROM pg_constraint c
+                        WHERE c.conrelid='{table}'::regclass AND c.contype='f'
+                          AND (SELECT attname FROM pg_attribute
+                               WHERE attrelid=c.conrelid AND attnum=c.conkey[1])='{column}';
+                        IF existing IS NOT NULL AND existing <> '{cname}' THEN
+                            EXECUTE format('ALTER TABLE {table} DROP CONSTRAINT %I', existing);
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='{cname}') THEN
+                            ALTER TABLE {table} ADD CONSTRAINT {cname}
+                                FOREIGN KEY ({column}) REFERENCES {ref_table}(id) ON DELETE SET NULL;
+                        END IF;
+                    END $$
+                """))
+
             logger.info("=== Tables sync OK ===")
     except Exception as e:
         logger.error(f"=== DB Connection FAILED: {e} ===")
