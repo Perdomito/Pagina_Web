@@ -130,8 +130,14 @@ class Usuario(Base):
     fecha_registro = Column(DateTime, default=datetime.utcnow, nullable=False)
     activo = Column(Boolean, default=False, nullable=False)
     region = Column(String(20), nullable=True)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"))
+    miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
 
     rol_rel = relationship("Rol", back_populates="usuarios")
+    pais_rel = relationship("Pais")
+    ciudad_rel = relationship("Ciudad")
+    miembro_rel = relationship("Miembro", foreign_keys=[miembro_id], primaryjoin="Usuario.miembro_id == Miembro.id")
 
 
 class Miembro(Base):
@@ -222,8 +228,12 @@ class Cotizacion(Base):
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"))
 
     miembro_rel = relationship("Miembro", back_populates="cotizaciones")
+    pais_rel = relationship("Pais")
+    ciudad_rel = relationship("Ciudad")
 
 
 class Presupuesto(Base):
@@ -314,7 +324,7 @@ class CiudadMision(Base):
     region = Column(String(150))
     estado_presencia = Column(String(30), nullable=False, default="En proceso")
     fecha_inicio_trabajo = Column(Date)
-    pastor_encargado_id = Column(String(30))
+    pastor_encargado_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
     pastor_encargado_nombre = Column(Text)
     cantidad_miembros_activos = Column(Integer, default=0)
     notas = Column(Text)
@@ -322,6 +332,7 @@ class CiudadMision(Base):
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     ciudad_rel = relationship("Ciudad", back_populates="misiones")
+    pastor_rel = relationship("Miembro", foreign_keys=[pastor_encargado_id])
 
 
 class Ingreso(Base):

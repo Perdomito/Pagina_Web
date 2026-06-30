@@ -71,6 +71,21 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE miembros ADD COLUMN IF NOT EXISTS avance_audio TEXT
             """))
+            await conn.execute(text("""
+                ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pais_id INTEGER
+            """))
+            await conn.execute(text("""
+                ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ciudad_id INTEGER
+            """))
+            await conn.execute(text("""
+                ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS miembro_id VARCHAR(30)
+            """))
+            await conn.execute(text("""
+                ALTER TABLE cotizaciones ADD COLUMN IF NOT EXISTS pais_id INTEGER
+            """))
+            await conn.execute(text("""
+                ALTER TABLE cotizaciones ADD COLUMN IF NOT EXISTS ciudad_id INTEGER
+            """))
             logger.info("=== Tables sync OK ===")
     except Exception as e:
         logger.error(f"=== DB Connection FAILED: {e} ===")

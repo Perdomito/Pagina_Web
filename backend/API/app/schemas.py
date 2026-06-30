@@ -125,6 +125,9 @@ class UsuarioBase(BaseModel):
     rol: int
     activo: bool = False
     region: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
 
 class UsuarioCreate(UsuarioBase):
     password: str
@@ -136,6 +139,9 @@ class UsuarioUpdate(BaseModel):
     rol: Optional[int] = None
     activo: Optional[bool] = None
     region: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
 
 class UsuarioOut(UsuarioBase):
     fecha_registro: datetime
@@ -292,6 +298,8 @@ class CotizacionBase(BaseModel):
     anio_agregado: Optional[int] = None
     notas: Optional[str] = None
     miembro_id: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
 
     @field_validator("mes_agregado")
     @classmethod
@@ -315,6 +323,8 @@ class CotizacionUpdate(BaseModel):
     anio_agregado: Optional[int] = None
     notas: Optional[str] = None
     miembro_id: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
 
 class CotizacionOut(CotizacionBase):
     id: int

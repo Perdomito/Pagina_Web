@@ -12,6 +12,7 @@ router = APIRouter(prefix="/cotizaciones", tags=["Cotizaciones"])
 async def listar(
     estado: CotizacionEstadoEnum | None = Query(None),
     miembro_id: str | None = Query(None),
+    pais_id: int | None = Query(None),
     anio: int | None = Query(None),
     mes: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -21,6 +22,8 @@ async def listar(
         q = q.where(Cotizacion.estado == estado)
     if miembro_id:
         q = q.where(Cotizacion.miembro_id == miembro_id)
+    if pais_id:
+        q = q.where(Cotizacion.pais_id == pais_id)
     if anio:
         q = q.where(Cotizacion.anio_agregado == anio)
     if mes:
