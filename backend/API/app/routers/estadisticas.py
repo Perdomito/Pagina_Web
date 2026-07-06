@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, extract
 from app.database import get_db
-from app.models import Usuario, Miembro, Contacto, Reporte, EstadisticaPais
+from app.models import Usuario, Miembro, Contacto, Reporte, EstadisticaPais, Pais, Ciudad, CiudadMision
 from app.schemas import (
     EstadisticasOut, ComparacionEstudios, SerieData,
     RendimientoProfesores, ProfesorRendimiento,
     EvangelismoProfesores, ProfesorEvangelismo,
-    CrecimientoEstudiantes, SeriesPorTipo,
+    CrecimientoEstudiantes, SeriesPorTipo, ResumenPaisStats,
 )
 
 router = APIRouter(prefix="/estadisticas", tags=["Estadisticas Generales"])
@@ -18,6 +18,7 @@ MESES_LABELS = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "
 @router.get("", response_model=EstadisticasOut)
 async def obtener_estadisticas(
     anio: int | None = Query(None),
+    pais_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     if anio is None:
@@ -39,6 +40,7 @@ async def obtener_estadisticas(
     evangelismo = await _build_evangelismo_profesores(db, anio)
     crecimiento_est = await _build_crecimiento_estudiantes(db, anio)
     crecimiento_miembros = await _build_crecimiento_miembros(db, anio)
+    resumen_pais = await _build_resumen_pais(db, pais_id)
 
     return EstadisticasOut(
         total_usuarios=total_usuarios,
@@ -50,6 +52,7 @@ async def obtener_estadisticas(
         evangelismo_profesores=evangelismo,
         crecimiento_estudiantes=crecimiento_est,
         crecimiento_miembros=crecimiento_miembros,
+        resumen_pais=resumen_pais,
         anio_seleccionado=anio,
         anios_disponibles=anios_disponibles,
     )
@@ -193,4 +196,34 @@ async def _build_crecimiento_miembros(db: AsyncSession, anio: int) -> SeriesPorT
         series_por_tipo=series_por_tipo,
         tipos_disponibles=tipos,
         anios_disponibles=anios_disponibles,
+    )
+
+
+async def _build_resumen_pais(db: AsyncSession, pais_id: int | None) -> ResumenPaisStats | None:
+    if pais_id is None:
+        return None
+
+    pais = await db.get(Pais, pais_id)
+    if not pais:
+        return None
+
+    cantidad_miembros = (
+        await db.execute(
+            select(func.count(Miembro.id)).where(Miembro.pais_id == pais_id)
+        )
+    ).scalar() or 0
+
+    cantidad_iglesias = (
+        await db.execute(
+            select(func.count(CiudadMision.id))
+            .join(Ciudad, CiudadMision.ciudad_id == Ciudad.id)
+            .where(Ciudad.pais_iso2 == pais.iso)
+        )
+    ).scalar() or 0
+
+    return ResumenPaisStats(
+        pais_id=pais.id,
+        nombre_pais=pais.nombre,
+        cantidad_iglesias=int(cantidad_iglesias),
+        cantidad_miembros=int(cantidad_miembros),
     )

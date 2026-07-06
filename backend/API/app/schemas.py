@@ -736,6 +736,10 @@ class UsuarioLoginOut(BaseModel):
     rol_id: int
     rol_nombre: str
     activo: bool
+    region: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class TokenResponse(BaseModel):
@@ -790,6 +794,12 @@ class SeriesPorTipo(BaseModel):
     tipos_disponibles: list[str]
     anios_disponibles: list[int]
 
+class ResumenPaisStats(BaseModel):
+    pais_id: int
+    nombre_pais: str
+    cantidad_iglesias: int
+    cantidad_miembros: int
+
 class EstadisticasOut(BaseModel):
     total_usuarios: int
     total_miembros: int
@@ -800,5 +810,6 @@ class EstadisticasOut(BaseModel):
     evangelismo_profesores: Optional[EvangelismoProfesores] = None
     crecimiento_estudiantes: Optional[CrecimientoEstudiantes] = None
     crecimiento_miembros: Optional[SeriesPorTipo] = None
+    resumen_pais: Optional[ResumenPaisStats] = None
     anio_seleccionado: int
     anios_disponibles: list[int] = []

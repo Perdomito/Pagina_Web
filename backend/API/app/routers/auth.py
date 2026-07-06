@@ -47,6 +47,10 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         rol_id=user.rol,
         rol_nombre=rol_nombre,
         activo=user.activo,
+        region=user.region,
+        pais_id=user.pais_id,
+        ciudad_id=user.ciudad_id,
+        miembro_id=user.miembro_id,
     )
     return TokenResponse(token=token, usuario=usuario_out)
 
