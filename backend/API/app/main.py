@@ -8,7 +8,7 @@ from app.routers import (
     estadisticas_paises, roles, configuracion, usuarios,
     ciudades_mision, ingresos, miembros_info_adicional,
     saldos_caja_banco, traslados, auth, continentes,
-    estudios_diarios, estadisticas,
+    estudios_diarios, estadisticas, archivos,
 )
 
 app = FastAPI(
@@ -134,6 +134,61 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE cotizaciones ADD COLUMN IF NOT EXISTS ciudad_id INTEGER
             """))
+            # Correlativo de recibos por pais+anio+mes (RC-001)
+            await conn.execute(text("""
+                ALTER TABLE ingresos ADD COLUMN IF NOT EXISTS numero VARCHAR(20)
+            """))
+            # Backfill idempotente: solo rellena los que aun no tienen numero
+            await conn.execute(text("""
+                WITH numbered AS (
+                    SELECT id, 'RC-' || LPAD((ROW_NUMBER() OVER (
+                        PARTITION BY pais_id, anio, mes ORDER BY fecha, id))::text, 3, '0') AS num
+                    FROM ingresos
+                )
+                UPDATE ingresos i SET numero = n.num
+                FROM numbered n WHERE i.id = n.id AND i.numero IS NULL
+            """))
+            # Codigos contables de caja/banco
+            await conn.execute(text("""
+                ALTER TABLE saldos_caja_banco ADD COLUMN IF NOT EXISTS codigo_contable_caja VARCHAR(20)
+            """))
+            await conn.execute(text("""
+                ALTER TABLE saldos_caja_banco ADD COLUMN IF NOT EXISTS codigo_contable_banco VARCHAR(20)
+            """))
+            # Tabla de archivos adjuntos (ingresos/gastos)
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.archivos (
+                    id              SERIAL PRIMARY KEY,
+                    tipo            VARCHAR(20) NOT NULL,
+                    referencia_id   INTEGER NOT NULL,
+                    nombre_original TEXT,
+                    content_type    VARCHAR(100),
+                    tamano_bytes    BIGINT,
+                    storage_path    TEXT,
+                    url             TEXT NOT NULL,
+                    fecha_creacion  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT chk_archivos_tipo CHECK (tipo IN ('ingreso', 'gasto'))
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_archivos_ref ON public.archivos (tipo, referencia_id)
+            """))
+            # Proteger contactos con estudios: recrear FK contacto_id como RESTRICT
+            await conn.execute(text("""
+                DO $$ DECLARE existing text; BEGIN
+                    SELECT conname INTO existing FROM pg_constraint c
+                    WHERE c.conrelid='estudios_diarios'::regclass AND c.contype='f'
+                      AND (SELECT attname FROM pg_attribute
+                           WHERE attrelid=c.conrelid AND attnum=c.conkey[1])='contacto_id';
+                    IF existing IS NOT NULL THEN
+                        IF (SELECT confdeltype FROM pg_constraint WHERE conname=existing) <> 'r' THEN
+                            EXECUTE format('ALTER TABLE estudios_diarios DROP CONSTRAINT %I', existing);
+                            ALTER TABLE estudios_diarios ADD CONSTRAINT estudios_diarios_contacto_id_fkey
+                                FOREIGN KEY (contacto_id) REFERENCES contactos(id) ON DELETE RESTRICT;
+                        END IF;
+                    END IF;
+                END $$
+            """))
 
             # ── Claves foraneas (idempotentes) ─────────────────────────────
             # Postgres no soporta ADD CONSTRAINT IF NOT EXISTS para FK, por eso
@@ -205,6 +260,7 @@ app.include_router(auth.router)
 app.include_router(continentes.router)
 app.include_router(estudios_diarios.router)
 app.include_router(estadisticas.router)
+app.include_router(archivos.router)
 
 
 @app.get("/", tags=["Estado"])

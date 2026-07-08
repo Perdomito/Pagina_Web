@@ -574,6 +574,7 @@ class IngresoUpdate(BaseModel):
 
 class IngresoOut(IngresoBase):
     id: int
+    numero: Optional[str] = None
     fecha_creacion: datetime
     model_config = {"from_attributes": True}
 
@@ -612,6 +613,8 @@ class SaldoCajaBancoBase(BaseModel):
     pais_id: Optional[int] = None
     saldo_caja: Decimal = Decimal("0")
     saldo_banco: Decimal = Decimal("0")
+    codigo_contable_caja: Optional[str] = None
+    codigo_contable_banco: Optional[str] = None
 
 class SaldoCajaBancoCreate(SaldoCajaBancoBase):
     pass
@@ -620,6 +623,8 @@ class SaldoCajaBancoUpdate(BaseModel):
     pais_id: Optional[int] = None
     saldo_caja: Optional[Decimal] = None
     saldo_banco: Optional[Decimal] = None
+    codigo_contable_caja: Optional[str] = None
+    codigo_contable_banco: Optional[str] = None
 
 class SaldoCajaBancoOut(SaldoCajaBancoBase):
     id: int
@@ -738,6 +743,7 @@ class UsuarioLoginOut(BaseModel):
     activo: bool
     region: Optional[str] = None
     pais_id: Optional[int] = None
+    pais_nombre: Optional[str] = None
     ciudad_id: Optional[int] = None
     miembro_id: Optional[str] = None
     model_config = {"from_attributes": True}
@@ -745,6 +751,20 @@ class UsuarioLoginOut(BaseModel):
 class TokenResponse(BaseModel):
     token: str
     usuario: UsuarioLoginOut
+
+
+# ── Archivos ───────────────────────────────────────────────────────────────
+
+class ArchivoOut(BaseModel):
+    id: int
+    tipo: str
+    referencia_id: int
+    nombre_original: Optional[str] = None
+    content_type: Optional[str] = None
+    tamano_bytes: Optional[int] = None
+    url: str
+    fecha_creacion: datetime
+    model_config = {"from_attributes": True}
 
 
 # ── Estadisticas Agregadas ────────────────────────────────────────────────

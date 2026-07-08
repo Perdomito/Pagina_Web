@@ -339,6 +339,7 @@ class Ingreso(Base):
     __tablename__ = "ingresos"
 
     id = Column(Integer, primary_key=True)
+    numero = Column(String(20))
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
     mes = Column(Integer, nullable=False)
     anio = Column(Integer, nullable=False)
@@ -376,6 +377,8 @@ class SaldoCajaBanco(Base):
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
     saldo_caja = Column(Numeric(15, 2), nullable=False, default=0)
     saldo_banco = Column(Numeric(15, 2), nullable=False, default=0)
+    codigo_contable_caja = Column(String(20))
+    codigo_contable_banco = Column(String(20))
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     pais_rel = relationship("Pais", back_populates="saldos")
@@ -411,7 +414,7 @@ class EstudioDiario(Base):
     id = Column(Integer, primary_key=True)
     miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="CASCADE"), nullable=False)
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
-    contacto_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"))
+    contacto_id = Column(Integer, ForeignKey("contactos.id", ondelete="RESTRICT"))
     mes = Column(Integer, nullable=False)
     anio = Column(Integer, nullable=False)
     dia = Column(Integer, nullable=False)
@@ -426,3 +429,21 @@ class EstudioDiario(Base):
     miembro_rel = relationship("Miembro", back_populates="estudios_diarios")
     pais_rel = relationship("Pais")
     contacto_rel = relationship("Contacto")
+
+
+class Archivo(Base):
+    __tablename__ = "archivos"
+
+    id = Column(Integer, primary_key=True)
+    tipo = Column(String(20), nullable=False)          # 'ingreso' | 'gasto'
+    referencia_id = Column(Integer, nullable=False)     # id del ingreso o gasto asociado
+    nombre_original = Column(Text)
+    content_type = Column(String(100))
+    tamano_bytes = Column(BigInteger)
+    storage_path = Column(Text)
+    url = Column(Text, nullable=False)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("tipo IN ('ingreso', 'gasto')", name="chk_archivos_tipo"),
+    )
