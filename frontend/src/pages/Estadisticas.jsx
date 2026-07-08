@@ -15,6 +15,8 @@ import {
 } from "chart.js";
 import administracionService from '../services/AdministracionService';
 import toast from 'react-hot-toast';
+import { useAuth } from "../context/AuthContext";
+import configuracionService from "../services/ConfiguracionService";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
@@ -97,11 +99,16 @@ const obtenerLecturaPronostico = (variacion) => {
 
 export default function Estadisticas() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const anioActualPorDefecto = new Date().getFullYear();
   const mesActualPorDefecto = new Date().toLocaleString('es-ES', { month: 'long' }).toUpperCase();
   const [stats, setStats] = useState(null);
   const [statsProyeccion, setStatsProyeccion] = useState(null);
+  const [resumenPaisFallback, setResumenPaisFallback] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paisUsuarioResuelto, setPaisUsuarioResuelto] = useState(
+    user?.pais_id || (user?.region && !Number.isNaN(Number(user.region)) ? Number(user.region) : null)
+  );
   const [tabActiva, setTabActiva] = useState("evangelismo");
   const [profesorSeleccionado, setProfesorSeleccionado] = useState("");
   const [tipoMiembroSeleccionado, setTipoMiembroSeleccionado] = useState("Todos");
@@ -110,6 +117,28 @@ export default function Estadisticas() {
   const [anioEvangelismoSeleccionado, setAnioEvangelismoSeleccionado] = useState(anioActualPorDefecto);
   const [mesEvangelismoSeleccionado, setMesEvangelismoSeleccionado] = useState(mesActualPorDefecto);
   const [anioComparacionEvangelismoSeleccionado, setAnioComparacionEvangelismoSeleccionado] = useState(anioActualPorDefecto - 1);
+  useEffect(() => {
+    const paisDesdeSesion = user?.pais_id || (user?.region && !Number.isNaN(Number(user.region)) ? Number(user.region) : null);
+    if (paisDesdeSesion) {
+      setPaisUsuarioResuelto(paisDesdeSesion);
+      return;
+    }
+
+    const cargarPaisUsuario = async () => {
+      if (!user?.id) return;
+      try {
+        const usuarioActual = await configuracionService.getUsuarioById(user.id);
+        const paisResuelto = usuarioActual?.pais_id || (usuarioActual?.region && !Number.isNaN(Number(usuarioActual.region)) ? Number(usuarioActual.region) : null);
+        if (paisResuelto) {
+          setPaisUsuarioResuelto(paisResuelto);
+        }
+      } catch (error) {
+        console.error('Error loading current user country:', error);
+      }
+    };
+
+    cargarPaisUsuario();
+  }, [user]);
 
   useEffect(() => {
     const cargarEstadisticas = async () => {
@@ -117,12 +146,14 @@ export default function Estadisticas() {
         setLoading(true);
         const [data, dataProyeccion] = await Promise.all([
           administracionService.getEstadisticasGenerales(anioActualPorDefecto, {
+            ...(paisUsuarioResuelto ? { pais_id: paisUsuarioResuelto } : {}),
             anio_evangelismo: anioEvangelismoSeleccionado,
             mes_evangelismo: mesEvangelismoSeleccionado,
             modo_evangelismo: modoEvangelismoSeleccionado,
             anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
           }),
           administracionService.getEstadisticasGenerales(anioActualPorDefecto, {
+            ...(paisUsuarioResuelto ? { pais_id: paisUsuarioResuelto } : {}),
             anio_evangelismo: anioEvangelismoSeleccionado,
             modo_evangelismo: "anual",
             anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
@@ -139,7 +170,45 @@ export default function Estadisticas() {
     };
 
     cargarEstadisticas();
-  }, [anioActualPorDefecto, anioEvangelismoSeleccionado, mesEvangelismoSeleccionado, modoEvangelismoSeleccionado, anioComparacionEvangelismoSeleccionado]);
+  }, [anioActualPorDefecto, anioEvangelismoSeleccionado, mesEvangelismoSeleccionado, modoEvangelismoSeleccionado, anioComparacionEvangelismoSeleccionado, paisUsuarioResuelto]);
+
+  useEffect(() => {
+    const cargarResumenPaisFallback = async () => {
+      if (!paisUsuarioResuelto) {
+        setResumenPaisFallback(null);
+        return;
+      }
+
+      if (stats?.resumen_pais) {
+        setResumenPaisFallback(stats.resumen_pais);
+        return;
+      }
+
+      try {
+        const pais = await administracionService.getPaisById(paisUsuarioResuelto);
+        const [miembros, ciudades, ciudadesMision] = await Promise.all([
+          administracionService.getMiembrosPorPais(paisUsuarioResuelto),
+          administracionService.getCiudadesPorPaisIso2(pais.iso),
+          administracionService.getCiudadesMision()
+        ]);
+
+        const ciudadesIds = new Set((ciudades || []).map((ciudad) => ciudad.id));
+        const cantidadIglesias = (ciudadesMision || []).filter((item) => ciudadesIds.has(item.ciudad_id)).length;
+
+        setResumenPaisFallback({
+          pais_id: pais.id,
+          nombre_pais: pais.nombre,
+          cantidad_iglesias: cantidadIglesias,
+          cantidad_miembros: (miembros || []).length
+        });
+      } catch (error) {
+        console.error('Error loading country summary fallback:', error);
+        setResumenPaisFallback(null);
+      }
+    };
+
+    cargarResumenPaisFallback();
+  }, [paisUsuarioResuelto, stats?.resumen_pais]);
 
   useEffect(() => {
     const profesores = stats?.rendimiento_profesores?.profesores || [];
@@ -244,6 +313,7 @@ export default function Estadisticas() {
   const profesorActivo = rendimientoProfesores.find(
     (profesor) => String(profesor.id) === profesorSeleccionado
   ) || rendimientoProfesores[0] || null;
+  const resumenPais = stats?.resumen_pais || resumenPaisFallback || null;
   const mesActualIndice = new Date().getMonth();
   const mesCorteProyeccion = anioSeleccionado < anioActualPorDefecto
     ? MESES_EN_ANIO - 1
@@ -613,6 +683,7 @@ export default function Estadisticas() {
   };
 
   const tabs = [
+    { id: "pais", label: "País" },
     { id: "evangelismo", label: "Evangelismo" },
     { id: "estudios", label: "Estudios" },
     { id: "profesores", label: "Profesores" },
@@ -730,6 +801,50 @@ export default function Estadisticas() {
               </button>
             ))}
           </div>
+
+          {tabActiva === "pais" && (
+            <div style={{ padding: "10px" }}>
+              <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Resumen por país</h2>
+                <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
+                  Datos consolidados del país asignado al usuario actual.
+                </p>
+
+                {resumenPais ? (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+                      <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>País</div>
+                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#0E5A61" }}>
+                          {resumenPais.nombre_pais}
+                        </div>
+                      </div>
+                      <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cantidad de iglesias</div>
+                        <div style={{ fontSize: "28px", fontWeight: "700", color: "#2E7D32" }}>
+                          {resumenPais.cantidad_iglesias || 0}
+                        </div>
+                      </div>
+                      <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cantidad de miembros</div>
+                        <div style={{ fontSize: "28px", fontWeight: "700", color: "#8E24AA" }}>
+                          {resumenPais.cantidad_miembros || 0}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb", color: "#4b5563", lineHeight: "1.6" }}>
+                      {`${resumenPais.nombre_pais} tiene ${resumenPais.cantidad_iglesias || 0} iglesias registradas y ${resumenPais.cantidad_miembros || 0} miembros asociados a ese país.`}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
+                    No hay un país asignado al usuario o todavía no hay datos disponibles para ese país.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {tabActiva === "evangelismo" && (
             <div style={{ padding: "10px" }}>

@@ -6,6 +6,11 @@ const ConfiguracionService = {
     return response.data;
   },
 
+  getUsuarioById: async (id) => {
+    const response = await axios.get(`/usuarios/${id}`);
+    return response.data;
+  },
+
   crearUsuario: async (datos) => {
     const response = await axios.post('/usuarios', datos);
     return response.data;
