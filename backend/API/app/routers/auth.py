@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import Usuario, Rol
+from app.models import Usuario, Rol, Pais
 from app.schemas import LoginRequest, TokenResponse, UsuarioLoginOut
 from app.auth_middleware import create_access_token
 
@@ -39,7 +39,12 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     rol_obj = rol_result.scalar_one_or_none()
     rol_nombre = rol_obj.nombre if rol_obj else ""
 
-    token = create_access_token(user.id, user.rol)
+    pais_nombre = None
+    if user.pais_id is not None:
+        pais_obj = await db.get(Pais, user.pais_id)
+        pais_nombre = pais_obj.nombre if pais_obj else None
+
+    token = create_access_token(user.id, user.rol, user.pais_id)
     usuario_out = UsuarioLoginOut(
         id=user.id,
         nombre=user.nombre,
@@ -47,6 +52,8 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         rol_id=user.rol,
         rol_nombre=rol_nombre,
         activo=user.activo,
+        pais_id=user.pais_id,
+        pais_nombre=pais_nombre,
     )
     return TokenResponse(token=token, usuario=usuario_out)
 

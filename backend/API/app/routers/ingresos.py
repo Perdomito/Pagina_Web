@@ -8,6 +8,21 @@ from app.schemas import IngresoCreate, IngresoUpdate, IngresoOut
 router = APIRouter(prefix="/ingresos", tags=["Ingresos"])
 
 
+async def _siguiente_numero(db: AsyncSession, pais_id: int | None, anio: int, mes: int) -> str:
+    """Correlativo por pais + anio + mes, formato RC-001. Robusto ante huecos/borrados."""
+    q = select(Ingreso.numero).where(Ingreso.anio == anio, Ingreso.mes == mes)
+    q = q.where(Ingreso.pais_id.is_(None) if pais_id is None else Ingreso.pais_id == pais_id)
+    result = await db.execute(q)
+    maximo = 0
+    for (numero,) in result.all():
+        if numero and numero.startswith("RC-"):
+            try:
+                maximo = max(maximo, int(numero[3:]))
+            except ValueError:
+                pass
+    return f"RC-{maximo + 1:03d}"
+
+
 @router.get("", response_model=list[IngresoOut])
 async def listar(
     pais_id: int | None = Query(None),
@@ -43,6 +58,7 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=IngresoOut, status_code=201)
 async def crear(data: IngresoCreate, db: AsyncSession = Depends(get_db)):
     obj = Ingreso(**data.model_dump())
+    obj.numero = await _siguiente_numero(db, data.pais_id, data.anio, data.mes)
     db.add(obj)
     await db.flush()
     await db.refresh(obj)

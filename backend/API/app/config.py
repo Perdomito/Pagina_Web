@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ENVIRONMENT: str = "production"
 
+    # Almacenamiento de archivos (Supabase Storage)
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_BUCKET: str = "archivos"
+
     class Config:
         env_file = ".env"
 
