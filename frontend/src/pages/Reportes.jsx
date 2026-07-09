@@ -146,14 +146,56 @@ export default function Reportes() {
         mes = meses[hoy.getMonth()];
       }
       
-      const datosReales = await estudiosService.getReporteCompleto(
-        parseInt(paisSeleccionado),
-        mes,
-        parseInt(año),
-        tipoReporte
+      // Obtener datos reales del resumen de estudios
+      const resumen = await estudiosService.getResumenCompleto(
+        parseInt(paisSeleccionado), mes, parseInt(año)
       );
       
-      return datosReales;
+      const raw = resumen || [];
+      const todasEntradas = Array.isArray(raw) ? raw :
+                            Array.isArray(raw.data) ? raw.data :
+                            Object.values(raw).find(v => Array.isArray(v)) || [];
+
+      const estudios = todasEntradas.filter(r => r && r.contacto_id != null);
+      const evangelismo = todasEntradas.filter(r => r && r.contacto_id == null && r.tipo != null);
+      const nuevosEst = todasEntradas.filter(r => r && r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0));
+
+      const contactosUnicos = [...new Set(estudios.map(e => e.contacto_id).filter(Boolean))];
+
+      // Capítulo máximo por contacto
+      const capMaxPorContacto = {};
+      estudios.forEach(e => {
+        const cap = parseInt(e.capitulo || 0);
+        const cid = e.contacto_id;
+        if (cid && cap > (capMaxPorContacto[cid] || 0)) capMaxPorContacto[cid] = cap;
+      });
+      const hastaCap4 = Object.values(capMaxPorContacto).filter(c => c >= 1 && c <= 4).length;
+      const hastaCap8 = Object.values(capMaxPorContacto).filter(c => c >= 5 && c <= 8).length;
+      const masDe8 = Object.values(capMaxPorContacto).filter(c => c > 8).length;
+
+      const horasOnline = evangelismo
+        .filter(e => (e.tipo || '').toLowerCase().includes('virtual'))
+        .reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+      const horasPresencial = evangelismo
+        .filter(e => (e.tipo || '').toLowerCase().includes('presencial') || (e.tipo || '').toLowerCase().includes('person'))
+        .reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+      const totalHorasEstudios = estudios.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+      const totalNuevosContactos = nuevosEst.reduce((s, e) => s + parseInt(e.nuevos_contactos || 0), 0);
+      const totalDijeronSi = nuevosEst.reduce((s, e) => s + parseInt(e.dijeron_si || 0), 0);
+
+      return {
+        estudiantesActuales: contactosUnicos.length,
+        evangelismoOnline: Math.round(horasOnline * 10) / 10,
+        evangelismoPresencial: Math.round(horasPresencial * 10) / 10,
+        numeroEstudios: Math.round(totalHorasEstudios * 10) / 10,
+        nuevosContactos: totalNuevosContactos,
+        contactosEstudian: contactosUnicos.length,
+        hastRomanos4: hastaCap4,
+        terminadoRomanos8: hastaCap8,
+        terminado4Leyes: masDe8,
+        probabilidadMiembro: totalDijeronSi,
+        ovejasPotenciales: totalDijeronSi
+      };
     } catch (error) {
       console.error('Error al calcular reporte:', error);
       return {
@@ -200,10 +242,11 @@ export default function Reportes() {
         mes = meses[hoy.getMonth()];
       }
       
-      const resumen = await estudiosService.getResumenCompleto(parseInt(paisSeleccionado), mes, parseInt(año));
+      const resumenRaw = await estudiosService.getResumenCompleto(parseInt(paisSeleccionado), mes, parseInt(año));
+      const resumenEstudios = Array.isArray(resumenRaw) ? resumenRaw.filter(r => r.contacto_id !== null) : (resumenRaw?.estudios || []);
       
       const misionerosConDatos = misionerosPais.map(misionero => {
-        const estudiantesMisionero = resumen.estudios.filter(e => e.miembro_responsable_id === misionero.id);
+        const estudiantesMisionero = resumenEstudios.filter(e => e.miembro_id === misionero.id || e.miembro_responsable_id === misionero.id);
         const estudiantesUnicos = [...new Set(estudiantesMisionero.map(e => e.contacto_id))];
         const horasTotales = estudiantesMisionero.reduce((sum, e) => sum + parseFloat(e.horas || 0), 0);
         
@@ -236,11 +279,12 @@ export default function Reportes() {
         mes = meses[hoy.getMonth()];
       }
       
-      const resumen = await estudiosService.getResumenCompleto(parseInt(paisSeleccionado), mes, parseInt(año));
+      const resumenRaw2 = await estudiosService.getResumenCompleto(parseInt(paisSeleccionado), mes, parseInt(año));
+      const resumenEstudios2 = Array.isArray(resumenRaw2) ? resumenRaw2.filter(r => r.contacto_id !== null) : (resumenRaw2?.estudios || []);
       
       const estudiantesPorMisionero = {};
-      resumen.estudios
-        .filter(e => e.miembro_responsable_id === misionero.id)
+      resumenEstudios2
+        .filter(e => e.miembro_id === misionero.id || e.miembro_responsable_id === misionero.id)
         .forEach(est => {
           if (!estudiantesPorMisionero[est.contacto_id]) {
             estudiantesPorMisionero[est.contacto_id] = {
@@ -342,38 +386,16 @@ export default function Reportes() {
     const diff = anterior ? calcularDiferencia(valor, anterior) : null;
     
     return (
-      <div style={{
-        background: "white",
-        borderRadius: "12px",
-        padding: "20px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        display: "flex",
-        alignItems: "center",
-        gap: "15px"
-      }}>
-        <div style={{
-          width: "50px",
-          height: "50px",
-          borderRadius: "10px",
-          background: `linear-gradient(135deg, ${color}22, ${color}44)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: color,
-          fontSize: "24px"
-        }}>
+      <div style={{ background: "white", borderRadius: "12px", padding: "20px", border: "1px solid #e8edf5", display: "flex", alignItems: "center", gap: "16px", boxShadow: "0 2px 8px rgba(19,64,105,0.06)" }}>
+        <div style={{ width: "48px", height: "48px", borderRadius: "10px", background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", color: color, fontSize: "22px", flexShrink: 0 }}>
           {icono}
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "13px", color: "#666", marginBottom: "5px" }}>{titulo}</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: "#333" }}>{valor}</div>
+          <div style={{ fontSize: "11px", color: "#8a97b0", marginBottom: "4px", fontWeight: "700", letterSpacing: "0.5px", textTransform: "uppercase", fontFamily: "'Lato',sans-serif" }}>{titulo}</div>
+          <div style={{ fontSize: "30px", fontWeight: "700", color: "#1a2d5a", fontFamily: "'Lato',sans-serif", lineHeight: 1 }}>{valor}</div>
           {diff !== null && diff !== 0 && (
-            <div style={{
-              fontSize: "12px",
-              color: diff > 0 ? "#4CAF50" : "#f44336",
-              marginTop: "5px"
-            }}>
-              {diff > 0 ? "▲" : "▼"} {Math.abs(diff)}% vs período anterior
+            <div style={{ fontSize: "11px", color: diff > 0 ? "#4CAF50" : "#f44336", marginTop: "4px", fontFamily: "'Lato',sans-serif" }}>
+              {diff > 0 ? "▲" : "▼"} {Math.abs(diff)}% vs previous period
             </div>
           )}
         </div>
@@ -384,166 +406,72 @@ export default function Reportes() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      padding: "20px"
+      background: "linear-gradient(160deg, #134069 0%, #1a5490 60%, #0d2d4a 100%)",
+      padding: "28px",
+      fontFamily: "'Lato', sans-serif"
     }}>
       <div style={{
         maxWidth: "1400px",
         margin: "0 auto",
         background: "white",
-        borderRadius: "20px",
-        padding: "30px",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+        borderRadius: "16px",
+        padding: "0",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+        overflow: "hidden"
       }}>
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "30px",
-          paddingBottom: "20px",
-          borderBottom: "2px solid #f0f0f0"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <button
-              onClick={handleVolver}
-              style={{
-                padding: "10px 15px",
-                background: "#0E5A61",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-              className="no-print"
-            >
-              <FaArrowLeft /> Volver
+        {/* HEADER */}
+        <div style={{ background: "#134069", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }} className="no-print">
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <button onClick={handleVolver} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", padding: "8px 14px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
+              <FaArrowLeft /> Back
             </button>
-            <h1 style={{ margin: 0, color: "#0E5A61", fontSize: "28px" }}>
-              <FaChartLine style={{ marginRight: "10px" }} />
-              Reportes de Evangelización
-            </h1>
+            <div>
+              <h1 style={{ margin: 0, color: "white", fontSize: "18px", fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>
+                <FaChartLine style={{ marginRight: "10px", fontSize: "16px" }} />
+                Evangelism Reports
+              </h1>
+              {reporteActual && (
+                <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
+                  {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre} · {obtenerPeriodos().find(p => p.valor === periodoSeleccionado)?.etiqueta}
+                </p>
+              )}
+            </div>
           </div>
-          
-          <div style={{ display: "flex", gap: "10px" }} className="no-print">
-            <button
-              onClick={handleImprimir}
-              disabled={!reporteActual && !misioneroSeleccionado}
-              style={{
-                padding: "10px 20px",
-                background: (reporteActual || misioneroSeleccionado) ? "#f44336" : "#ccc",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: (reporteActual || misioneroSeleccionado) ? "pointer" : "not-allowed",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              <FaFilePdf /> Imprimir
-            </button>
-          </div>
+          <button onClick={handleImprimir} disabled={!reporteActual && !misioneroSeleccionado}
+            style={{ background: (reporteActual || misioneroSeleccionado) ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "8px 16px", color: "white", cursor: (reporteActual || misioneroSeleccionado) ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
+            <FaFilePdf /> Export PDF
+          </button>
+        </div>
+
+        <div style={{ padding: "24px 28px" }}>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }} className="no-print">
+          {[
+            { value: continenteSeleccionado, onChange: (v) => { setContinenteSeleccionado(v); setPaisSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: continentes.map(c => ({ val: c.id, label: c.nombre })), placeholder: "Select Region", disabled: false },
+            { value: paisSeleccionado, onChange: (v) => { setPaisSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: paisesDelContinente.map(p => ({ val: p.id, label: p.nombre })), placeholder: "Select Country", disabled: !continenteSeleccionado },
+            { value: tipoReporte, onChange: (v) => { setTipoReporte(v); setPeriodoSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: [{ val: "mensual", label: "Monthly Report" }, { val: "semanal", label: "Weekly Report" }], placeholder: null, disabled: false },
+            { value: periodoSeleccionado, onChange: (v) => { setPeriodoSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: obtenerPeriodos().map(p => ({ val: p.valor, label: p.etiqueta })), placeholder: "Select Period", disabled: false, key: tipoReporte },
+          ].map((sel, i) => (
+            <select key={sel.key || i} value={sel.value} onChange={e => sel.onChange(e.target.value)} disabled={sel.disabled}
+              style={{ padding: "10px 14px", borderRadius: "8px", border: "1.5px solid #dde3ef", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", outline: "none", cursor: sel.disabled ? "not-allowed" : "pointer", opacity: sel.disabled ? 0.5 : 1 }}>
+              {sel.placeholder && <option value="">{sel.placeholder}</option>}
+              {sel.options.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+            </select>
+          ))}
         </div>
         
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "15px", marginBottom: "30px" }} className="no-print">
-          <select
-            value={continenteSeleccionado}
-            onChange={(e) => {
-              setContinenteSeleccionado(e.target.value);
-              setPaisSeleccionado("");
-              setMostrandoDetalle(false);
-              setMisioneroSeleccionado(null);
-            }}
-            style={{
-              padding: "12px",
-              borderRadius: "8px",
-              border: "2px solid #e0e0e0",
-              fontSize: "14px"
-            }}
-          >
-            <option value="">Seleccione Continente</option>
-            {continentes.map(c => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
-          
-          <select
-            value={paisSeleccionado}
-            onChange={(e) => {
-              setPaisSeleccionado(e.target.value);
-              setMostrandoDetalle(false);
-              setMisioneroSeleccionado(null);
-            }}
-            disabled={!continenteSeleccionado}
-            style={{
-              padding: "12px",
-              borderRadius: "8px",
-              border: "2px solid #e0e0e0",
-              fontSize: "14px"
-            }}
-          >
-            <option value="">Seleccione País</option>
-            {paisesDelContinente.map(p => (
-              <option key={p.id} value={p.id}>{p.nombre}</option>
-            ))}
-          </select>
-          
-          <select
-            value={tipoReporte}
-            onChange={(e) => {
-              setTipoReporte(e.target.value);
-              setPeriodoSeleccionado("");
-              setMostrandoDetalle(false);
-              setMisioneroSeleccionado(null);
-            }}
-            style={{
-              padding: "12px",
-              borderRadius: "8px",
-              border: "2px solid #e0e0e0",
-              fontSize: "14px"
-            }}
-          >
-            <option value="semanal">Reporte Semanal</option>
-            <option value="mensual">Reporte Mensual</option>
-          </select>
-          
-          <select
-            key={tipoReporte}
-            value={periodoSeleccionado}
-            onChange={(e) => {
-              setPeriodoSeleccionado(e.target.value);
-              setMostrandoDetalle(false);
-              setMisioneroSeleccionado(null);
-            }}
-            style={{
-              padding: "12px",
-              borderRadius: "8px",
-              border: "2px solid #e0e0e0",
-              fontSize: "14px"
-            }}
-          >
-            <option value="">Seleccione Período</option>
-            {obtenerPeriodos().map(p => (
-              <option key={p.valor} value={p.valor}>{p.etiqueta}</option>
-            ))}
-          </select>
-        </div>
-        
-        {!mostrandoDetalle && !misioneroSeleccionado && reporteActual && (
+        {!misioneroSeleccionado && reporteActual && (
           <>
-            <div style={{ textAlign: "center", marginBottom: "30px" }}>
-              <h2 style={{ color: "#0E5A61", fontSize: "24px", margin: "0 0 5px 0" }}>
-                Reporte {tipoReporte === "semanal" ? "Semanal" : "Mensual"} de {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
+            <div style={{ marginBottom: "24px", borderBottom: "2px solid #e8edf5", paddingBottom: "16px" }}>
+              <h2 style={{ color: "#134069", fontSize: "20px", margin: "0 0 4px", fontFamily: "'Cinzel',serif", fontWeight: "600" }}>
+                {tipoReporte === "semanal" ? "Weekly" : "Monthly"} Report — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
               </h2>
-              <p style={{ color: "#666", fontSize: "16px", margin: 0 }}>
+              <p style={{ color: "#8a97b0", fontSize: "13px", margin: 0, fontFamily: "'Lato',sans-serif" }}>
                 {obtenerPeriodos().find(p => p.valor === periodoSeleccionado)?.etiqueta}
               </p>
             </div>
             
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px" }}>
               <MetricaCard icono={<FaUsers />} titulo="Estudiantes Actuales de la Biblia" valor={reporteActual.estudiantesActuales} anterior={reporteAnterior?.estudiantesActuales} color="#2196F3" />
               <MetricaCard icono={<FaClock />} titulo="Evangelismo Online (horas)" valor={reporteActual.evangelismoOnline} anterior={reporteAnterior?.evangelismoOnline} color="#9C27B0" />
               <MetricaCard icono={<FaClock />} titulo="Evangelismo Presencial (horas)" valor={reporteActual.evangelismoPresencial} anterior={reporteAnterior?.evangelismoPresencial} color="#FF9800" />
@@ -552,39 +480,24 @@ export default function Reportes() {
               <MetricaCard icono={<FaCheckCircle />} titulo="Contactos que Tomaron el Estudio" valor={reporteActual.contactosEstudian} anterior={reporteAnterior?.contactosEstudian} color="#8BC34A" />
             </div>
             
-            <div style={{ textAlign: "center", marginBottom: "30px" }} className="no-print">
-              <button
-                onClick={cargarDetalleMisioneros}
-                style={{
-                  padding: "15px 30px",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)"
-                }}
-              >
-                <FaEye /> Ver Detalle por Misionero
+            <div style={{ marginBottom: "24px" }} className="no-print">
+              <button onClick={mostrandoDetalle ? () => setMostrandoDetalle(false) : cargarDetalleMisioneros}
+                style={{ background: mostrandoDetalle ? "#f0f4fa" : "#134069", color: mostrandoDetalle ? "#134069" : "white", border: mostrandoDetalle ? "1.5px solid #dde3ef" : "none", borderRadius: "8px", padding: "12px 24px", cursor: "pointer", fontSize: "14px", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "8px", fontFamily: "'Lato',sans-serif", boxShadow: mostrandoDetalle ? "none" : "0 4px 12px rgba(19,64,105,0.3)" }}>
+                <FaEye /> {mostrandoDetalle ? "Hide Missionary Detail" : "View Detail by Missionary"}
               </button>
             </div>
             
-            <div style={{ background: "#f5f5f5", borderRadius: "12px", padding: "20px", marginTop: "30px" }}>
-              <h3 style={{ color: "#0E5A61", fontSize: "18px", marginBottom: "15px" }}>
-                Seguimiento de Progreso (Próximamente)
+            <div style={{ background: "#f4f6fb", borderRadius: "12px", padding: "20px", marginTop: "16px", border: "1px solid #e8edf5" }}>
+              <h3 style={{ color: "#134069", fontSize: "15px", marginBottom: "16px", fontFamily: "'Cinzel',serif", fontWeight: "600" }}>
+                Progress Tracking
               </h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "15px" }}>
                 {[
-                  { label: "Estudiantes hasta Romanos 4", value: reporteActual.hastRomanos4 },
-                  { label: "Estudiantes que terminaron Romanos 8", value: reporteActual.terminadoRomanos8 },
-                  { label: "Estudiantes que terminaron las 4 Leyes", value: reporteActual.terminado4Leyes },
-                  { label: "Probabilidad de Hacerse Miembro", value: reporteActual.probabilidadMiembro },
-                  { label: "Ovejas Potenciales", value: reporteActual.ovejasPotenciales }
+                  { label: "Students up to Chapter 4", value: reporteActual.hastRomanos4 },
+                  { label: "Students up to Chapter 8", value: reporteActual.terminadoRomanos8 },
+                  { label: "Students past Chapter 8", value: reporteActual.terminado4Leyes },
+                  { label: "Said Yes", value: reporteActual.probabilidadMiembro },
+                  { label: "Potential Sheep", value: reporteActual.ovejasPotenciales }
                 ].map((item, idx) => (
                   <div key={idx} style={{ background: "white", padding: "15px", borderRadius: "8px", textAlign: "center" }}>
                     <div style={{ fontSize: "12px", color: "#999", marginBottom: "5px" }}>{item.label}</div>
@@ -595,7 +508,7 @@ export default function Reportes() {
             </div>
             
             <div style={{ marginTop: "30px" }} className="no-print">
-              <label style={{ display: "block", marginBottom: "10px", color: "#0E5A61", fontWeight: "600" }}>
+              <label style={{ display: "block", marginBottom: "8px", color: "#134069", fontWeight: "700", fontSize: "13px", letterSpacing: "0.5px", textTransform: "uppercase", fontFamily: "'Lato',sans-serif" }}>
                 Observaciones y Comentarios
               </label>
               <textarea
@@ -619,8 +532,8 @@ export default function Reportes() {
         {mostrandoDetalle && !misioneroSeleccionado && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h2 style={{ color: "#0E5A61", fontSize: "24px", margin: 0 }}>
-                Detalle por Misionero - {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
+              <h2 style={{ color: "#134069", fontSize: "18px", margin: "0 0 4px", fontFamily: "'Cinzel',serif", fontWeight: "600" }}>
+                Missionary Detail — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
               </h2>
             </div>
             
@@ -637,7 +550,7 @@ export default function Reportes() {
                     transition: "all 0.3s ease"
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#667eea";
+                    e.currentTarget.style.borderColor = "#134069";
                     e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
                   }}
@@ -648,7 +561,7 @@ export default function Reportes() {
                   }}
                 >
                   <div style={{ marginBottom: "15px" }}>
-                    <h3 style={{ color: "#0E5A61", fontSize: "18px", margin: "0 0 5px 0" }}>
+                    <h3 style={{ color: "#134069", fontSize: "18px", margin: "0 0 5px 0" }}>
                       {misionero.nombre}
                     </h3>
                     {misionero.identidad && (
@@ -678,7 +591,7 @@ export default function Reportes() {
                     style={{
                       width: "100%",
                       padding: "12px",
-                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      background: "#134069",
                       color: "white",
                       border: "none",
                       borderRadius: "8px",
@@ -717,7 +630,7 @@ export default function Reportes() {
             
             <div className="no-print">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h2 style={{ color: "#0E5A61", fontSize: "24px", margin: 0 }}>
+                <h2 style={{ color: "#134069", fontSize: "24px", margin: 0 }}>
                   {misioneroSeleccionado.nombre} - {obtenerPeriodos().find(p => p.valor === periodoSeleccionado)?.etiqueta}
                 </h2>
               </div>
@@ -732,7 +645,7 @@ export default function Reportes() {
                   overflow: "hidden"
                 }}>
                   <thead>
-                    <tr style={{ background: "#0E5A61", color: "white" }}>
+                    <tr style={{ background: "#134069", color: "white", fontFamily: "'Lato',sans-serif" }}>
                       <th style={{ padding: "12px", textAlign: "left" }}>N°</th>
                       <th style={{ padding: "12px", textAlign: "left" }}>Nombre</th>
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(dia => (
@@ -741,7 +654,7 @@ export default function Reportes() {
                         </th>
                       ))}
                     </tr>
-                    <tr style={{ background: "#0E5A61", color: "white" }}>
+                    <tr style={{ background: "#134069", color: "white", fontFamily: "'Lato',sans-serif" }}>
                       <th colSpan="2"></th>
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(dia => (
                         <React.Fragment key={dia}>
@@ -775,7 +688,11 @@ export default function Reportes() {
           </div>
         )}
         
-        <style>{estilosImpresion}</style>
+        </div>{/* cierre padding div */}
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
+          ${estilosImpresion}
+        `}</style>
       </div>
     </div>
   );

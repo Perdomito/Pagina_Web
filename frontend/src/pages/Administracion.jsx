@@ -5,7 +5,7 @@ import {
   FaListAlt, FaPlus, FaTrash, FaSearch, FaFilter, FaTimes,
   FaSave, FaArrowLeft, FaDollarSign, FaCheckCircle,
   FaTimesCircle, FaFileAlt, FaChartBar, FaGlobe,
-  FaArrowDown, FaArrowUp, FaEdit
+  FaArrowDown, FaArrowUp, FaEdit, FaPrint
 } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import administracionService from '../services/AdministracionService';
@@ -38,12 +38,12 @@ export default function Administracion() {
   const [año]                         = useState(new Date().getFullYear());
   const [paisNombre, setPaisNombre]   = useState("");
   const [paisId, setPaisId]           = useState(1);
+  const [listaPaises, setListaPaises]   = useState([]);
   const [tasaCambio, setTasaCambio]   = useState(58.00);
 
   // Cajas y bancos
   const [saldoCaja, setSaldoCaja]     = useState(0);
   const [saldoBanco, setSaldoBanco]   = useState(0);
-  const [saldoId, setSaldoId]         = useState(null);
 
   // Traslados
   const [traslados, setTraslados]     = useState([]);
@@ -64,7 +64,7 @@ export default function Administracion() {
     tipo: "", fecha: new Date().toISOString().split('T')[0],
     proveedor: "", categoria: "", descripcion: "",
     cantidad: 1, valorUnitario: 0, descuento: 0,
-    formaPago: "Cash", observaciones: ""
+    formaPago: "Cash", observaciones: "", centro_costo: ""
   });
 
   useEffect(() => {
@@ -72,7 +72,6 @@ export default function Administracion() {
       const pid = user.pais_id || 1;
       setPaisId(pid);
       cargarDatos(pid);
-      cargarFinanzas(pid);
     }
   }, [user]);
 
@@ -82,70 +81,57 @@ export default function Administracion() {
         administracionService.getAllPaises(),
         administracionService.getTasaCambio()
       ]);
-      const p = paises.find(x => x.id === pid);
+      setListaPaises(paises);
+      const p = paises.find(x => String(x.id) === String(pid));
       if (p) setPaisNombre(p.nombre);
       setTasaCambio(parseFloat(tasa));
     } catch {}
-  };
-
-  const cargarFinanzas = async (pid) => {
-    try {
-      const [saldos, trasl] = await Promise.all([
-        administracionService.getSaldos(pid),
-        administracionService.getTraslados(pid)
-      ]);
-      const fila = Array.isArray(saldos) ? saldos[0] : saldos;
-      if (fila) {
-        setSaldoCaja(parseFloat(fila.saldo_caja) || 0);
-        setSaldoBanco(parseFloat(fila.saldo_banco) || 0);
-        setSaldoId(fila.id);
-      } else {
-        setSaldoCaja(0); setSaldoBanco(0); setSaldoId(null);
-      }
-      setTraslados((trasl || []).map(t => ({
-        id: t.id, de: t.de, a: t.a, valor: parseFloat(t.valor) || 0,
-        observaciones: t.observaciones, fecha: t.fecha
-      })));
-    } catch {}
-  };
-
-  const persistirSaldo = async (nuevoCaja, nuevoBanco) => {
-    try {
-      if (saldoId) {
-        await administracionService.actualizarSaldos(saldoId, {
-          saldo_caja: nuevoCaja, saldo_banco: nuevoBanco
-        });
-      } else {
-        const s = await administracionService.crearSaldos({
-          pais_id: paisId, saldo_caja: nuevoCaja, saldo_banco: nuevoBanco
-        });
-        if (s && s.id) setSaldoId(s.id);
-      }
-    } catch { toast.error("Movement saved, but balance could not be updated"); }
   };
 
   const cargarGastosMes = useCallback(async () => {
     try {
       const d = await administracionService.getDetallePresupuesto(paisId, mes, año);
       setGastos(d.map(x => ({
-        id: x.id, concepto: x.concepto, monto: parseFloat(x.monto),
-        tipo: x.tipo, fecha: x.fecha_registro?.split('T')[0] || new Date().toISOString().split('T')[0]
+        id: x.id, concepto: x.concepto, monto: parseFloat(x.monto), centro_costo: x.centro_costo || '',
+        tipo: x.tipo, fecha: x.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
       })));
     } catch {}
   }, [paisId, mes, año]);
+
+  useEffect(() => { cargarGastosMes(); }, [mes, cargarGastosMes]);
 
   const cargarIngresosMes = useCallback(async () => {
     try {
-      const d = await administracionService.getIngresos(paisId, mes, año);
-      setIngresos((d || []).map(x => ({
-        id: x.id, fecha: x.fecha, tipo: x.tipo, origen: x.origen,
-        dondeIngresa: x.donde_ingresa, valorRecibido: x.valor,
-        observaciones: x.observaciones
+      const data = await administracionService.getIngresos(paisId, mes, año);
+      setIngresos(data.map(x => ({
+        id: x.id,
+        tipo: x.tipo || "RC-1-Recibo de caja",
+        origen: x.origen || "World Olivet Assembly",
+        dondeIngresa: x.donde_ingresa || "banco",
+        valorRecibido: parseFloat(x.valor || x.monto || 0),
+        observaciones: x.observaciones || "",
+        fecha: x.fecha?.split('T')[0] || new Date().toISOString().split('T')[0],
+        numero: x.numero || `RC-${String(x.id).padStart(3,'0')}`
       })));
     } catch {}
   }, [paisId, mes, año]);
 
-  useEffect(() => { cargarGastosMes(); cargarIngresosMes(); }, [mes, cargarGastosMes, cargarIngresosMes]);
+  const cargarTrasladosMes = useCallback(async () => {
+    try {
+      const data = await administracionService.getTraslados(paisId);
+      setTraslados(data.map(x => ({
+        id: x.id,
+        de: x.de,
+        a: x.a,
+        valor: parseFloat(x.valor || 0),
+        observaciones: x.observaciones || "",
+        fecha: x.fecha?.split('T')[0] || new Date().toISOString().split('T')[0]
+      })));
+    } catch {}
+  }, [paisId]);
+
+  useEffect(() => { cargarIngresosMes(); }, [mes, cargarIngresosMes]);
+  useEffect(() => { cargarTrasladosMes(); }, [cargarTrasladosMes]);
 
   // Totales
   const totalIngresos  = ingresos.reduce((s, i) => s + parseFloat(i.valorRecibido || 0), 0);
@@ -163,43 +149,63 @@ export default function Administracion() {
     if (!nuevoTraslado.valor) { toast.error("Enter an amount"); return; }
     const val = parseFloat(nuevoTraslado.valor);
     try {
-      const creado = await administracionService.crearTraslado({
-        pais_id: paisId, de: nuevoTraslado.de, a: nuevoTraslado.a,
-        valor: val, observaciones: nuevoTraslado.observaciones, fecha: nuevoTraslado.fecha
+      await administracionService.crearTraslado({
+        pais_id: paisId,
+        de: nuevoTraslado.de,
+        a: nuevoTraslado.a,
+        valor: val,
+        observaciones: nuevoTraslado.observaciones,
+        fecha: nuevoTraslado.fecha
       });
-      setTraslados([{
-        id: creado?.id ?? Date.now(), de: nuevoTraslado.de, a: nuevoTraslado.a,
-        valor: val, observaciones: nuevoTraslado.observaciones, fecha: nuevoTraslado.fecha
-      }, ...traslados]);
-      const nuevoCaja  = saldoCaja  + (nuevoTraslado.a === "caja"  ? val : 0) - (nuevoTraslado.de === "caja"  ? val : 0);
-      const nuevoBanco = saldoBanco + (nuevoTraslado.a === "banco" ? val : 0) - (nuevoTraslado.de === "banco" ? val : 0);
-      setSaldoCaja(nuevoCaja); setSaldoBanco(nuevoBanco);
-      await persistirSaldo(nuevoCaja, nuevoBanco);
+      const t = { ...nuevoTraslado, id: Date.now(), valor: val };
+      setTraslados([t, ...traslados]);
+      if (nuevoTraslado.de === "banco") setSaldoBanco(s => s - val);
+      else setSaldoCaja(s => s - val);
+      if (nuevoTraslado.a === "caja") setSaldoCaja(s => s + val);
+      else setSaldoBanco(s => s + val);
       toast.success("Transfer recorded");
       setModalTraslado(false);
       setNuevoTraslado({ de:"banco", a:"caja", valor:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
     } catch { toast.error("Error saving transfer"); }
   };
 
+  const eliminarIngreso = async (id) => {
+    if (!window.confirm("Delete this income record?")) return;
+    try {
+      await administracionService.eliminarIngreso(id);
+      const ing = ingresos.find(i => i.id === id);
+      if (ing) {
+        if (ing.dondeIngresa === "caja") setSaldoCaja(s => s - parseFloat(ing.valorRecibido));
+        else setSaldoBanco(s => s - parseFloat(ing.valorRecibido));
+      }
+      setIngresos(prev => prev.filter(i => i.id !== id));
+      toast.success("Income record deleted");
+    } catch { toast.error("Error deleting record"); }
+  };
+
   const guardarIngreso = async () => {
     if (!nuevoIngreso.valorRecibido) { toast.error("Enter the amount received"); return; }
     const val = parseFloat(nuevoIngreso.valorRecibido);
     try {
-      const creado = await administracionService.crearIngreso({
-        pais_id: paisId, mes: MESES.indexOf(mes) + 1, anio: año,
-        tipo: nuevoIngreso.tipo, origen: nuevoIngreso.origen,
-        donde_ingresa: nuevoIngreso.dondeIngresa, valor: val,
-        observaciones: nuevoIngreso.observaciones, fecha: nuevoIngreso.fecha
+      const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+      const mesNum = MESES.indexOf(mes) + 1;
+      const saved = await administracionService.crearIngreso({
+        pais_id: paisId,
+        mes: mesNum,
+        mes_nombre: mes,
+        anio: año,
+        tipo: nuevoIngreso.tipo,
+        origen: nuevoIngreso.origen,
+        donde_ingresa: nuevoIngreso.dondeIngresa,
+        valor: val,
+        observaciones: nuevoIngreso.observaciones || null,
+        fecha: nuevoIngreso.fecha
       });
-      setIngresos([{
-        id: creado?.id ?? Date.now(), fecha: nuevoIngreso.fecha, tipo: nuevoIngreso.tipo,
-        origen: nuevoIngreso.origen, dondeIngresa: nuevoIngreso.dondeIngresa,
-        valorRecibido: val, observaciones: nuevoIngreso.observaciones
-      }, ...ingresos]);
-      const nuevoCaja  = saldoCaja  + (nuevoIngreso.dondeIngresa === "caja"  ? val : 0);
-      const nuevoBanco = saldoBanco + (nuevoIngreso.dondeIngresa === "banco" ? val : 0);
-      setSaldoCaja(nuevoCaja); setSaldoBanco(nuevoBanco);
-      await persistirSaldo(nuevoCaja, nuevoBanco);
+      const numeroCorrelativo = saved.numero || `RC-${String(saved.id || Date.now()).padStart(3,'0')}`;
+      const ing = { ...nuevoIngreso, id: saved.id || Date.now(), numero: numeroCorrelativo, valorRecibido: val };
+      setIngresos([ing, ...ingresos]);
+      if (nuevoIngreso.dondeIngresa === "caja") setSaldoCaja(s => s + val);
+      else setSaldoBanco(s => s + val);
       toast.success("Income recorded");
       setModalIngreso(false);
       setNuevoIngreso({ tipo:"RC-1-Recibo de caja", origen:"World Olivet Assembly", dondeIngresa:"banco", valorRecibido:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
@@ -211,15 +217,19 @@ export default function Administracion() {
     const total = (parseFloat(nuevoGasto.valorUnitario) * parseInt(nuevoGasto.cantidad)) - parseFloat(nuevoGasto.descuento || 0);
     try {
       const g = await administracionService.agregarItemPresupuesto({
-        pais_id: paisId, mes, anio: año,
-        tipo: nuevoGasto.tipo || "otro_gasto",
+        pais_id: paisId,
+        pais: paisNombre,
+        mes, anio: año,
+        tipo_gasto: nuevoGasto.tipo || "otros_gastos",
         concepto: `${nuevoGasto.descripcion}${nuevoGasto.proveedor ? ` — ${nuevoGasto.proveedor}` : ""}`,
-        monto: total, moneda: "DOP", tasa_cambio: tasaCambio
+        monto: total, moneda: "DOP", tasa_cambio: tasaCambio,
+        notas: nuevoGasto.observaciones || null,
+        centro_costo: nuevoGasto.centro_costo || paisNombre
       });
       setGastos([{ id: g.id, concepto: g.concepto || nuevoGasto.descripcion, monto: total, tipo: nuevoGasto.tipo || "otro_gasto", fecha: nuevoGasto.fecha }, ...gastos]);
       toast.success("Expense saved");
       setModalGasto(false);
-      setNuevoGasto({ tipo:"", fecha: new Date().toISOString().split('T')[0], proveedor:"", categoria:"", descripcion:"", cantidad:1, valorUnitario:0, descuento:0, formaPago:"Cash", observaciones:"" });
+      setNuevoGasto({ tipo:"", fecha: new Date().toISOString().split('T')[0], proveedor:"", categoria:"", descripcion:"", cantidad:1, valorUnitario:0, descuento:0, formaPago:"Cash", observaciones:"", centro_costo:"" });
     } catch { toast.error("Error saving expense"); }
   };
 
@@ -292,7 +302,7 @@ export default function Administracion() {
       <div style={{ width:220, background:P, display:"flex", flexDirection:"column", flexShrink:0 }}>
         <div style={{ padding:"22px 20px 16px", borderBottom:"1px solid rgba(255,255,255,0.12)" }}>
           <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:13, color:"white", margin:"0 0 4px", letterSpacing:1 }}>Administration</h2>
-          <p style={{ fontSize:11, color:"rgba(255,255,255,0.5)", margin:0 }}>{paisNombre} · {año}</p>
+          <p style={{ fontSize:11, color:"rgba(255,255,255,0.5)", margin:0 }}>OA · {año}</p>
         </div>
 
         <nav style={{ paddingTop:8 }}>
@@ -310,8 +320,27 @@ export default function Administracion() {
           </div>
         </nav>
 
-        {/* Tasa de cambio */}
+        {/* Selector de país */}
         <div style={{ padding:"14px 20px", borderTop:"1px solid rgba(255,255,255,0.1)", marginTop:"auto" }}>
+          <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>Country</div>
+          <select
+            value={paisId}
+            onChange={e => {
+              const id = parseInt(e.target.value);
+              setPaisId(id);
+              const p = listaPaises.find(x => x.id === id);
+              if (p) setPaisNombre(p.nombre);
+            }}
+            style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:6, color:"white", fontSize:12, fontWeight:600, width:"100%", padding:"5px 8px", outline:"none", fontFamily:"'Lato',sans-serif" }}
+          >
+            {listaPaises.map(p => (
+              <option key={p.id} value={p.id} style={{ background:P, color:"white" }}>{p.nombre}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Tasa de cambio */}
+        <div style={{ padding:"14px 20px", borderTop:"1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>Exchange Rate</div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
             <FaDollarSign style={{ color:"rgba(255,255,255,0.5)", fontSize:11 }} />
@@ -342,20 +371,30 @@ export default function Administracion() {
             :                         "Reports" }
           </span>
           <div style={{ display:"flex", gap:10 }}>
-            { seccion==="traslados" && <button className="adm-btn adm-btn-p adm-btn-sm" onClick={()=>setModalTraslado(true)}><FaPlus /> New Transfer</button> }
-            { seccion==="ingresos"  && <button className="adm-btn adm-btn-s adm-btn-sm" onClick={()=>setModalIngreso(true)}><FaPlus /> New Receipt</button> }
-            { seccion==="gastos"    && <button className="adm-btn adm-btn-p adm-btn-sm" onClick={()=>setModalGasto(true)}><FaPlus /> New Expense</button> }
+            { seccion==="traslados" ? <button className="adm-btn adm-btn-p adm-btn-sm" onClick={()=>setModalTraslado(true)}><FaPlus /> New Transfer</button> : null }
+            { seccion==="ingresos"  ? <button className="adm-btn adm-btn-s adm-btn-sm" onClick={()=>setModalIngreso(true)}><FaPlus /> New Receipt</button> : null }
+            { seccion==="gastos"    ? <button className="adm-btn adm-btn-p adm-btn-sm" onClick={()=>setModalGasto(true)}><FaPlus /> New Expense</button> : null }
           </div>
         </div>
 
         {/* MES SELECTOR */}
         <div style={{ background:"white", borderBottom:"1px solid #e8edf5", padding:"10px 28px", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", flexShrink:0 }}>
           <span style={{ fontSize:11, fontWeight:700, color:"#8a97b0", letterSpacing:1, textTransform:"uppercase", marginRight:4 }}>Month:</span>
-          {MESES.map(m => (
-            <button key={m} className={`adm-mes-btn ${mes===m?"active":""}`} onClick={()=>setMes(m)}>
-              {MES_EN[m].slice(0,3)}
-            </button>
-          ))}
+          {MESES.map((m, idx) => {
+            const mesActualIdx = new Date().getMonth();
+            const esFuturo = idx > mesActualIdx;
+            return (
+              <button
+                key={m}
+                className={`adm-mes-btn ${mes===m?"active":""}`}
+                onClick={() => !esFuturo && setMes(m)}
+                style={{ opacity: esFuturo ? 0.35 : 1, cursor: esFuturo ? "not-allowed" : "pointer" }}
+                title={esFuturo ? "Month not available yet" : ""}
+              >
+                {MES_EN[m].slice(0,3)}
+              </button>
+            );
+          })}
         </div>
 
         {/* CONTENT */}
@@ -363,7 +402,7 @@ export default function Administracion() {
 
           {/* ── DASHBOARD ── */}
           {seccion==="dashboard" && (
-            <>
+            <div key={`dash-${mes}`}>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:20 }}>
                 <div className="adm-stat">
                   <div className="adm-stat-lbl">Cash Available</div>
@@ -428,12 +467,12 @@ export default function Administracion() {
                   ))}
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* ── CAJAS Y BANCOS ── */}
           {seccion==="cajas" && (
-            <div className="adm-card">
+            <div key={`cajas-${mes}`} className="adm-card">
               <div className="adm-card-hdr"><h3 className="adm-card-ttl">Bank Accounts & Cash</h3></div>
               <table className="adm-table">
                 <thead>
@@ -469,7 +508,7 @@ export default function Administracion() {
 
           {/* ── TRASLADOS ── */}
           {seccion==="traslados" && (
-            <div className="adm-card">
+            <div key={`traslados-${mes}`} className="adm-card">
               <div className="adm-card-hdr">
                 <h3 className="adm-card-ttl">Money Transfers</h3>
                 <span style={{ fontSize:12, color:"#8a97b0" }}>Record cash withdrawals and transfers between accounts</span>
@@ -508,7 +547,7 @@ export default function Administracion() {
 
           {/* ── INGRESOS ── */}
           {seccion==="ingresos" && (
-            <div className="adm-card">
+            <div key={`ingresos-${mes}`} className="adm-card">
               <div className="adm-card-hdr">
                 <h3 className="adm-card-ttl">Cash Receipts — Income</h3>
                 <span style={{ fontSize:12, color:"#8a97b0" }}>Record money received from headquarters</span>
@@ -522,6 +561,7 @@ export default function Administracion() {
                 <table className="adm-table">
                   <thead>
                     <tr>
+                      <th style={{ width:40 }}></th>
                       <th>No.</th>
                       <th>Date</th>
                       <th>Type</th>
@@ -533,16 +573,21 @@ export default function Administracion() {
                   <tbody>
                     {ingresos.map((ing,i) => (
                       <tr key={ing.id}>
-                        <td style={{ color:"#8a97b0", fontSize:12 }}>RC-{i+1}</td>
+                        <td>
+                          <button onClick={() => eliminarIngreso(ing.id)} style={{ background:"#fff0f0", border:"none", borderRadius:6, padding:"4px 8px", cursor:"pointer", color:"#f44336" }}>
+                            <FaTrash style={{ fontSize:11 }} />
+                          </button>
+                        </td>
+                        <td style={{ color:"#8a97b0", fontSize:12 }}>{ing.numero || `RC-${i+1}`}</td>
                         <td style={{ color:"#8a97b0", fontSize:12 }}>{ing.fecha}</td>
                         <td>{ing.tipo}</td>
                         <td style={{ fontWeight:600 }}>{ing.origen}</td>
                         <td><span className="adm-badge adm-badge-tr">{ing.dondeIngresa==="caja"?"Petty Cash":"Bank"}</span></td>
-                        <td style={{ textAlign:"right", fontWeight:700, color:"#4CAF50" }}>${parseFloat(ing.valorRecibido).toLocaleString()}</td>
+                        <td style={{ textAlign:"right", fontWeight:700, color:"#4CAF50" }}>${parseFloat(ing.valorRecibido||0).toLocaleString()}</td>
                       </tr>
                     ))}
                     <tr style={{ background:"#f0f4fa" }}>
-                      <td colSpan={5} style={{ fontWeight:700, color:"#5a6a85", fontSize:12, textTransform:"uppercase" }}>Total Income</td>
+                      <td colSpan={6} style={{ fontWeight:700, color:"#5a6a85", fontSize:12, textTransform:"uppercase" }}>Total Income</td>
                       <td style={{ textAlign:"right", fontWeight:700, fontSize:16, color:"#4CAF50" }}>${totalIngresos.toLocaleString()}</td>
                     </tr>
                   </tbody>
@@ -553,7 +598,7 @@ export default function Administracion() {
 
           {/* ── GASTOS ── */}
           {seccion==="gastos" && (
-            <>
+            <div key={`gastos-${mes}`}>
               {/* Filtros estilo Siigo */}
               <div style={{ background:"white", borderRadius:12, border:"1px solid #e8edf5", padding:"16px 20px", marginBottom:16 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:12, fontSize:12, color:"#8a97b0", cursor:"pointer" }}>
@@ -633,31 +678,117 @@ export default function Administracion() {
                   </table>
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {/* ── REPORTES ── */}
           {seccion==="reporte" && (
-            <div className="adm-card">
-              <div className="adm-card-hdr"><h3 className="adm-card-ttl">Financial Reports</h3></div>
-              <div style={{ padding:"20px 24px" }}>
-                {[
-                  { grupo:"Accounting", items:["Account List","Detailed Vouchers","Voucher Sequence","Financial Movement Report"] },
-                  { grupo:"Financial", items:["Financial Situation Statement","Trial Balance","Income Statement"] },
-                  { grupo:"Balances", items:["General Trial Balance","Balance by Country","Balance by Missionary"] },
-                ].map(g => (
-                  <div key={g.grupo} style={{ marginBottom:24 }}>
-                    <div style={{ fontWeight:700, color:"#1a2d5a", fontSize:13, marginBottom:10, fontFamily:"'Cinzel',serif" }}>{g.grupo}</div>
-                    {g.items.map(item => (
-                      <div key={item} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #f0f4fa", cursor:"pointer" }}
-                        onMouseOver={e=>e.currentTarget.style.paddingLeft="8px"}
-                        onMouseOut={e=>e.currentTarget.style.paddingLeft="0"}>
-                        <span style={{ fontSize:13, color:"#5a6a85", transition:"all 0.2s" }}>{item}</span>
-                        <FaFileAlt style={{ color:"#b0bcd0", fontSize:12 }} />
-                      </div>
-                    ))}
+            <div key={`reporte-${mes}`}>
+              {/* Resumen del mes */}
+              <div className="adm-card" style={{ marginBottom:16 }}>
+                <div className="adm-card-hdr">
+                  <h3 className="adm-card-ttl">Financial Summary — {MES_EN[mes]} {año}</h3>
+                  <button className="adm-btn adm-btn-o adm-btn-sm" onClick={() => window.print()}><FaPrint /> Print</button>
+                </div>
+                <div style={{ padding:"20px 24px" }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16, marginBottom:20 }}>
+                    <div style={{ background:"#f0faf4", borderRadius:10, padding:"16px 20px", borderLeft:"4px solid #4CAF50" }}>
+                      <div style={{ fontSize:11, color:"#4CAF50", fontWeight:700, marginBottom:4 }}>TOTAL INCOME</div>
+                      <div style={{ fontSize:28, fontWeight:700, color:"#1a2d5a" }}>${totalIngresos.toLocaleString()}</div>
+                      <div style={{ fontSize:11, color:"#8a97b0" }}>{ingresos.length} receipt{ingresos.length!==1?"s":""}</div>
+                    </div>
+                    <div style={{ background:"#fff5f5", borderRadius:10, padding:"16px 20px", borderLeft:"4px solid #f44336" }}>
+                      <div style={{ fontSize:11, color:"#f44336", fontWeight:700, marginBottom:4 }}>TOTAL EXPENSES</div>
+                      <div style={{ fontSize:28, fontWeight:700, color:"#1a2d5a" }}>${totalGastos.toLocaleString()}</div>
+                      <div style={{ fontSize:11, color:"#8a97b0" }}>{gastos.length} record{gastos.length!==1?"s":""}</div>
+                    </div>
+                    <div style={{ background:saldoNeto>=0?"#f0faf4":"#fff5f5", borderRadius:10, padding:"16px 20px", borderLeft:`4px solid ${saldoNeto>=0?"#4CAF50":"#f44336"}` }}>
+                      <div style={{ fontSize:11, color:saldoNeto>=0?"#4CAF50":"#f44336", fontWeight:700, marginBottom:4 }}>NET BALANCE</div>
+                      <div style={{ fontSize:28, fontWeight:700, color:"#1a2d5a" }}>{saldoNeto<0?"-":""}${Math.abs(saldoNeto).toLocaleString()}</div>
+                      <div style={{ fontSize:11, color:"#8a97b0" }}>DOP</div>
+                    </div>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {/* Reporte de ingresos */}
+              <div className="adm-card" style={{ marginBottom:16 }}>
+                <div className="adm-card-hdr">
+                  <h3 className="adm-card-ttl">Income Report</h3>
+                </div>
+                {ingresos.length === 0 ? (
+                  <div style={{ padding:"30px", textAlign:"center", color:"#b0bcd0" }}>No income recorded for {MES_EN[mes]}</div>
+                ) : (
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>No.</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Origin</th>
+                        <th>Account</th>
+                        <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ingresos.map((ing, i) => (
+                        <tr key={ing.id}>
+                          <td style={{ color:"#8a97b0", fontSize:12 }}>{ing.numero || `RC-${String(i+1).padStart(3,'0')}`}</td>
+                          <td style={{ color:"#8a97b0", fontSize:12 }}>{ing.fecha}</td>
+                          <td style={{ fontSize:12 }}>{ing.tipo}</td>
+                          <td style={{ fontWeight:600 }}>{ing.origen}</td>
+                          <td><span className="adm-badge adm-badge-tr">{ing.dondeIngresa==="caja"?"Petty Cash":"Bank"}</span></td>
+                          <td style={{ textAlign:"right", fontWeight:700, color:"#4CAF50" }}>${parseFloat(ing.valorRecibido||0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ background:"#f8faff", fontWeight:700 }}>
+                        <td colSpan="5" style={{ textAlign:"right", paddingRight:16, fontSize:13 }}>TOTAL</td>
+                        <td style={{ textAlign:"right", color:"#4CAF50", fontSize:15 }}>${totalIngresos.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Reporte de gastos */}
+              <div className="adm-card">
+                <div className="adm-card-hdr">
+                  <h3 className="adm-card-ttl">Expenses Report</h3>
+                </div>
+                {gastos.length === 0 ? (
+                  <div style={{ padding:"30px", textAlign:"center", color:"#b0bcd0" }}>No expenses recorded for {MES_EN[mes]}</div>
+                ) : (
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Cost Center</th>
+                        <th>Description</th>
+                        <th>Provider</th>
+                        <th>Payment</th>
+                        <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gastos.map(g => (
+                        <tr key={g.id}>
+                          <td style={{ color:"#8a97b0", fontSize:12 }}>{g.fecha}</td>
+                          <td style={{ fontSize:12 }}>{g.tipo_gasto?.replace(/_/g," ") || g.tipo}</td>
+                          <td style={{ fontSize:12, color:"#8a97b0" }}>{g.centro_costo || paisNombre || "—"}</td>
+                          <td style={{ fontWeight:600 }}>{g.concepto || g.descripcion}</td>
+                          <td style={{ color:"#5a6a85" }}>{g.proveedor || "—"}</td>
+                          <td><span className="adm-badge adm-badge-p">{g.metodoPago || g.metodo_pago || "Cash"}</span></td>
+                          <td style={{ textAlign:"right", fontWeight:700, color:"#f44336" }}>${parseFloat(g.monto || g.total || 0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ background:"#f8faff", fontWeight:700 }}>
+                        <td colSpan="6" style={{ textAlign:"right", paddingRight:16, fontSize:13 }}>TOTAL</td>
+                        <td style={{ textAlign:"right", color:"#f44336", fontSize:15 }}>${totalGastos.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           )}
@@ -717,7 +848,7 @@ export default function Administracion() {
         <div className="adm-overlay" onClick={()=>setModalIngreso(false)}>
           <div className="adm-modal" onClick={e=>e.stopPropagation()}>
             <div className="adm-modal-hdr">
-              <h3 className="adm-modal-ttl">New Cash Receipt — Income</h3>
+              <h3 className="adm-modal-ttl">New Cash Receipt — Income <span style={{ fontSize:12, color:"#8a97b0", fontWeight:400 }}>#{(ingresos.length + 1).toString().padStart(3,'0')}</span></h3>
               <button onClick={()=>setModalIngreso(false)} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#8a97b0" }}><FaTimes /></button>
             </div>
             <div className="adm-modal-body">
@@ -770,9 +901,13 @@ export default function Administracion() {
                   <label style={labelCls}>Type</label>
                   <select value={nuevoGasto.tipo} onChange={e=>setNuevoGasto({...nuevoGasto, tipo:e.target.value})} style={{...inputCls}} className="adm-input">
                     <option value="">Select...</option>
-                    <option value="gasto_fijo">Fixed Expense</option>
-                    <option value="pago_misionero">Missionary Payment</option>
-                    <option value="otro_gasto">Other Expense</option>
+                    <option value="alquiler_local">Alquiler local</option>
+                    <option value="servicios_publicos">Servicios públicos</option>
+                    <option value="materiales_evangelizacion">Materiales de evangelización</option>
+                    <option value="alimentacion">Alimentación</option>
+                    <option value="transporte">Transporte</option>
+                    <option value="comunicaciones">Comunicaciones</option>
+                    <option value="otros_gastos">Otros gastos</option>
                   </select>
                 </div>
                 <div>
@@ -788,6 +923,11 @@ export default function Administracion() {
               </div>
               <label style={labelCls}>Supplier / Provider</label>
               <input type="text" placeholder="e.g. Person or company name" value={nuevoGasto.proveedor} onChange={e=>setNuevoGasto({...nuevoGasto, proveedor:e.target.value})} style={{...inputCls}} className="adm-input" />
+              <label style={labelCls}>Cost Center (Country)</label>
+              <select value={nuevoGasto.centro_costo} onChange={e=>setNuevoGasto({...nuevoGasto, centro_costo:e.target.value})} style={{...inputCls}} className="adm-input">
+                <option value="">{paisNombre || "Select country..."}</option>
+                {listaPaises.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+              </select>
               <label style={labelCls}>Category</label>
               <select value={nuevoGasto.categoria} onChange={e=>setNuevoGasto({...nuevoGasto, categoria:e.target.value})} style={{...inputCls}} className="adm-input">
                 <option value="">Select category...</option>

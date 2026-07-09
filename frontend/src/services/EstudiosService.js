@@ -60,6 +60,22 @@ const estudiosService = {
       params: buildParams(pais_id, mes, anio, { tipo })
     });
     return response.data;
+  },
+
+  tieneEstudios: async (contacto_id) => {
+    try {
+      const response = await API.get('/estudios-diarios', {
+        params: { contacto_id }
+      });
+      if (!Array.isArray(response.data)) return false;
+      // Filtrar estrictamente por contacto_id en caso de que la API no filtre
+      const conDatos = response.data.filter(r => 
+        String(r.contacto_id) === String(contacto_id) && parseFloat(r.horas || 0) > 0
+      );
+      return conDatos.length > 0;
+    } catch {
+      return false;
+    }
   }
 };
 

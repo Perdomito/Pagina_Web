@@ -379,6 +379,15 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
         </div>
 
         {/* ── TABLA ── */}
+        {!loading && (
+          <div style={{ display:"flex", gap:12, marginBottom:16 }}>
+            <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:10, padding:"10px 20px", color:"white" }}>
+              <span style={{ fontSize:11, opacity:0.8 }}>TOTAL MEMBERS </span>
+              <strong style={{ fontSize:18 }}>{miembrosFiltrados.length}</strong>
+              {filtro && <span style={{ fontSize:11, opacity:0.7 }}> of {miembros.length}</span>}
+            </div>
+          </div>
+        )}
         {loading ? (
           <div style={{ textAlign: "center", color: "white", padding: "60px", fontSize: "16px" }}>Loading...</div>
         ) : (
@@ -406,7 +415,7 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                       <tr key={miembro.id} className="row-hover" style={{ borderBottom: "1px solid #eef2f7", background: i % 2 === 0 ? "white" : "#fafbfd" }}>
                         <td style={{ padding: "14px 16px", fontWeight: "600", color: "#1a2d5a", fontFamily: "'Lato', sans-serif" }}>{miembro.nombre}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85", fontSize: "13px" }}>{miembro.identidad}</td>
-                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{paisesMap.get(miembro.pais_id)?.iso || '-'}</td>
+                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{paisesMap.get(miembro.pais_id)?.nombre || paisesMap.get(miembro.pais_id)?.iso || '-'}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.ciudad}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.edad}</td>
                         <td style={{ padding: "14px 16px" }}>
