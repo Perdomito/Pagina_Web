@@ -1,5 +1,5 @@
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -17,8 +17,14 @@ def _hash_password(plain: str) -> str:
 
 
 @router.get("", response_model=list[UsuarioOut])
-async def listar(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Usuario).order_by(Usuario.nombre))
+async def listar(
+    pais_id: int | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(Usuario).order_by(Usuario.nombre)
+    if pais_id:
+        q = q.where(Usuario.pais_id == pais_id)
+    result = await db.execute(q)
     return result.scalars().all()
 
 

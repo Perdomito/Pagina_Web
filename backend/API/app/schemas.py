@@ -125,6 +125,9 @@ class UsuarioBase(BaseModel):
     rol: int
     activo: bool = False
     region: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
 
 class UsuarioCreate(UsuarioBase):
     password: str
@@ -136,6 +139,9 @@ class UsuarioUpdate(BaseModel):
     rol: Optional[int] = None
     activo: Optional[bool] = None
     region: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
 
 class UsuarioOut(UsuarioBase):
     fecha_registro: datetime
@@ -292,6 +298,8 @@ class CotizacionBase(BaseModel):
     anio_agregado: Optional[int] = None
     notas: Optional[str] = None
     miembro_id: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
 
     @field_validator("mes_agregado")
     @classmethod
@@ -315,6 +323,8 @@ class CotizacionUpdate(BaseModel):
     anio_agregado: Optional[int] = None
     notas: Optional[str] = None
     miembro_id: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
 
 class CotizacionOut(CotizacionBase):
     id: int
@@ -564,6 +574,7 @@ class IngresoUpdate(BaseModel):
 
 class IngresoOut(IngresoBase):
     id: int
+    numero: Optional[str] = None
     fecha_creacion: datetime
     model_config = {"from_attributes": True}
 
@@ -602,6 +613,8 @@ class SaldoCajaBancoBase(BaseModel):
     pais_id: Optional[int] = None
     saldo_caja: Decimal = Decimal("0")
     saldo_banco: Decimal = Decimal("0")
+    codigo_contable_caja: Optional[str] = None
+    codigo_contable_banco: Optional[str] = None
 
 class SaldoCajaBancoCreate(SaldoCajaBancoBase):
     pass
@@ -610,6 +623,8 @@ class SaldoCajaBancoUpdate(BaseModel):
     pais_id: Optional[int] = None
     saldo_caja: Optional[Decimal] = None
     saldo_banco: Optional[Decimal] = None
+    codigo_contable_caja: Optional[str] = None
+    codigo_contable_banco: Optional[str] = None
 
 class SaldoCajaBancoOut(SaldoCajaBancoBase):
     id: int
@@ -726,11 +741,30 @@ class UsuarioLoginOut(BaseModel):
     rol_id: int
     rol_nombre: str
     activo: bool
+    region: Optional[str] = None
+    pais_id: Optional[int] = None
+    pais_nombre: Optional[str] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class TokenResponse(BaseModel):
     token: str
     usuario: UsuarioLoginOut
+
+
+# ── Archivos ───────────────────────────────────────────────────────────────
+
+class ArchivoOut(BaseModel):
+    id: int
+    tipo: str
+    referencia_id: int
+    nombre_original: Optional[str] = None
+    content_type: Optional[str] = None
+    tamano_bytes: Optional[int] = None
+    url: str
+    fecha_creacion: datetime
+    model_config = {"from_attributes": True}
 
 
 # ── Estadisticas Agregadas ────────────────────────────────────────────────
@@ -780,6 +814,12 @@ class SeriesPorTipo(BaseModel):
     tipos_disponibles: list[str]
     anios_disponibles: list[int]
 
+class ResumenPaisStats(BaseModel):
+    pais_id: int
+    nombre_pais: str
+    cantidad_iglesias: int
+    cantidad_miembros: int
+
 class EstadisticasOut(BaseModel):
     total_usuarios: int
     total_miembros: int
@@ -790,5 +830,6 @@ class EstadisticasOut(BaseModel):
     evangelismo_profesores: Optional[EvangelismoProfesores] = None
     crecimiento_estudiantes: Optional[CrecimientoEstudiantes] = None
     crecimiento_miembros: Optional[SeriesPorTipo] = None
+    resumen_pais: Optional[ResumenPaisStats] = None
     anio_seleccionado: int
     anios_disponibles: list[int] = []

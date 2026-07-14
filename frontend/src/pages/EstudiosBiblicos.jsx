@@ -6,10 +6,20 @@ import toast from 'react-hot-toast';
 // 
 import contactosService from '../services/ContactosService';
 import miembrosService from '../services/MiembrosService';
-import estudiosService from '../services/EstudiosService';
+import estudiosService, { MESES } from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
 
-export default function StudiesBiblicos() {
+const mesEnIngles = {
+  "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
+  "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
+  "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
+  "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
+};
+
+const MESES_ARR = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+const toMesNum = (mes) => typeof mes === 'string' ? MESES_ARR.indexOf(mes) + 1 : mes;
+
+export default function EstudiosBiblicos() {
   const navigate = useNavigate();
   
   const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
@@ -31,12 +41,7 @@ export default function StudiesBiblicos() {
 const [, setCargandoDatos] = useState(false);
 
  const [continentes, setContinentes] = useState([]);
-  const mesEnIngles = {
-  "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
-  "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
-  "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
-  "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
-};
+  
   const meses = [
     "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
     "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
@@ -180,9 +185,14 @@ try {
         const pais = continentes.find(c => c.id === continenteSeleccionado)?.paises.find(p => p.id === paisSeleccionado);
         if (!pais) return;
         
-        const resumen = await estudiosService.getResumenCompleto(pais.id, mesSeleccionado, añoActual);
-        
-        console.log('Datos cargados:', resumen);
+        const resumenRaw = await estudiosService.getResumenCompleto(pais.id, mesSeleccionado, añoActual);
+              
+        // Separar array plano en categorías
+        const resumen = {
+          evangelismo: resumenRaw.filter(r => r.tipo !== null && r.contacto_id === null),
+          nuevosEstudiantes: resumenRaw.filter(r => r.tipo === null && r.contacto_id === null && (r.dijeron_si > 0 || r.nuevos_contactos > 0)),
+          estudios: resumenRaw.filter(r => r.contacto_id !== null)
+        };
         
         const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
         
@@ -236,7 +246,7 @@ try {
           const studentsPorMissionary = {};
           
           resumen.estudios.forEach(est => {
-            const misioneroId = est.miembro_responsable_id;
+            const misioneroId = est.miembro_id;
             if (!studentsPorMissionary[misioneroId]) {
               studentsPorMissionary[misioneroId] = [];
             }
@@ -244,10 +254,19 @@ try {
             // Buscar si el estudiante ya existe
             let estudiante = studentsPorMissionary[misioneroId].find(e => e.id === est.contacto_id);
             if (!estudiante) {
+              // Buscar en students ya cargados para obtener nombre y teléfono
+              const claveBusqueda = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+              const studentsExistentes = students[claveBusqueda] || {};
+              let nombreContacto = est.contacto_nombre || '';
+              let telefonoContacto = '';
+              Object.values(studentsExistentes).forEach(lista => {
+                const found = lista.find(e => e.id === est.contacto_id);
+                if (found) { nombreContacto = found.nombre || nombreContacto; telefonoContacto = found.numero || ''; }
+              });
               estudiante = {
                 id: est.contacto_id,
-                numero: est.contacto_id,
-                nombre: est.contacto_nombre,
+                numero: telefonoContacto,
+                nombre: nombreContacto,
                 pais: '',
                 estudios: {}
               };
@@ -385,11 +404,10 @@ const actualizarEvangelismo = (misioneroId, tipo, dia, campo, valor) => {
     const horas = campo === 'horas' ? valor : (datosActuales[tipo]?.[dia]?.horas || 0);
     
     if (horas > 0 || donde) {
-      const _MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
       estudiosService.guardarEvangelismo({
         miembro_id: misioneroId,
         pais_id: paisSeleccionado,
-        mes: typeof mesSeleccionado === 'string' ? _MESES.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
+        mes: mesSeleccionado,
         anio: añoActual,
         dia: parseInt(dia),
         tipo: tipo === 'virtual' ? 'Virtual' : 'Presencial',
@@ -416,11 +434,10 @@ const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
   // Autoguardar en BD
   const contactosCantidad = nuevosContactos[clave]?.[misioneroId]?.[dia] || 0;
   
-  const _MESES2 = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
-    mes: typeof mesSeleccionado === 'string' ? _MESES2.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
+    mes: mesSeleccionado,
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(cantidad || 0),
@@ -445,11 +462,10 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   // Autoguardar en BD
   const dijeronSiCantidad = studentsQueDigeronSi[clave]?.[misioneroId]?.[dia] || 0;
   
-  const _MESES2 = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
-    mes: typeof mesSeleccionado === 'string' ? _MESES2.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
+    mes: mesSeleccionado,
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(dijeronSiCantidad || 0),
@@ -563,12 +579,15 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
       contacto_id: estudianteId,
       miembro_id: misioneroId,
       pais_id: paisSeleccionado,
-      mes: typeof mesSeleccionado === 'string' ? _MESES3.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
+      mes: MESES[mesSeleccionado] ?? Number(mesSeleccionado),
       anio: añoActual,
       dia: parseInt(dia),
       capitulo: capituloActual,
       horas: parseFloat(horasActual || 0)
-    }).catch(err => console.error('Error autoguardando:', err));
+    }).catch(err => {
+      console.error('Error autoguardando:', err);
+      toast.error('Error al guardar el estudio');
+    });
   }
 };
   
@@ -1030,36 +1049,30 @@ const eliminarPais = async (continenteId, paisId) => {
             >
               <FaGlobe size={12} /> Change Region
             </button>
-            <button
-              onClick={() => {
-                setMissionarySeleccionado(null);
-                setVistaActual("resumen");
-              }}
-              className="btn-secondary"
-              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-            >
-              <FaChartBar size={12} /> Summary
-            </button>
-            <button
-              onClick={() => {
-                setMissionarySeleccionado(null);
-                setVistaActual("misioneros");
-              }}
-              className="btn-secondary"
-              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-            >
-              <FaUser size={12} /> By Missionary
-            </button>
-            <button
-              onClick={() => {
-                setMissionarySeleccionado(null);
-                setVistaActual("nuevosEstudiantes");
-              }}
-              className="btn-secondary"
-              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-            >
-              <FaUserPlus size={12} /> New Students
-            </button>
+            {misioneroSeleccionado && (
+              <>
+                <button
+                  onClick={() => {
+                    setMissionarySeleccionado(null);
+                    setVistaActual("resumen");
+                  }}
+                  className="btn-secondary"
+                  style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
+                >
+                  <FaChartBar size={12} /> Summary
+                </button>
+                <button
+                  onClick={() => {
+                    setMissionarySeleccionado(null);
+                    setVistaActual("misioneros");
+                  }}
+                  className="btn-secondary"
+                  style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
+                >
+                  <FaUser size={12} /> By Missionary
+                </button>
+              </>
+            )}
             <div style={{ flex: 1 }}></div>
             <div style={{ color: "white", fontSize: "16px", fontWeight: "600" }}>
               {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesSeleccionado}
@@ -1832,16 +1845,17 @@ const eliminarPais = async (continenteId, paisId) => {
                     Object.entries(estudiosCapturados).forEach(([dia, datos]) => {
                       if (datos.horas && datos.horas > 0) {
                         promesasStudies.push(
-                          const _MESES3 = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
-      estudiosService.guardarEstudio({
+                          estudiosService.guardarEstudio({
                             contacto_id: nuevoContacto.id,
                             miembro_id: misioneroSeleccionado,
                             pais_id: paisSeleccionado,
-                            mes: typeof mesSeleccionado === 'string' ? _MESES4.indexOf(mesSeleccionado) + 1 : mesSeleccionado,
+                            mes: MESES[mesSeleccionado] ?? Number(mesSeleccionado),
                             anio: añoActual,
                             dia: parseInt(dia),
                             capitulo: datos.capitulo || '',
                             horas: parseFloat(datos.horas)
+                          }).catch(err => {
+                            console.error('Error guardando estudio:', err);
                           })
                         );
                       }

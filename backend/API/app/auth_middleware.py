@@ -33,11 +33,12 @@ async def get_current_user(
     return user
 
 
-def create_access_token(user_id: str, rol_id: int) -> str:
+def create_access_token(user_id: str, rol_id: int, pais_id: int | None = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": user_id,
         "rol": rol_id,
+        "pais_id": pais_id,
         "exp": expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

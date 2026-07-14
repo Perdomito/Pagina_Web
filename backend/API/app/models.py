@@ -130,8 +130,14 @@ class Usuario(Base):
     fecha_registro = Column(DateTime, default=datetime.utcnow, nullable=False)
     activo = Column(Boolean, default=False, nullable=False)
     region = Column(String(20), nullable=True)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"))
+    miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
 
     rol_rel = relationship("Rol", back_populates="usuarios")
+    pais_rel = relationship("Pais")
+    ciudad_rel = relationship("Ciudad")
+    miembro_rel = relationship("Miembro", foreign_keys=[miembro_id], primaryjoin="Usuario.miembro_id == Miembro.id")
 
 
 class Miembro(Base):
@@ -222,8 +228,12 @@ class Cotizacion(Base):
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"))
 
     miembro_rel = relationship("Miembro", back_populates="cotizaciones")
+    pais_rel = relationship("Pais")
+    ciudad_rel = relationship("Ciudad")
 
 
 class Presupuesto(Base):
@@ -314,7 +324,7 @@ class CiudadMision(Base):
     region = Column(String(150))
     estado_presencia = Column(String(30), nullable=False, default="En proceso")
     fecha_inicio_trabajo = Column(Date)
-    pastor_encargado_id = Column(String(30))
+    pastor_encargado_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
     pastor_encargado_nombre = Column(Text)
     cantidad_miembros_activos = Column(Integer, default=0)
     notas = Column(Text)
@@ -322,12 +332,14 @@ class CiudadMision(Base):
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     ciudad_rel = relationship("Ciudad", back_populates="misiones")
+    pastor_rel = relationship("Miembro", foreign_keys=[pastor_encargado_id])
 
 
 class Ingreso(Base):
     __tablename__ = "ingresos"
 
     id = Column(Integer, primary_key=True)
+    numero = Column(String(20))
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
     mes = Column(Integer, nullable=False)
     anio = Column(Integer, nullable=False)
@@ -365,6 +377,8 @@ class SaldoCajaBanco(Base):
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
     saldo_caja = Column(Numeric(15, 2), nullable=False, default=0)
     saldo_banco = Column(Numeric(15, 2), nullable=False, default=0)
+    codigo_contable_caja = Column(String(20))
+    codigo_contable_banco = Column(String(20))
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     pais_rel = relationship("Pais", back_populates="saldos")
@@ -400,7 +414,7 @@ class EstudioDiario(Base):
     id = Column(Integer, primary_key=True)
     miembro_id = Column(String(30), ForeignKey("miembros.id", ondelete="CASCADE"), nullable=False)
     pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
-    contacto_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"))
+    contacto_id = Column(Integer, ForeignKey("contactos.id", ondelete="RESTRICT"))
     mes = Column(Integer, nullable=False)
     anio = Column(Integer, nullable=False)
     dia = Column(Integer, nullable=False)
@@ -415,3 +429,21 @@ class EstudioDiario(Base):
     miembro_rel = relationship("Miembro", back_populates="estudios_diarios")
     pais_rel = relationship("Pais")
     contacto_rel = relationship("Contacto")
+
+
+class Archivo(Base):
+    __tablename__ = "archivos"
+
+    id = Column(Integer, primary_key=True)
+    tipo = Column(String(20), nullable=False)          # 'ingreso' | 'gasto'
+    referencia_id = Column(Integer, nullable=False)     # id del ingreso o gasto asociado
+    nombre_original = Column(Text)
+    content_type = Column(String(100))
+    tamano_bytes = Column(BigInteger)
+    storage_path = Column(Text)
+    url = Column(Text, nullable=False)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("tipo IN ('ingreso', 'gasto')", name="chk_archivos_tipo"),
+    )

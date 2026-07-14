@@ -43,6 +43,7 @@ export default function Administracion() {
   // Cajas y bancos
   const [saldoCaja, setSaldoCaja]     = useState(0);
   const [saldoBanco, setSaldoBanco]   = useState(0);
+  const [saldoId, setSaldoId]         = useState(null);
 
   // Traslados
   const [traslados, setTraslados]     = useState([]);
@@ -71,6 +72,7 @@ export default function Administracion() {
       const pid = user.pais_id || 1;
       setPaisId(pid);
       cargarDatos(pid);
+      cargarFinanzas(pid);
     }
   }, [user]);
 
@@ -86,17 +88,64 @@ export default function Administracion() {
     } catch {}
   };
 
+  const cargarFinanzas = async (pid) => {
+    try {
+      const [saldos, trasl] = await Promise.all([
+        administracionService.getSaldos(pid),
+        administracionService.getTraslados(pid)
+      ]);
+      const fila = Array.isArray(saldos) ? saldos[0] : saldos;
+      if (fila) {
+        setSaldoCaja(parseFloat(fila.saldo_caja) || 0);
+        setSaldoBanco(parseFloat(fila.saldo_banco) || 0);
+        setSaldoId(fila.id);
+      } else {
+        setSaldoCaja(0); setSaldoBanco(0); setSaldoId(null);
+      }
+      setTraslados((trasl || []).map(t => ({
+        id: t.id, de: t.de, a: t.a, valor: parseFloat(t.valor) || 0,
+        observaciones: t.observaciones, fecha: t.fecha
+      })));
+    } catch {}
+  };
+
+  const persistirSaldo = async (nuevoCaja, nuevoBanco) => {
+    try {
+      if (saldoId) {
+        await administracionService.actualizarSaldos(saldoId, {
+          saldo_caja: nuevoCaja, saldo_banco: nuevoBanco
+        });
+      } else {
+        const s = await administracionService.crearSaldos({
+          pais_id: paisId, saldo_caja: nuevoCaja, saldo_banco: nuevoBanco
+        });
+        if (s && s.id) setSaldoId(s.id);
+      }
+    } catch { toast.error("Movement saved, but balance could not be updated"); }
+  };
+
   const cargarGastosMes = useCallback(async () => {
     try {
       const d = await administracionService.getDetallePresupuesto(paisId, mes, año);
       setGastos(d.map(x => ({
         id: x.id, concepto: x.concepto, monto: parseFloat(x.monto),
-        tipo: x.tipo, fecha: x.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+        tipo: x.tipo, fecha: x.fecha_registro?.split('T')[0] || new Date().toISOString().split('T')[0]
       })));
     } catch {}
   }, [paisId, mes, año]);
 
-  useEffect(() => { cargarGastosMes(); }, [mes, cargarGastosMes]);
+  const cargarIngresosMes = useCallback(async () => {
+    try {
+      const d = await administracionService.getIngresos(paisId, mes, año);
+      setIngresos((d || []).map(x => ({
+        id: x.id, fecha: x.fecha, tipo: x.tipo, origen: x.origen,
+        dondeIngresa: x.donde_ingresa, valorRecibido: x.valor,
+        observaciones: x.observaciones
+      })));
+    } catch {}
+  }, [paisId, mes, año]);
+
+  useEffect(() => { cargarGastosMes(); cargarIngresosMes(); }, [mes, cargarGastosMes, cargarIngresosMes]);
 
   // Totales
   const totalIngresos  = ingresos.reduce((s, i) => s + parseFloat(i.valorRecibido || 0), 0);
@@ -110,29 +159,51 @@ export default function Administracion() {
     return matchBusq && matchTipo;
   });
 
-  const guardarTraslado = () => {
+  const guardarTraslado = async () => {
     if (!nuevoTraslado.valor) { toast.error("Enter an amount"); return; }
-    const t = { ...nuevoTraslado, id: Date.now(), valor: parseFloat(nuevoTraslado.valor) };
-    setTraslados([t, ...traslados]);
-    if (nuevoTraslado.de === "banco") setSaldoBanco(s => s - t.valor);
-    else setSaldoCaja(s => s - t.valor);
-    if (nuevoTraslado.a === "caja") setSaldoCaja(s => s + t.valor);
-    else setSaldoBanco(s => s + t.valor);
-    toast.success("Transfer recorded");
-    setModalTraslado(false);
-    setNuevoTraslado({ de:"banco", a:"caja", valor:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
+    const val = parseFloat(nuevoTraslado.valor);
+    try {
+      const creado = await administracionService.crearTraslado({
+        pais_id: paisId, de: nuevoTraslado.de, a: nuevoTraslado.a,
+        valor: val, observaciones: nuevoTraslado.observaciones, fecha: nuevoTraslado.fecha
+      });
+      setTraslados([{
+        id: creado?.id ?? Date.now(), de: nuevoTraslado.de, a: nuevoTraslado.a,
+        valor: val, observaciones: nuevoTraslado.observaciones, fecha: nuevoTraslado.fecha
+      }, ...traslados]);
+      const nuevoCaja  = saldoCaja  + (nuevoTraslado.a === "caja"  ? val : 0) - (nuevoTraslado.de === "caja"  ? val : 0);
+      const nuevoBanco = saldoBanco + (nuevoTraslado.a === "banco" ? val : 0) - (nuevoTraslado.de === "banco" ? val : 0);
+      setSaldoCaja(nuevoCaja); setSaldoBanco(nuevoBanco);
+      await persistirSaldo(nuevoCaja, nuevoBanco);
+      toast.success("Transfer recorded");
+      setModalTraslado(false);
+      setNuevoTraslado({ de:"banco", a:"caja", valor:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
+    } catch { toast.error("Error saving transfer"); }
   };
 
-  const guardarIngreso = () => {
+  const guardarIngreso = async () => {
     if (!nuevoIngreso.valorRecibido) { toast.error("Enter the amount received"); return; }
-    const ing = { ...nuevoIngreso, id: Date.now(), numero: `RC-${Date.now()}` };
-    setIngresos([ing, ...ingresos]);
     const val = parseFloat(nuevoIngreso.valorRecibido);
-    if (nuevoIngreso.dondeIngresa === "caja") setSaldoCaja(s => s + val);
-    else setSaldoBanco(s => s + val);
-    toast.success("Income recorded");
-    setModalIngreso(false);
-    setNuevoIngreso({ tipo:"RC-1-Recibo de caja", origen:"World Olivet Assembly", dondeIngresa:"banco", valorRecibido:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
+    try {
+      const creado = await administracionService.crearIngreso({
+        pais_id: paisId, mes: MESES.indexOf(mes) + 1, anio: año,
+        tipo: nuevoIngreso.tipo, origen: nuevoIngreso.origen,
+        donde_ingresa: nuevoIngreso.dondeIngresa, valor: val,
+        observaciones: nuevoIngreso.observaciones, fecha: nuevoIngreso.fecha
+      });
+      setIngresos([{
+        id: creado?.id ?? Date.now(), fecha: nuevoIngreso.fecha, tipo: nuevoIngreso.tipo,
+        origen: nuevoIngreso.origen, dondeIngresa: nuevoIngreso.dondeIngresa,
+        valorRecibido: val, observaciones: nuevoIngreso.observaciones
+      }, ...ingresos]);
+      const nuevoCaja  = saldoCaja  + (nuevoIngreso.dondeIngresa === "caja"  ? val : 0);
+      const nuevoBanco = saldoBanco + (nuevoIngreso.dondeIngresa === "banco" ? val : 0);
+      setSaldoCaja(nuevoCaja); setSaldoBanco(nuevoBanco);
+      await persistirSaldo(nuevoCaja, nuevoBanco);
+      toast.success("Income recorded");
+      setModalIngreso(false);
+      setNuevoIngreso({ tipo:"RC-1-Recibo de caja", origen:"World Olivet Assembly", dondeIngresa:"banco", valorRecibido:"", observaciones:"", fecha: new Date().toISOString().split('T')[0] });
+    } catch { toast.error("Error saving income"); }
   };
 
   const guardarGasto = async () => {

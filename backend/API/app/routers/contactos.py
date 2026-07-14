@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models import Contacto, Pais
 from app.schemas import ContactoCreate, ContactoUpdate, ContactoOut
@@ -88,3 +89,11 @@ async def eliminar(id: int, db: AsyncSession = Depends(get_db)):
     if not obj:
         raise HTTPException(404, "Contacto no encontrado")
     await db.delete(obj)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            409,
+            "No se puede eliminar el contacto porque tiene estudios biblicos registrados.",
+        )

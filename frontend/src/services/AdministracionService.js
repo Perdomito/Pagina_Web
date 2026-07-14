@@ -6,6 +6,41 @@ const administracionService = {
     return response.data;
   },
 
+  getPaisById: async (id) => {
+    const response = await axios.get(`/paises/${id}`);
+    return response.data;
+  },
+
+  getMiembrosPorPais: async (pais_id) => {
+    const response = await axios.get('/miembros', {
+      params: { pais_id }
+    });
+    return response.data;
+  },
+
+  getCiudadesPorPaisIso2: async (pais_iso2, limit = 500) => {
+    let offset = 0;
+    const ciudades = [];
+    let keepLoading = true;
+
+    while (keepLoading) {
+      const response = await axios.get('/ciudades', {
+        params: { pais_iso2, limit, offset }
+      });
+      const batch = response.data || [];
+      ciudades.push(...batch);
+      offset += limit;
+      keepLoading = batch.length === limit;
+    }
+
+    return ciudades;
+  },
+
+  getCiudadesMision: async () => {
+    const response = await axios.get('/ciudades-mision');
+    return response.data;
+  },
+
   crearPais: async (datos) => {
     const response = await axios.post('/paises', datos);
     return response.data;
@@ -60,7 +95,7 @@ const administracionService = {
 
   getEstadisticasGenerales: async (anio, filtros = {}) => {
     const response = await axios.get('/estadisticas', {
-      params: { ...(anio ? { anio } : {}) }
+      params: { ...(anio ? { anio } : {}), ...filtros }
     });
     return response.data;
   },
