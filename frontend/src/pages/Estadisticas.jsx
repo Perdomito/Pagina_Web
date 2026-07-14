@@ -14,6 +14,9 @@ import {
   Filler
 } from "chart.js";
 import administracionService from '../services/AdministracionService';
+import estudiosService from '../services/EstudiosService';
+import miembrosService from '../services/MiembrosService';
+import contactosService from '../services/ContactosService';
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext";
 import configuracionService from "../services/ConfiguracionService";
@@ -60,7 +63,7 @@ const sumarSerie = (serie = []) => serie.reduce((sum, value) => sum + Number(val
 const sumarSerieHastaMes = (serie = [], mesIndice = 0) =>
   serie.slice(0, Math.max(0, Math.min(mesIndice + 1, serie.length))).reduce((sum, value) => sum + Number(value || 0), 0);
 
-const proyectarCierreAnual = (acumulado, mesesTranscurridos) => {
+const proyectarCierreAnnual = (acumulado, mesesTranscurridos) => {
   if (!mesesTranscurridos || mesesTranscurridos <= 0) return 0;
   return Number(((Number(acumulado || 0) / mesesTranscurridos) * MESES_EN_ANIO).toFixed(1));
 };
@@ -78,7 +81,7 @@ const obtenerLecturaPronostico = (variacion) => {
     return {
       etiqueta: "Alto",
       color: "#2E7D32",
-      descripcion: "El cierre proyectado va por encima del año anterior."
+      descripcion: "Projected closing is above the previous year."
     };
   }
 
@@ -86,14 +89,14 @@ const obtenerLecturaPronostico = (variacion) => {
     return {
       etiqueta: "Bajo",
       color: "#C62828",
-      descripcion: "El cierre proyectado va por debajo del año anterior."
+      descripcion: "Projected closing is below the previous year."
     };
   }
 
   return {
     etiqueta: "Estable",
     color: "#B26A00",
-    descripcion: "El cierre proyectado está cerca del año anterior."
+    descripcion: "Projected closing is near the previous year."
   };
 };
 
@@ -103,6 +106,13 @@ export default function Estadisticas() {
   const anioActualPorDefecto = new Date().getFullYear();
   const mesActualPorDefecto = new Date().toLocaleString('es-ES', { month: 'long' }).toUpperCase();
   const [stats, setStats] = useState(null);
+  const [continentes, setContinentes] = useState([]);
+  const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
+  const [paisSeleccionado, setPaisSeleccionado] = useState(null);
+  const [paisesDelContinente, setPaisesDelContinente] = useState([]);
+  const [datosRealesEstudios, setDatosRealesEstudios] = useState(null);
+  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().toLocaleString('en-US', {month:'long'}).toUpperCase());
+  const [anioSeleccionadoFiltro, setAnioSeleccionadoFiltro] = useState(new Date().getFullYear());
   const [statsProyeccion, setStatsProyeccion] = useState(null);
   const [resumenPaisFallback, setResumenPaisFallback] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -110,13 +120,28 @@ export default function Estadisticas() {
     user?.pais_id || (user?.region && !Number.isNaN(Number(user.region)) ? Number(user.region) : null)
   );
   const [tabActiva, setTabActiva] = useState("evangelismo");
-  const [profesorSeleccionado, setProfesorSeleccionado] = useState("");
-  const [tipoMiembroSeleccionado, setTipoMiembroSeleccionado] = useState("Todos");
+  const [profesorSelectdo, setMissionarySelectdo] = useState("");
+  const [tipoMiembroSelectdo, setTipoMiembroSelectdo] = useState("Todos");
   const [anioComparacionMiembros, setAnioComparacionMiembros] = useState(anioActualPorDefecto - 1);
-  const [modoEvangelismoSeleccionado, setModoEvangelismoSeleccionado] = useState("mensual");
-  const [anioEvangelismoSeleccionado, setAnioEvangelismoSeleccionado] = useState(anioActualPorDefecto);
-  const [mesEvangelismoSeleccionado, setMesEvangelismoSeleccionado] = useState(mesActualPorDefecto);
-  const [anioComparacionEvangelismoSeleccionado, setAnioComparacionEvangelismoSeleccionado] = useState(anioActualPorDefecto - 1);
+  const [modoEvangelismoSelectdo, setModoEvangelismoSelectdo] = useState("monthly");
+  const [anioEvangelismoSelectdo, setAnioEvangelismoSelectdo] = useState(anioActualPorDefecto);
+  const [mesEvangelismoSelectdo, setMesEvangelismoSelectdo] = useState(mesActualPorDefecto);
+  const [anioComparacionEvangelismoSelectdo, setAnioComparacionEvangelismoSelectdo] = useState(anioActualPorDefecto - 1);
+  useEffect(() => {
+    const cargarContinentes = async () => {
+      try {
+        const data = await administracionService.getAllContinentes();
+        setContinentes(data);
+        if (data.length > 0) {
+          setContinenteSeleccionado(data[0].id);
+          setPaisesDelContinente(data[0].paises || []);
+          // No preseleccionar país — usuario elige
+        }
+      } catch {}
+    };
+    cargarContinentes();
+  }, []);
+
   useEffect(() => {
     const paisDesdeSesion = user?.pais_id || (user?.region && !Number.isNaN(Number(user.region)) ? Number(user.region) : null);
     if (paisDesdeSesion) {
@@ -144,33 +169,25 @@ export default function Estadisticas() {
     const cargarEstadisticas = async () => {
       try {
         setLoading(true);
+        const filtros = {
+          ...(paisSeleccionado ? { pais_id: paisSeleccionado } : paisUsuarioResuelto ? { pais_id: paisUsuarioResuelto } : {})
+        };
         const [data, dataProyeccion] = await Promise.all([
-          administracionService.getEstadisticasGenerales(anioActualPorDefecto, {
-            ...(paisUsuarioResuelto ? { pais_id: paisUsuarioResuelto } : {}),
-            anio_evangelismo: anioEvangelismoSeleccionado,
-            mes_evangelismo: mesEvangelismoSeleccionado,
-            modo_evangelismo: modoEvangelismoSeleccionado,
-            anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
-          }),
-          administracionService.getEstadisticasGenerales(anioActualPorDefecto, {
-            ...(paisUsuarioResuelto ? { pais_id: paisUsuarioResuelto } : {}),
-            anio_evangelismo: anioEvangelismoSeleccionado,
-            modo_evangelismo: "anual",
-            anio_comparacion_evangelismo: anioComparacionEvangelismoSeleccionado
-          })
+          administracionService.getEstadisticasGenerales(anioSeleccionadoFiltro, filtros).catch(() => null),
+          administracionService.getEstadisticasGenerales(anioSeleccionadoFiltro, filtros).catch(() => null)
         ]);
         setStats(data);
         setStatsProyeccion(dataProyeccion);
       } catch (error) {
         console.error('Error:', error);
-        toast.error('Error al cargar estadísticas');
+        toast.error('Error loading statistics');
       } finally {
         setLoading(false);
       }
     };
 
     cargarEstadisticas();
-  }, [anioActualPorDefecto, anioEvangelismoSeleccionado, mesEvangelismoSeleccionado, modoEvangelismoSeleccionado, anioComparacionEvangelismoSeleccionado, paisUsuarioResuelto]);
+  }, [anioSeleccionadoFiltro, paisSeleccionado, paisUsuarioResuelto]);
 
   useEffect(() => {
     const cargarResumenPaisFallback = async () => {
@@ -211,80 +228,114 @@ export default function Estadisticas() {
   }, [paisUsuarioResuelto, stats?.resumen_pais]);
 
   useEffect(() => {
-    const profesores = stats?.rendimiento_profesores?.profesores || [];
+    const missionaries = stats?.rendimiento_missionaries?.missionaries || [];
 
-    if (!profesores.length) {
-      setProfesorSeleccionado("");
+    if (!missionaries.length) {
+      setMissionarySelectdo("");
       return;
     }
 
-    const profesorExiste = profesores.some(
-      (profesor) => String(profesor.id) === profesorSeleccionado
+    const profesorExiste = missionaries.some(
+      (profesor) => String(profesor.id) === profesorSelectdo
     );
 
-    if (!profesorSeleccionado || !profesorExiste) {
-      setProfesorSeleccionado(String(profesores[0].id));
+    if (!profesorSelectdo || !profesorExiste) {
+      setMissionarySelectdo(String(missionaries[0].id));
     }
-  }, [stats, profesorSeleccionado]);
+  }, [stats, profesorSelectdo]);
 
   useEffect(() => {
     const tiposDisponibles = stats?.crecimiento_miembros?.tipos_disponibles || ["Todos"];
 
-    if (!tiposDisponibles.includes(tipoMiembroSeleccionado)) {
-      setTipoMiembroSeleccionado("Todos");
+    if (!tiposDisponibles.includes(tipoMiembroSelectdo)) {
+      setTipoMiembroSelectdo("Todos");
     }
-  }, [stats, tipoMiembroSeleccionado]);
+  }, [stats, tipoMiembroSelectdo]);
 
   useEffect(() => {
-    const anioSeleccionadoActual = stats?.anio_seleccionado || anioActualPorDefecto;
+    const anioSelectdoActual = stats?.anio_seleccionado || anioActualPorDefecto;
     const aniosComparables = (stats?.crecimiento_miembros?.anios_disponibles || [])
-      .filter((anio) => anio !== anioSeleccionadoActual);
+      .filter((anio) => anio !== anioSelectdoActual);
 
-    const anioPreferido = aniosComparables.includes(anioSeleccionadoActual - 1)
-      ? anioSeleccionadoActual - 1
-      : aniosComparables[0] || (anioSeleccionadoActual - 1);
+    const anioPreferido = aniosComparables.includes(anioSelectdoActual - 1)
+      ? anioSelectdoActual - 1
+      : aniosComparables[0] || (anioSelectdoActual - 1);
 
     if (!aniosComparables.includes(anioComparacionMiembros)) {
       setAnioComparacionMiembros(anioPreferido);
     }
   }, [stats, anioActualPorDefecto, anioComparacionMiembros]);
 
+  // Cargar datos reales de estudios bíblicos
   useEffect(() => {
-    const aniosDisponibles = stats?.evangelismo_profesores?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
-    const aniosComparables = aniosDisponibles.filter((anio) => anio !== anioEvangelismoSeleccionado);
-    const sugerido = aniosComparables.includes(anioEvangelismoSeleccionado - 1)
-      ? anioEvangelismoSeleccionado - 1
-      : (aniosComparables[0] || (anioEvangelismoSeleccionado - 1));
+    if (!paisSeleccionado) return;
+    const cargarDatosReales = async () => {
+      try {
+        const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+        const mesNombre = MESES[new Date().getMonth()];
+        const resumen = await estudiosService.getResumenCompleto(paisSeleccionado, mesNombre, anioSeleccionadoFiltro);
+        const raw = resumen || [];
+        const entries = Array.isArray(raw) ? raw : Object.values(raw).find(v => Array.isArray(v)) || [];
+        const estudios = entries.filter(r => r && r.contacto_id != null);
+        const evangelismo = entries.filter(r => r && r.contacto_id == null && r.tipo != null);
+        const nuevos = entries.filter(r => r && r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0));
+        const contactosUnicos = [...new Set(estudios.map(e => e.contacto_id).filter(Boolean))];
+        const horasTotales = estudios.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+        const horasOnline = evangelismo.filter(e => (e.tipo||'').toLowerCase().includes('virtual')).reduce((s,e) => s + parseFloat(e.horas||0), 0);
+        const horasPresencial = evangelismo.filter(e => (e.tipo||'').toLowerCase().includes('presencial')||(e.tipo||'').toLowerCase().includes('person')).reduce((s,e) => s + parseFloat(e.horas||0), 0);
+        const dijeronSi = nuevos.reduce((s,e) => s + parseInt(e.dijeron_si||0), 0);
+        const nuevosContactos = nuevos.reduce((s,e) => s + parseInt(e.nuevos_contactos||0), 0);
+        setDatosRealesEstudios({ estudiantesActivos: contactosUnicos.length, horasTotales: Math.round(horasTotales*10)/10, horasOnline: Math.round(horasOnline*10)/10, horasPresencial: Math.round(horasPresencial*10)/10, dijeronSi, nuevosContactos });
+      } catch {}
+    };
+    cargarDatosReales();
+  }, [paisSeleccionado, anioSeleccionadoFiltro]);
 
-    if (!aniosComparables.includes(anioComparacionEvangelismoSeleccionado)) {
-      setAnioComparacionEvangelismoSeleccionado(sugerido);
+  useEffect(() => {
+    if (!continenteSeleccionado) return;
+    const cont = continentes.find(c => c.id === continenteSeleccionado);
+    if (cont) {
+      setPaisesDelContinente(cont.paises || []);
+      setPaisSeleccionado(null); // Reset país al cambiar región
     }
-  }, [stats, anioActualPorDefecto, anioEvangelismoSeleccionado, anioComparacionEvangelismoSeleccionado]);
+  }, [continenteSeleccionado, continentes]);
+
+  useEffect(() => {
+    const aniosDisponibles = stats?.evangelismo_missionaries?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
+    const aniosComparables = aniosDisponibles.filter((anio) => anio !== anioEvangelismoSelectdo);
+    const sugerido = aniosComparables.includes(anioEvangelismoSelectdo - 1)
+      ? anioEvangelismoSelectdo - 1
+      : (aniosComparables[0] || (anioEvangelismoSelectdo - 1));
+
+    if (!aniosComparables.includes(anioComparacionEvangelismoSelectdo)) {
+      setAnioComparacionEvangelismoSelectdo(sugerido);
+    }
+  }, [stats, anioActualPorDefecto, anioEvangelismoSelectdo, anioComparacionEvangelismoSelectdo]);
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f5f7fa", padding: "20px", display: "flex", justifyContent: "center", alignItems: "center" }}>
+      <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)", padding: "28px", fontFamily: "'Lato', sans-serif", display: "flex", justifyContent: "center", alignItems: "center" }}>
         <div style={{ background: "white", padding: "40px", borderRadius: "12px", textAlign: "center" }}>
-          Cargando estadísticas...
+          Loading statistics...
         </div>
       </div>
     );
   }
 
   const comparacion = stats?.comparacion_estudios || {};
-  const rendimientoProfesores = stats?.rendimiento_profesores?.profesores || [];
-  const anioRendimiento = stats?.rendimiento_profesores?.anio || new Date().getFullYear();
-  const evangelismoProfesores = stats?.evangelismo_profesores?.profesores || [];
-  const evangelismoProfesoresComparacion = stats?.evangelismo_profesores?.profesores_comparacion || [];
-  const modoEvangelismo = stats?.evangelismo_profesores?.modo || modoEvangelismoSeleccionado;
-  const mesEvangelismo = formatearMes(stats?.evangelismo_profesores?.mes || "");
-  const anioEvangelismo = stats?.evangelismo_profesores?.anio || new Date().getFullYear();
-  const anioComparacionEvangelismo = stats?.evangelismo_profesores?.anio_comparacion || anioComparacionEvangelismoSeleccionado;
-  const aniosEvangelismoDisponibles = stats?.evangelismo_profesores?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
-  const aniosEvangelismoComparables = aniosEvangelismoDisponibles.filter((anio) => anio !== anioEvangelismoSeleccionado);
-  const totalEvangelismoActual = evangelismoProfesores.reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
-  const totalEvangelismoComparacion = evangelismoProfesoresComparacion.reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
-  const variacionEvangelismoAnual = totalEvangelismoComparacion > 0
+  const rendimientoMissionaryes = stats?.rendimiento_missionaries?.missionaries || [];
+  const anioRendimiento = stats?.rendimiento_missionaries?.anio || new Date().getFullYear();
+  const evangelismoMissionaryes = stats?.evangelismo_missionaries?.missionaries || [];
+  const evangelismoMissionaryesComparacion = stats?.evangelismo_missionaries?.missionaries_comparacion || [];
+  const modoEvangelismo = stats?.evangelismo_missionaries?.modo || modoEvangelismoSelectdo;
+  const mesEvangelismo = formatearMes(stats?.evangelismo_missionaries?.mes || "");
+  const anioEvangelismo = stats?.evangelismo_missionaries?.anio || new Date().getFullYear();
+  const anioComparacionEvangelismo = stats?.evangelismo_missionaries?.anio_comparacion || anioComparacionEvangelismoSelectdo;
+  const aniosEvangelismoDisponibles = stats?.evangelismo_missionaries?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
+  const aniosEvangelismoComparables = aniosEvangelismoDisponibles.filter((anio) => anio !== anioEvangelismoSelectdo);
+  const totalEvangelismoActual = evangelismoMissionaryes.reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const totalEvangelismoComparacion = evangelismoMissionaryesComparacion.reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const variacionEvangelismoAnnual = totalEvangelismoComparacion > 0
     ? Number((((totalEvangelismoActual - totalEvangelismoComparacion) / totalEvangelismoComparacion) * 100).toFixed(1))
     : (totalEvangelismoActual > 0 ? 100 : 0);
   const crecimientoEstudiantes = stats?.crecimiento_estudiantes || {};
@@ -292,30 +343,30 @@ export default function Estadisticas() {
   const crecimientoEstudiantesProyeccion = statsProyeccion?.crecimiento_estudiantes || crecimientoEstudiantes;
   const crecimientoMiembrosProyeccion = statsProyeccion?.crecimiento_miembros || crecimientoMiembros;
   const comparacionEstudiosProyeccion = statsProyeccion?.comparacion_estudios || comparacion;
-  const evangelismoProyeccion = statsProyeccion?.evangelismo_profesores || {};
-  const anioSeleccionado = stats?.anio_seleccionado || anioActualPorDefecto;
-  const aniosDisponibles = stats?.anios_disponibles || [anioSeleccionado];
+  const evangelismoProyeccion = statsProyeccion?.evangelismo_missionaries || {};
+  const anioSelectdo = stats?.anio_seleccionado || anioActualPorDefecto;
+  const aniosDisponibles = stats?.anios_disponibles || [anioSelectdo];
   const tiposMiembroDisponibles = crecimientoMiembros.tipos_disponibles || ["Todos"];
   const aniosComparacionDisponibles = (crecimientoMiembros.anios_disponibles || aniosDisponibles)
-    .filter((anio) => anio !== anioSeleccionado);
+    .filter((anio) => anio !== anioSelectdo);
   const aniosComparacionMiembrosOpciones = aniosComparacionDisponibles.length
     ? aniosComparacionDisponibles
-    : [anioSeleccionado - 1];
+    : [anioSelectdo - 1];
   const seriesMiembrosPorTipo = crecimientoMiembros.series_por_tipo || {};
-  const seriesTipoMiembroSeleccionado = seriesMiembrosPorTipo[tipoMiembroSeleccionado] || {};
-  const serieCrecimientoMiembrosActual = seriesTipoMiembroSeleccionado[anioSeleccionado] || Array(12).fill(0);
-  const serieCrecimientoMiembrosComparacion = seriesTipoMiembroSeleccionado[anioComparacionMiembros] || Array(12).fill(0);
+  const seriesTipoMiembroSelectdo = seriesMiembrosPorTipo[tipoMiembroSelectdo] || {};
+  const serieCrecimientoMiembrosActual = seriesTipoMiembroSelectdo[anioSelectdo] || Array(12).fill(0);
+  const serieCrecimientoMiembrosComparacion = seriesTipoMiembroSelectdo[anioComparacionMiembros] || Array(12).fill(0);
   const totalCrecimientoMiembrosActual = serieCrecimientoMiembrosActual.reduce((sum, value) => sum + value, 0);
   const totalCrecimientoMiembrosComparacion = serieCrecimientoMiembrosComparacion.reduce((sum, value) => sum + value, 0);
   const variacionCrecimientoMiembros = totalCrecimientoMiembrosComparacion > 0
     ? Number((((totalCrecimientoMiembrosActual - totalCrecimientoMiembrosComparacion) / totalCrecimientoMiembrosComparacion) * 100).toFixed(1))
     : (totalCrecimientoMiembrosActual > 0 ? 100 : 0);
-  const profesorActivo = rendimientoProfesores.find(
-    (profesor) => String(profesor.id) === profesorSeleccionado
-  ) || rendimientoProfesores[0] || null;
+  const profesorActivo = rendimientoMissionaryes.find(
+    (profesor) => String(profesor.id) === profesorSelectdo
+  ) || rendimientoMissionaryes[0] || null;
   const resumenPais = stats?.resumen_pais || resumenPaisFallback || null;
   const mesActualIndice = new Date().getMonth();
-  const mesCorteProyeccion = anioSeleccionado < anioActualPorDefecto
+  const mesCorteProyeccion = anioSelectdo < anioActualPorDefecto
     ? MESES_EN_ANIO - 1
     : Math.min(mesActualIndice, MESES_EN_ANIO - 1);
   const mesesTranscurridosProyeccion = mesCorteProyeccion + 1;
@@ -324,11 +375,11 @@ export default function Estadisticas() {
   const acumuladoEstudiosActual = sumarSerieHastaMes(serieEstudiosActual, mesCorteProyeccion);
   const acumuladoEstudiosAnteriorMismoPeriodo = sumarSerieHastaMes(serieEstudiosAnterior, mesCorteProyeccion);
   const totalEstudiosAnterior = sumarSerie(serieEstudiosAnterior);
-  const proyeccionEstudios = proyectarCierreAnual(acumuladoEstudiosActual, mesesTranscurridosProyeccion);
+  const proyeccionEstudios = proyectarCierreAnnual(acumuladoEstudiosActual, mesesTranscurridosProyeccion);
   const variacionProyeccionEstudios = calcularVariacion(proyeccionEstudios, totalEstudiosAnterior);
   const lecturaEstudios = obtenerLecturaPronostico(variacionProyeccionEstudios);
   const seriesMiembrosTodosProyeccion = crecimientoMiembrosProyeccion.series_por_tipo?.Todos || {};
-  const serieMiembrosActualProyeccion = seriesMiembrosTodosProyeccion[anioSeleccionado] || Array(MESES_EN_ANIO).fill(0);
+  const serieMiembrosActualProyeccion = seriesMiembrosTodosProyeccion[anioSelectdo] || Array(MESES_EN_ANIO).fill(0);
   const anioComparacionPronosticoMiembros = aniosComparacionMiembrosOpciones.includes(anioComparacionMiembros)
     ? anioComparacionMiembros
     : aniosComparacionMiembrosOpciones[0];
@@ -336,22 +387,22 @@ export default function Estadisticas() {
   const acumuladoMiembrosActual = sumarSerieHastaMes(serieMiembrosActualProyeccion, mesCorteProyeccion);
   const acumuladoMiembrosAnteriorMismoPeriodo = sumarSerieHastaMes(serieMiembrosAnteriorProyeccion, mesCorteProyeccion);
   const totalMiembrosAnterior = sumarSerie(serieMiembrosAnteriorProyeccion);
-  const proyeccionMiembros = proyectarCierreAnual(acumuladoMiembrosActual, mesesTranscurridosProyeccion);
+  const proyeccionMiembros = proyectarCierreAnnual(acumuladoMiembrosActual, mesesTranscurridosProyeccion);
   const variacionProyeccionMiembros = calcularVariacion(proyeccionMiembros, totalMiembrosAnterior);
   const lecturaMiembros = obtenerLecturaPronostico(variacionProyeccionMiembros);
   const serieEstudiantesActualProyeccion = crecimientoEstudiantesProyeccion.serie || Array(MESES_EN_ANIO).fill(0);
   const acumuladoEstudiantesActual = sumarSerieHastaMes(serieEstudiantesActualProyeccion, mesCorteProyeccion);
-  const proyeccionEstudiantes = proyectarCierreAnual(acumuladoEstudiantesActual, mesesTranscurridosProyeccion);
-  const totalEvangelismoActualProyeccion = (evangelismoProyeccion.profesores || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
-  const totalEvangelismoAnteriorProyeccion = (evangelismoProyeccion.profesores_comparacion || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
-  const proyeccionEvangelismo = proyectarCierreAnual(totalEvangelismoActualProyeccion, mesesTranscurridosProyeccion);
+  const proyeccionEstudiantes = proyectarCierreAnnual(acumuladoEstudiantesActual, mesesTranscurridosProyeccion);
+  const totalEvangelismoActualProyeccion = (evangelismoProyeccion.missionaries || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const totalEvangelismoAnteriorProyeccion = (evangelismoProyeccion.missionaries_comparacion || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const proyeccionEvangelismo = proyectarCierreAnnual(totalEvangelismoActualProyeccion, mesesTranscurridosProyeccion);
   const variacionProyeccionEvangelismo = calcularVariacion(proyeccionEvangelismo, totalEvangelismoAnteriorProyeccion);
   const lecturaEvangelismo = obtenerLecturaPronostico(variacionProyeccionEvangelismo);
   const resumenesPronostico = [
     {
       id: "evangelismo",
-      titulo: "Evangelismo",
-      color: "#0E5A61",
+      titulo: "Evangelism",
+      color: "#134069",
       actual: totalEvangelismoActualProyeccion,
       anteriorMismoPeriodo: null,
       proyectado: proyeccionEvangelismo,
@@ -362,7 +413,7 @@ export default function Estadisticas() {
     },
     {
       id: "miembros",
-      titulo: "Miembros",
+      titulo: "Members",
       color: "#8E24AA",
       actual: acumuladoMiembrosActual,
       anteriorMismoPeriodo: acumuladoMiembrosAnteriorMismoPeriodo,
@@ -374,7 +425,7 @@ export default function Estadisticas() {
     },
     {
       id: "estudios",
-      titulo: "Estudios",
+      titulo: "Studies",
       color: "#2E7D32",
       actual: acumuladoEstudiosActual,
       anteriorMismoPeriodo: acumuladoEstudiosAnteriorMismoPeriodo,
@@ -386,10 +437,10 @@ export default function Estadisticas() {
     }
   ];
   const graficoComparacion = {
-    labels: comparacion.labels || ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"],
+    labels: comparacion.labels || ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
     datasets: [
       {
-        label: comparacion?.serie_anterior?.etiqueta || "Año anterior",
+        label: comparacion?.serie_anterior?.etiqueta || "Previous Year",
         data: comparacion?.serie_anterior?.data || Array(12).fill(0),
         borderColor: "#B8C4CC",
         backgroundColor: "rgba(184, 196, 204, 0.10)",
@@ -400,10 +451,10 @@ export default function Estadisticas() {
         fill: false
       },
       {
-        label: comparacion?.serie_actual?.etiqueta || "Año actual",
+        label: comparacion?.serie_actual?.etiqueta || "Current Year",
         data: comparacion?.serie_actual?.data || Array(12).fill(0),
-        borderColor: "#0E5A61",
-        backgroundColor: "rgba(14, 90, 97, 0.12)",
+        borderColor: "#134069",
+        backgroundColor: "rgba(19, 64, 105, 0.12)",
         borderWidth: 2.5,
         pointRadius: 0,
         pointHoverRadius: 4,
@@ -454,11 +505,11 @@ export default function Estadisticas() {
     }
   };
 
-  const graficoRendimientoProfesor = {
-    labels: ["Rendimiento anual", "Promedio mensual", "Promedio diario"],
+  const graficoRendimientoMissionary = {
+    labels: ["Annual Performance", "Monthly Average", "Daily Average"],
     datasets: [
       {
-        label: profesorActivo?.nombre || "Profesor",
+        label: profesorActivo?.nombre || "Missionary",
         data: profesorActivo
           ? [
               profesorActivo.total_estudios || 0,
@@ -466,10 +517,10 @@ export default function Estadisticas() {
               profesorActivo.promedio_diario || 0
             ]
           : [0, 0, 0],
-        borderColor: "#0E5A61",
-        backgroundColor: "rgba(14, 90, 97, 0.12)",
+        borderColor: "#134069",
+        backgroundColor: "rgba(19, 64, 105, 0.12)",
         borderWidth: 3,
-        pointBackgroundColor: "#0E5A61",
+        pointBackgroundColor: "#134069",
         pointBorderColor: "#ffffff",
         pointBorderWidth: 2,
         pointRadius: 5,
@@ -480,7 +531,7 @@ export default function Estadisticas() {
     ]
   };
 
-  const opcionesGraficoProfesores = {
+  const opcionesGraficoMissionaryes = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -520,19 +571,19 @@ export default function Estadisticas() {
     }
   };
 
-  const graficoEvangelismoProfesores = {
+  const graficoEvangelismoMissionaryes = {
     labels: Array.from(new Set([
-      ...evangelismoProfesores.map((profesor) => profesor.nombre),
-      ...evangelismoProfesoresComparacion.map((profesor) => profesor.nombre)
+      ...evangelismoMissionaryes.map((profesor) => profesor.nombre),
+      ...evangelismoMissionaryesComparacion.map((profesor) => profesor.nombre)
     ])),
-    datasets: modoEvangelismo === "anual"
+    datasets: modoEvangelismo === "annual"
       ? [
           {
             label: `Horas ${anioComparacionEvangelismo}`,
             data: Array.from(new Set([
-              ...evangelismoProfesores.map((profesor) => profesor.nombre),
-              ...evangelismoProfesoresComparacion.map((profesor) => profesor.nombre)
-            ])).map((nombre) => evangelismoProfesoresComparacion.find((profesor) => profesor.nombre === nombre)?.total_horas || 0),
+              ...evangelismoMissionaryes.map((profesor) => profesor.nombre),
+              ...evangelismoMissionaryesComparacion.map((profesor) => profesor.nombre)
+            ])).map((nombre) => evangelismoMissionaryesComparacion.find((profesor) => profesor.nombre === nombre)?.total_horas || 0),
             backgroundColor: "#B8C4CC",
             borderRadius: 10,
             borderSkipped: false
@@ -540,20 +591,20 @@ export default function Estadisticas() {
           {
             label: `Horas ${anioEvangelismo}`,
             data: Array.from(new Set([
-              ...evangelismoProfesores.map((profesor) => profesor.nombre),
-              ...evangelismoProfesoresComparacion.map((profesor) => profesor.nombre)
-            ])).map((nombre) => evangelismoProfesores.find((profesor) => profesor.nombre === nombre)?.total_horas || 0),
-            backgroundColor: "#0E5A61",
+              ...evangelismoMissionaryes.map((profesor) => profesor.nombre),
+              ...evangelismoMissionaryesComparacion.map((profesor) => profesor.nombre)
+            ])).map((nombre) => evangelismoMissionaryes.find((profesor) => profesor.nombre === nombre)?.total_horas || 0),
+            backgroundColor: "#134069",
             borderRadius: 10,
             borderSkipped: false
           }
         ]
       : [
           {
-            label: `Horas de evangelismo en ${mesEvangelismo || "el mes actual"}`,
-            data: evangelismoProfesores.map((profesor) => profesor.total_horas || 0),
+            label: `Evangelism hours · ${mesEvangelismo || "current month"}`,
+            data: evangelismoMissionaryes.map((profesor) => profesor.total_horas || 0),
             backgroundColor: [
-              "#0E5A61",
+              "#134069",
               "#177E89",
               "#1FA2A6",
               "#4CB5AE",
@@ -571,7 +622,7 @@ export default function Estadisticas() {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: modoEvangelismo === "anual"
+        display: modoEvangelismo === "annual"
       },
       tooltip: {
         backgroundColor: "#1f2937",
@@ -605,10 +656,10 @@ export default function Estadisticas() {
   };
 
   const graficoCrecimientoEstudiantes = {
-    labels: crecimientoEstudiantes.labels || ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"],
+    labels: crecimientoEstudiantes.labels || ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
     datasets: [
       {
-        label: `Estudiantes unicos por mes ${crecimientoEstudiantes.anio || new Date().getFullYear()}`,
+        label: `Unique students per month · ${crecimientoEstudiantes.anio || new Date().getFullYear()}`,
         data: crecimientoEstudiantes.serie || Array(12).fill(0),
         borderColor: "#2E7D32",
         backgroundColor: "rgba(46, 125, 50, 0.14)",
@@ -625,10 +676,10 @@ export default function Estadisticas() {
   };
 
   const graficoCrecimientoMiembros = {
-    labels: crecimientoMiembros.labels || ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"],
+    labels: crecimientoMiembros.labels || ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
     datasets: [
       {
-        label: `${tipoMiembroSeleccionado} ${anioComparacionMiembros}`,
+        label: `${tipoMiembroSelectdo} ${anioComparacionMiembros}`,
         data: serieCrecimientoMiembrosComparacion,
         borderColor: "#B8C4CC",
         backgroundColor: "rgba(184, 196, 204, 0.10)",
@@ -639,7 +690,7 @@ export default function Estadisticas() {
         fill: false
       },
       {
-        label: `${tipoMiembroSeleccionado} ${anioSeleccionado}`,
+        label: `${tipoMiembroSelectdo} ${anioSelectdo}`,
         data: serieCrecimientoMiembrosActual,
         borderColor: "#8E24AA",
         backgroundColor: "rgba(142, 36, 170, 0.12)",
@@ -659,21 +710,21 @@ export default function Estadisticas() {
     labels: resumenesPronostico.map((item) => item.titulo),
     datasets: [
       {
-        label: `Acumulado ${anioSeleccionado}`,
+        label: `Accumulated ${anioSelectdo}`,
         data: resumenesPronostico.map((item) => Number(formatearDecimal(item.actual, 1))),
         backgroundColor: ["#8FD3D7", "#D2A8E6", "#A5D6A7"],
         borderRadius: 10,
         borderSkipped: false
       },
       {
-        label: `Proyección cierre ${anioSeleccionado}`,
+        label: `Year-end projection ${anioSelectdo}`,
         data: resumenesPronostico.map((item) => item.proyectado),
-        backgroundColor: ["#0E5A61", "#8E24AA", "#2E7D32"],
+        backgroundColor: ["#134069", "#8E24AA", "#2E7D32"],
         borderRadius: 10,
         borderSkipped: false
       },
       {
-        label: `Cierre ${anioSeleccionado - 1}`,
+        label: `Year-end ${anioSelectdo - 1}`,
         data: resumenesPronostico.map((item) => Number(item.cierreAnterior || 0)),
         backgroundColor: ["#B8C4CC", "#C9B6D9", "#C8E6C9"],
         borderRadius: 10,
@@ -683,34 +734,68 @@ export default function Estadisticas() {
   };
 
   const tabs = [
-    { id: "pais", label: "País" },
-    { id: "evangelismo", label: "Evangelismo" },
-    { id: "estudios", label: "Estudios" },
-    { id: "profesores", label: "Profesores" },
-    { id: "crecimiento", label: "Crecimiento" },
-    { id: "proyeccion", label: "Proyección" }
+    { id: "pais", label: "Country" },
+    { id: "evangelismo", label: "Evangelism" },
+    { id: "estudios", label: "Bible Studies" },
+    { id: "missionaries", label: "Missionaries" },
+    { id: "crecimiento", label: "Growth" },
+    { id: "proyeccion", label: "Projection" },
+    { id: "iglesias", label: "Churches by Country" }
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f7fa", padding: "20px" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)", padding: "28px", fontFamily: "'Lato', sans-serif" }}>
       <div style={{ maxWidth: "1600px", margin: "0 auto" }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "20px" }}>
-          <button onClick={() => navigate("/home")} style={{ background: "white", border: "none", borderRadius: "12px", width: "50px", height: "50px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            <FaArrowLeft style={{ fontSize: "18px", color: "#0E5A61" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "28px" }}>
+          <button onClick={() => navigate("/home")} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", padding: "8px 14px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
+            <FaArrowLeft /> Back
           </button>
           <div>
-            <h1 style={{ fontSize: "28px", color: "#1a1a1a", margin: 0 }}>Estadísticas Generales</h1>
-            <p style={{ margin: "5px 0 0", color: "#666", fontSize: "14px" }}>Resumen del sistema</p>
+            <h1 style={{ fontSize: "20px", color: "white", margin: 0, fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>General Statistics</h1>
+            <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>System overview · {new Date().getFullYear()}</p>
           </div>
         </div>
+
+        {/* Selector de región y país */}
+        <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+          <select value={continenteSeleccionado || ""} onChange={e => { setContinenteSeleccionado(Number(e.target.value)); setPaisSeleccionado(null); }}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600", minWidth: "200px" }}>
+            <option value="">Select Region</option>
+            {continentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+          <select value={anioSeleccionadoFiltro} onChange={e => setAnioSeleccionadoFiltro(Number(e.target.value))}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600" }}>
+            {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+
+        {/* Tarjetas datos reales de estudios */}
+        {datosRealesEstudios && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: "12px", marginBottom: "20px" }}>
+            {[
+              { label: "Active Students", value: datosRealesEstudios.estudiantesActivos, color: "#134069", icon: "📖" },
+              { label: "Study Hours", value: datosRealesEstudios.horasTotales, color: "#4CAF50", icon: "⏱" },
+              { label: "Online Evang.", value: datosRealesEstudios.horasOnline, color: "#2196F3", icon: "💻" },
+              { label: "In-Person Evang.", value: datosRealesEstudios.horasPresencial, color: "#FF9800", icon: "🚶" },
+              { label: "New Contacts", value: datosRealesEstudios.nuevosContactos, color: "#9C27B0", icon: "👥" },
+              { label: "Said Yes", value: datosRealesEstudios.dijeronSi, color: "#E91E63", icon: "✋" },
+            ].map((item, i) => (
+              <div key={i} style={{ background: "white", borderRadius: "10px", padding: "14px 16px", border: "1px solid #e8edf5", boxShadow: "0 2px 6px rgba(19,64,105,0.06)" }}>
+                <div style={{ fontSize: "18px", marginBottom: "4px" }}>{item.icon}</div>
+                <div style={{ fontSize: "10px", color: "#8a97b0", fontWeight: "700", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "4px" }}>{item.label}</div>
+                <div style={{ fontSize: "24px", fontWeight: "700", color: item.color }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Tarjetas de resumen */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Usuarios</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Users</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#2196F3" }}>
                   {stats?.total_usuarios || 0}
                 </div>
@@ -722,7 +807,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Miembros</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Members</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#4CAF50" }}>
                   {stats?.total_miembros || 0}
                 </div>
@@ -734,7 +819,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Contactos</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Contacts</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#FF9800" }}>
                   {stats?.total_contactos || 0}
                 </div>
@@ -746,7 +831,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Estudios</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Studies</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#9C27B0" }}>
                   {stats?.total_estudios || 0}
                 </div>
@@ -758,22 +843,22 @@ export default function Estadisticas() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "30px" }}>
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Variacion anual</div>
+            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Annual Variation</div>
             <div style={{ fontSize: "30px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.crecimiento || 0) }}>
               {formatearVariacion(comparacion.crecimiento || 0)}
             </div>
             <div style={{ marginTop: "10px", color: "#777", fontSize: "13px" }}>
-              Frente al periodo anterior
+              vs previous period
             </div>
           </div>
 
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Diferencia total</div>
+            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Difference</div>
             <div style={{ fontSize: "30px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.diferencia || 0) }}>
               {comparacion.diferencia > 0 ? `+${comparacion.diferencia}` : comparacion.diferencia || 0}
             </div>
             <div style={{ marginTop: "10px", color: "#777", fontSize: "13px" }}>
-              Estudios de diferencia
+              Study difference
             </div>
           </div>
         </div>
@@ -792,7 +877,7 @@ export default function Estadisticas() {
                   fontWeight: "600",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
-                  background: tabActiva === tab.id ? "#0E5A61" : "#edf2f4",
+                  background: tabActiva === tab.id ? "#134069" : "#f0f4fa",
                   color: tabActiva === tab.id ? "white" : "#4b5563",
                   transition: "all 0.2s ease"
                 }}
@@ -805,7 +890,7 @@ export default function Estadisticas() {
           {tabActiva === "pais" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Resumen por país</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Country Summary</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
                   Datos consolidados del país asignado al usuario actual.
                 </p>
@@ -814,8 +899,8 @@ export default function Estadisticas() {
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
                       <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>País</div>
-                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#0E5A61" }}>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Country</div>
+                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>
                           {resumenPais.nombre_pais}
                         </div>
                       </div>
@@ -839,7 +924,7 @@ export default function Estadisticas() {
                   </>
                 ) : (
                   <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
-                    No hay un país asignado al usuario o todavía no hay datos disponibles para ese país.
+                    No country assigned to user or no data available for this country.
                   </div>
                 )}
               </div>
@@ -849,11 +934,11 @@ export default function Estadisticas() {
           {tabActiva === "evangelismo" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Horas de evangelismo por profesor</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Evangelism Hours by Missionary</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  {modoEvangelismo === "anual"
-                    ? `Total de horas registradas por profesor durante ${anioEvangelismo}, con comparación frente a ${anioComparacionEvangelismo}.`
-                    : `Total de horas registradas por profesor en ${mesEvangelismo || "el mes actual"} de ${anioEvangelismo}.`}
+                  {modoEvangelismo === "annual"
+                    ? `Total hours recorded by missionary during ${anioEvangelismo}, vs ${anioComparacionEvangelismo}.`
+                    : `Total hours recorded by missionary in ${mesEvangelismo || "current month"} de ${anioEvangelismo}.`}
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
@@ -862,8 +947,8 @@ export default function Estadisticas() {
                       Vista
                     </label>
                     <select
-                      value={modoEvangelismoSeleccionado}
-                      onChange={(e) => setModoEvangelismoSeleccionado(e.target.value)}
+                      value={modoEvangelismoSelectdo}
+                      onChange={(e) => setModoEvangelismoSelectdo(e.target.value)}
                       style={{
                         width: "100%",
                         padding: "12px 14px",
@@ -874,8 +959,8 @@ export default function Estadisticas() {
                         fontSize: "14px"
                       }}
                     >
-                      <option value="mensual">Mes especifico</option>
-                      <option value="anual">Todo el ano</option>
+                      <option value="monthly">Specific month</option>
+                      <option value="annual">Todo el ano</option>
                     </select>
                   </div>
                   <div>
@@ -883,8 +968,8 @@ export default function Estadisticas() {
                       Año
                     </label>
                     <select
-                      value={anioEvangelismoSeleccionado}
-                      onChange={(e) => setAnioEvangelismoSeleccionado(Number(e.target.value))}
+                      value={anioEvangelismoSelectdo}
+                      onChange={(e) => setAnioEvangelismoSelectdo(Number(e.target.value))}
                       style={{
                         width: "100%",
                         padding: "12px 14px",
@@ -902,14 +987,14 @@ export default function Estadisticas() {
                       ))}
                     </select>
                   </div>
-                  {modoEvangelismoSeleccionado === "mensual" && (
+                  {modoEvangelismoSelectdo === "monthly" && (
                     <div>
                       <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
                         Mes
                       </label>
                       <select
-                        value={mesEvangelismoSeleccionado}
-                        onChange={(e) => setMesEvangelismoSeleccionado(e.target.value)}
+                        value={mesEvangelismoSelectdo}
+                        onChange={(e) => setMesEvangelismoSelectdo(e.target.value)}
                         style={{
                           width: "100%",
                           padding: "12px 14px",
@@ -928,14 +1013,14 @@ export default function Estadisticas() {
                       </select>
                     </div>
                   )}
-                  {modoEvangelismoSeleccionado === "anual" && (
+                  {modoEvangelismoSelectdo === "annual" && (
                     <div>
                       <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
                         Comparar contra
                       </label>
                       <select
-                        value={anioComparacionEvangelismoSeleccionado}
-                        onChange={(e) => setAnioComparacionEvangelismoSeleccionado(Number(e.target.value))}
+                        value={anioComparacionEvangelismoSelectdo}
+                        onChange={(e) => setAnioComparacionEvangelismoSelectdo(Number(e.target.value))}
                         style={{
                           width: "100%",
                           padding: "12px 14px",
@@ -946,7 +1031,7 @@ export default function Estadisticas() {
                           fontSize: "14px"
                         }}
                       >
-                        {(aniosEvangelismoComparables.length ? aniosEvangelismoComparables : [anioEvangelismoSeleccionado - 1]).map((anio) => (
+                        {(aniosEvangelismoComparables.length ? aniosEvangelismoComparables : [anioEvangelismoSelectdo - 1]).map((anio) => (
                           <option key={anio} value={anio}>
                             {anio}
                           </option>
@@ -956,37 +1041,37 @@ export default function Estadisticas() {
                   )}
                 </div>
 
-                {evangelismoProfesores.length > 0 ? (
+                {evangelismoMissionaryes.length > 0 ? (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Profesores con registro</div>
-                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#0E5A61" }}>
-                          {evangelismoProfesores.filter((profesor) => Number(profesor.total_horas) > 0).length}
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Missionaryes con registro</div>
+                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>
+                          {evangelismoMissionaryes.filter((profesor) => Number(profesor.total_horas) > 0).length}
                         </div>
                       </div>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
                         <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>
-                          {modoEvangelismo === "anual" ? `Horas totales ${anioEvangelismo}` : "Horas totales del mes"}
+                          {modoEvangelismo === "annual" ? `Total hours ${anioEvangelismo}` : "Total hours del mes"}
                         </div>
                         <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                           {formatearDecimal(totalEvangelismoActual, 1)}
                         </div>
                       </div>
-                      {modoEvangelismo === "anual" && (
+                      {modoEvangelismo === "annual" && (
                         <>
                           <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
                             <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>
-                              {`Horas totales ${anioComparacionEvangelismo}`}
+                              {`Total hours ${anioComparacionEvangelismo}`}
                             </div>
                             <div style={{ fontSize: "24px", fontWeight: "700", color: "#475467" }}>
                               {formatearDecimal(totalEvangelismoComparacion, 1)}
                             </div>
                           </div>
                           <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                            <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Variacion anual</div>
-                            <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(variacionEvangelismoAnual) }}>
-                              {formatearVariacion(variacionEvangelismoAnual)}
+                            <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Annual Variation</div>
+                            <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(variacionEvangelismoAnnual) }}>
+                              {formatearVariacion(variacionEvangelismoAnnual)}
                             </div>
                           </div>
                         </>
@@ -994,11 +1079,11 @@ export default function Estadisticas() {
                     </div>
 
                     <div style={{ height: "340px", marginBottom: "20px" }}>
-                      <Bar data={graficoEvangelismoProfesores} options={opcionesGraficoEvangelismo} />
+                      <Bar data={graficoEvangelismoMissionaryes} options={opcionesGraficoEvangelismo} />
                     </div>
 
                     <div style={{ background: "white", borderRadius: "14px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
-                      {evangelismoProfesores.map((profesor, index) => (
+                      {evangelismoMissionaryes.map((profesor, index) => (
                         <div
                           key={profesor.id || profesor.nombre}
                           style={{
@@ -1011,7 +1096,7 @@ export default function Estadisticas() {
                           }}
                         >
                           <div style={{ color: "#1f2937", fontWeight: "700" }}>{profesor.nombre}</div>
-                          <div style={{ textAlign: "right", color: "#0E5A61", fontWeight: "700" }}>
+                          <div style={{ textAlign: "right", color: "#134069", fontWeight: "700" }}>
                             {formatearDecimal(profesor.total_horas, 1)} h
                           </div>
                         </div>
@@ -1020,7 +1105,7 @@ export default function Estadisticas() {
                   </>
                 ) : (
                   <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
-                    No hay horas de evangelismo registradas para mostrar todavía.
+                    No evangelism hours recorded yet.
                   </div>
                 )}
               </div>
@@ -1031,13 +1116,13 @@ export default function Estadisticas() {
             <div style={{ padding: "10px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                 <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Variacion anual</div>
+                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Annual Variation</div>
                   <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.crecimiento || 0) }}>
                     {formatearVariacion(comparacion.crecimiento || 0)}
                   </div>
                 </div>
                 <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Diferencia total</div>
+                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Total Difference</div>
                   <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.diferencia || 0) }}>
                     {comparacion.diferencia > 0 ? `+${comparacion.diferencia}` : comparacion.diferencia || 0}
                   </div>
@@ -1045,9 +1130,9 @@ export default function Estadisticas() {
               </div>
 
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", minWidth: 0 }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Comparación de estudios</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Studies Comparison</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Total de estudios por mes para comparar el año actual frente al anterior.
+                  Total studies per month comparing current year vs previous year.
                 </p>
 
                 <div style={{ height: "340px" }}>
@@ -1057,36 +1142,36 @@ export default function Estadisticas() {
             </div>
           )}
 
-          {tabActiva === "profesores" && (
+          {tabActiva === "missionaries" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", minWidth: 0 }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Rendimiento por profesor</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Performance by Missionary</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
                   Estudios del año {anioRendimiento}, con promedio mensual y promedio diario por profesor.
                 </p>
 
-                {rendimientoProfesores.length > 0 ? (
+                {rendimientoMissionaryes.length > 0 ? (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Profesores con datos</div>
-                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#0E5A61" }}>{rendimientoProfesores.length}</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Missionaryes con datos</div>
+                        <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>{rendimientoMissionaryes.length}</div>
                       </div>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Profesor seleccionado</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Missionary seleccionado</div>
                         <div style={{ fontSize: "16px", fontWeight: "700", color: "#1f2937" }}>
-                          {profesorActivo?.nombre || "Sin datos"}
+                          {profesorActivo?.nombre || "No data"}
                         </div>
                       </div>
                     </div>
 
                     <div style={{ marginBottom: "20px" }}>
                       <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                        Seleccionar profesor
+                        Selectr profesor
                       </label>
                       <select
-                        value={profesorSeleccionado}
-                        onChange={(e) => setProfesorSeleccionado(e.target.value)}
+                        value={profesorSelectdo}
+                        onChange={(e) => setMissionarySelectdo(e.target.value)}
                         style={{
                           width: "100%",
                           padding: "12px 14px",
@@ -1097,7 +1182,7 @@ export default function Estadisticas() {
                           fontSize: "14px"
                         }}
                       >
-                        {rendimientoProfesores.map((profesor) => (
+                        {rendimientoMissionaryes.map((profesor) => (
                           <option key={profesor.id} value={String(profesor.id)}>
                             {profesor.nombre}
                           </option>
@@ -1106,7 +1191,7 @@ export default function Estadisticas() {
                     </div>
 
                     <div style={{ height: "300px", marginBottom: "20px" }}>
-                      <Line data={graficoRendimientoProfesor} options={opcionesGraficoProfesores} />
+                      <Line data={graficoRendimientoMissionary} options={opcionesGraficoMissionaryes} />
                     </div>
 
                     <div style={{ background: "white", borderRadius: "14px", border: "1px solid #e5e7eb", maxHeight: "260px", overflowY: "auto" }}>
@@ -1124,15 +1209,15 @@ export default function Estadisticas() {
                         >
                           <div>
                             <div style={{ color: "#1f2937", fontWeight: "700" }}>{profesor.nombre}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Profesor</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>Missionary</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ color: "#0E5A61", fontWeight: "700" }}>{profesor.total_estudios || 0}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Anual</div>
+                            <div style={{ color: "#134069", fontWeight: "700" }}>{profesor.total_estudios || 0}</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>Annual</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ color: "#1f2937", fontWeight: "600" }}>{formatearDecimal(profesor.promedio_mensual, 1)}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Mensual</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>Monthly</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ color: "#1f2937", fontWeight: "600" }}>{formatearDecimal(profesor.promedio_diario, 2)}</div>
@@ -1144,7 +1229,7 @@ export default function Estadisticas() {
                   </>
                 ) : (
                   <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
-                    No hay datos de rendimiento por profesor para mostrar todavía.
+                    No missionary performance data available yet.
                   </div>
                 )}
               </div>
@@ -1154,9 +1239,9 @@ export default function Estadisticas() {
           {tabActiva === "crecimiento" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Crecimiento de miembros por mes</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Member Growth by Month</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Altas mensuales de miembros segun el tipo seleccionado, comparando el año principal frente a otro año.
+                  Monthly member additions by type, comparing main year vs another year.
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
@@ -1165,8 +1250,8 @@ export default function Estadisticas() {
                       Tipo de miembro
                     </label>
                     <select
-                      value={tipoMiembroSeleccionado}
-                      onChange={(e) => setTipoMiembroSeleccionado(e.target.value)}
+                      value={tipoMiembroSelectdo}
+                      onChange={(e) => setTipoMiembroSelectdo(e.target.value)}
                       style={{
                         width: "100%",
                         padding: "12px 14px",
@@ -1212,13 +1297,13 @@ export default function Estadisticas() {
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Año principal</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Main Year</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#8E24AA" }}>
-                      {anioSeleccionado}
+                      {anioSelectdo}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Miembros nuevos en {anioSeleccionado}</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Miembros nuevos en {anioSelectdo}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                       {totalCrecimientoMiembrosActual}
                     </div>
@@ -1230,7 +1315,7 @@ export default function Estadisticas() {
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Variacion anual</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Annual Variation</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(variacionCrecimientoMiembros) }}>
                       {formatearVariacion(variacionCrecimientoMiembros)}
                     </div>
@@ -1243,20 +1328,20 @@ export default function Estadisticas() {
               </div>
 
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Estudiantes unicos con estudio biblico por mes</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Unique Students with Bible Study per Month</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
                   Muestra cuantos estudiantes diferentes tuvieron al menos un estudio biblico en cada mes de {crecimientoEstudiantes.anio || new Date().getFullYear()}, sin repetir al mismo estudiante dentro del mismo mes.
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Año analizado</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Year analyzed</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#2E7D32" }}>
                       {crecimientoEstudiantes.anio || new Date().getFullYear()}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Suma de estudiantes por mes</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Total students per month</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                       {crecimientoEstudiantes.total || 0}
                     </div>
@@ -1273,15 +1358,15 @@ export default function Estadisticas() {
           {tabActiva === "proyeccion" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Proyección de cierre anual</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Annual Closing Projection</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Estima cómo podría cerrar el año {anioSeleccionado} si el ritmo promedio de enero a {formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} se mantiene hasta diciembre, comparándolo con el cierre del año anterior.
+                  Estimates how the year {anioSelectdo} may close if the average pace from January to {formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} is maintained through December, compared to the previous year closing.
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Año proyectado</div>
-                    <div style={{ fontSize: "24px", fontWeight: "700", color: "#0E5A61" }}>{anioSeleccionado}</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Projected year</div>
+                    <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>{anioSelectdo}</div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
                     <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Meses analizados</div>
@@ -1325,13 +1410,13 @@ export default function Estadisticas() {
                           </div>
                         </div>
                         <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cierre año anterior</div>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Previous year closing</div>
                           <div style={{ fontSize: "24px", fontWeight: "700", color: "#475467" }}>
                             {formatearDecimal(item.cierreAnterior, 1)}
                           </div>
                         </div>
                         <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Variación proyectada</div>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Projected variation</div>
                           <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(item.variacion) }}>
                             {formatearVariacion(item.variacion)}
                           </div>
@@ -1340,8 +1425,8 @@ export default function Estadisticas() {
 
                       <div style={{ color: "#4b5563", fontSize: "14px", lineHeight: "1.6" }}>
                         {item.titulo === "Evangelismo"
-                          ? `Si el ritmo actual se mantiene, ${item.titulo.toLowerCase()} podría cerrar en ${formatearDecimal(item.proyectado, 1)} ${item.unidad}, frente a ${formatearDecimal(item.cierreAnterior, 1)} ${item.unidad} del año anterior. ${item.lectura.descripcion}`
-                          : `Hasta ${formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} llevas ${formatearDecimal(item.actual, 1)} ${item.unidad}. En el mismo periodo del año anterior iban ${formatearDecimal(item.anteriorMismoPeriodo, 1)} ${item.unidad}. ${item.lectura.descripcion}`}
+                          ? `At current pace, ${item.titulo.toLowerCase()} could close at ${formatearDecimal(item.proyectado, 1)} ${item.unidad}, vs ${formatearDecimal(item.cierreAnterior, 1)} ${item.unidad} of the previous year. ${item.lectura.descripcion}`
+                          : `Through ${formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} you have ${formatearDecimal(item.actual, 1)} ${item.unidad}. At the same point last year: ${formatearDecimal(item.anteriorMismoPeriodo, 1)} ${item.unidad}. ${item.lectura.descripcion}`}
                       </div>
                     </div>
                   ))}
@@ -1351,12 +1436,54 @@ export default function Estadisticas() {
           )}
         </div>
 
-        <div style={{ background: "white", padding: "30px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "20px", color: "#1a1a1a" }}>Resumen</h2>
-          <p style={{ color: "#666", lineHeight: "1.6", margin: 0 }}>
-            Comparativa mensual de estudios registrados.
-          </p>
-        </div>
+        {/* TAB IGLESIAS POR PAÍS */}
+        {tabActiva === "iglesias" && (
+          <div style={{ background: "white", borderRadius: "12px", border: "1px solid #e8edf5", overflow: "hidden" }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid #e8edf5" }}>
+              <h2 style={{ margin: 0, color: "#134069", fontFamily: "'Cinzel',serif", fontSize: "17px" }}>
+                Churches & Presence by Country
+              </h2>
+              <p style={{ margin: "4px 0 0", color: "#8a97b0", fontSize: "12px" }}>
+                {continenteSeleccionado ? continentes.find(c => c.id === continenteSeleccionado)?.nombre : "All regions"} — {anioSeleccionadoFiltro}
+              </p>
+            </div>
+            <div style={{ padding: "20px 24px" }}>
+              {paisesDelContinente.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#b0bcd0", padding: "40px" }}>Select a region to view countries</div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+                  {paisesDelContinente.map((pais, i) => {
+                    const colores = ["#134069","#4CAF50","#2196F3","#FF9800","#9C27B0","#E91E63","#00BCD4","#FF5722"];
+                    const color = colores[i % colores.length];
+                    return (
+                      <div key={pais.id} style={{ background: "#f8faff", borderRadius: "12px", padding: "18px", border: `2px solid ${paisSeleccionado === pais.id ? color : "#e8edf5"}`, cursor: "pointer", transition: "all 0.2s" }}
+                        onClick={() => setPaisSeleccionado(pais.id)}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                          <div style={{ fontWeight: "700", color: "#1a2d5a", fontSize: "15px", fontFamily: "'Lato',sans-serif" }}>{pais.nombre}</div>
+                          <div style={{ background: color, color: "white", borderRadius: "6px", padding: "2px 8px", fontSize: "10px", fontWeight: "700" }}>{pais.codigo_iso || pais.iso || "—"}</div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          {[
+                            { label: "Members", value: stats?.total_miembros || "—", icon: "👥" },
+                            { label: "Contacts", value: stats?.total_contactos || "—", icon: "📞" },
+                            { label: "Churches", value: resumenPaisFallback?.cantidad_iglesias || 0, icon: "⛪" },
+                            { label: "Studies", value: datosRealesEstudios?.estudiantesActivos || 0, icon: "📖" },
+                          ].map((item, j) => (
+                            <div key={j} style={{ background: "white", borderRadius: "8px", padding: "10px", textAlign: "center", border: "1px solid #e8edf5" }}>
+                              <div style={{ fontSize: "16px" }}>{item.icon}</div>
+                              <div style={{ fontSize: "18px", fontWeight: "700", color: color }}>{item.value}</div>
+                              <div style={{ fontSize: "10px", color: "#8a97b0", fontWeight: "700" }}>{item.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

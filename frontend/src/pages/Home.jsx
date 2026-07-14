@@ -32,7 +32,7 @@ export default function Home() {
 
   useEffect(() => {
     cargarPermisos();
-    if (user?.rol_id === 2) {
+    if (user) {
       cargarNotificaciones();
     }
   }, []);
@@ -83,7 +83,9 @@ export default function Home() {
   const getRolLabel = (rol_id) => {
     if (rol_id === 1) return 'Administrator';
     if (rol_id === 2) return 'Pastor';
-    return 'Missionary';
+    if (rol_id === 3) return 'Missionary';
+    if (rol_id === 4) return 'Treasurer';
+    return 'Member';
   };
 
   const modulosConPermisos = [

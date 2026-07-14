@@ -12,9 +12,6 @@ import toast from 'react-hot-toast';
 const P  = "#1a5490";
 const PL = "#2a72b8";
 
-const SUDAMERICA = ["Argentina","Bolivia","Brasil","Chile","Colombia","Ecuador","Guyana","Paraguay","Perú","Surinam","Uruguay","Venezuela"];
-const CAC        = ["Belice","Costa Rica","Cuba","El Salvador","Guatemala","Haití","Honduras","México","Nicaragua","Panamá","República Dominicana"];
-
 const MESES_EN = {
   ENERO:"January", FEBRERO:"February", MARZO:"March", ABRIL:"April",
   MAYO:"May", JUNIO:"June", JULIO:"July", AGOSTO:"August",
@@ -26,27 +23,42 @@ export default function InformeRegional() {
   const navigate   = useNavigate();
   const { user }   = useAuth();
 
-  // Detectar región del usuario por su país
-  const region = user?.region || "Sudamérica"; // 'Sudamérica' o 'CAC'
-  const paisesRegion = region === "CAC" ? CAC : SUDAMERICA;
-
   const [año, setAño]               = useState(new Date().getFullYear());
   const [mes, setMes]               = useState(MESES[new Date().getMonth()]);
   const [filtroModo, setFiltroModo] = useState("mensual"); // mensual | anual
   const [busqueda, setBusqueda]     = useState("");
   const [datos, setDatos]           = useState([]);
   const [paises, setPaises]         = useState([]);
+  const [continentes, setContinentes] = useState([]);
+  const [continenteId, setContinenteId] = useState(null);
+  const [region, setRegion]         = useState("CAC");
   const [cargando, setCargando]     = useState(false);
   const [generado, setGenerado]     = useState(false);
 
-  useEffect(() => { cargarPaises(); }, []);
+  useEffect(() => { cargarContinentes(); }, []);
 
-  const cargarPaises = async () => {
+  const cargarContinentes = async () => {
     try {
-      const all = await administracionService.getAllPaises();
-      const filtrados = all.filter(p => paisesRegion.includes(p.nombre));
-      setPaises(filtrados);
-    } catch { toast.error("Error loading countries"); }
+      const data = await administracionService.getAllContinentes();
+      setContinentes(data);
+      // Seleccionar el primer continente por defecto
+      if (data.length > 0) {
+        setContinenteId(data[0].id);
+        setRegion(data[0].nombre);
+        setPaises(data[0].paises || []);
+      }
+    } catch { toast.error("Error loading regions"); }
+  };
+
+  const handleContinenteChange = (id) => {
+    const cont = continentes.find(c => String(c.id) === String(id));
+    if (cont) {
+      setContinenteId(cont.id);
+      setRegion(cont.nombre);
+      setPaises(cont.paises || []);
+      setGenerado(false);
+      setDatos([]);
+    }
   };
 
   const generarInforme = async () => {
@@ -63,25 +75,32 @@ export default function InformeRegional() {
             const movimientos = [];
 
             for (const m of mesesConsulta) {
-              const detalles = await administracionService.getDetallePresupuesto(pais.id, m, año);
-              const gastosMes = detalles.reduce((s, d) => s + parseFloat(d.monto || 0), 0);
-              totalGastado += gastosMes;
-              if (gastosMes > 0) {
-                movimientos.push({ mes: MESES_EN[m], monto: gastosMes, items: detalles.length });
-              }
+              try {
+                const detalles = await administracionService.getDetallePresupuesto(pais.id, m, año);
+                const lista = Array.isArray(detalles) ? detalles : [];
+                const gastosMes = lista.reduce((s, d) => s + parseFloat(d.monto || d.valor || 0), 0);
+                totalGastado += gastosMes;
+                if (gastosMes > 0) {
+                  movimientos.push({ mes: MESES_EN[m], monto: gastosMes, items: lista.length });
+                }
+                // Ingresos del mes
+                const ingresosMes = await administracionService.getIngresos(pais.id, m, año).catch(() => []);
+                const ingresosList = Array.isArray(ingresosMes) ? ingresosMes : [];
+                totalRecibido += ingresosList.reduce((s, i) => s + parseFloat(i.valor || i.monto || 0), 0);
+              } catch {}
             }
 
             return {
               pais: pais.nombre,
-              iso: pais.codigo_iso,
+              iso: pais.codigo_iso || pais.iso || "",
               totalRecibido,
               totalGastado,
               restante: totalRecibido - totalGastado,
               movimientos,
-              tieneData: totalGastado > 0
+              tieneData: totalGastado > 0 || totalRecibido > 0
             };
           } catch {
-            return { pais: pais.nombre, iso: pais.codigo_iso, totalRecibido: 0, totalGastado: 0, restante: 0, movimientos: [], tieneData: false };
+            return { pais: pais.nombre, iso: pais.codigo_iso || pais.iso || "", totalRecibido: 0, totalGastado: 0, restante: 0, movimientos: [], tieneData: false };
           }
         })
       );
@@ -219,7 +238,11 @@ export default function InformeRegional() {
       {/* ── FILTROS ── */}
       <div className="ir-filters no-print">
         <FaFilter style={{ color: "#b0bcd0", fontSize: "13px" }} />
-        <span className="ir-filter-label">Period:</span>
+        <span className="ir-filter-label">Region:</span>
+        <select className="ir-select" value={continenteId || ""} onChange={e => handleContinenteChange(e.target.value)}>
+          {continentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <span className="ir-filter-label" style={{ marginLeft:8 }}>Period:</span>
         <button className={`ir-mode-btn ${filtroModo === "mensual" ? "active" : ""}`} onClick={() => setFiltroModo("mensual")}>Monthly</button>
         <button className={`ir-mode-btn ${filtroModo === "anual"   ? "active" : ""}`} onClick={() => setFiltroModo("anual")}>Annual</button>
 
@@ -259,7 +282,7 @@ export default function InformeRegional() {
             <div className="ir-empty-icon"><FaGlobe /></div>
             <div style={{ fontWeight: "700", fontSize: "16px", marginBottom: "8px" }}>Configure and generate the report</div>
             <p style={{ fontSize: "13px", maxWidth: "320px", margin: "0 auto" }}>
-              Select the period and click <strong>Generate Report</strong> to see the consolidated data for all {paisesRegion.length} countries in {region}.
+              Select the period and click <strong>Generate Report</strong> to see the consolidated data for all {paises.length} countries in {region}.
             </p>
           </div>
         )}
@@ -267,7 +290,7 @@ export default function InformeRegional() {
         {cargando && (
           <div className="ir-loading">
             <div className="ir-spinner" />
-            <div style={{ color: "#8a97b0", fontSize: "14px" }}>Loading data from {paisesRegion.length} countries...</div>
+            <div style={{ color: "#8a97b0", fontSize: "14px" }}>Loading data from {paises.length} countries...</div>
           </div>
         )}
 
@@ -277,7 +300,7 @@ export default function InformeRegional() {
             <div className="ir-summary">
               <div className="ir-sum-card">
                 <div className="ir-sum-label">Countries in Region</div>
-                <div className="ir-sum-value" style={{ color: P }}>{paisesRegion.length}</div>
+                <div className="ir-sum-value" style={{ color: P }}>{paises.length}</div>
                 <div className="ir-sum-sub">{paisesConData} with records</div>
               </div>
               <div className="ir-sum-card">
@@ -359,7 +382,7 @@ export default function InformeRegional() {
                       ${Math.abs(totalRegionRecibido - totalRegionGastado).toLocaleString()}
                     </td>
                     <td colSpan="2" style={{ textAlign: "center", color: "#8a97b0" }}>
-                      {paisesConData} / {paisesRegion.length} countries
+                      {paisesConData} / {paises.length} countries
                     </td>
                   </tr>
                 </tbody>

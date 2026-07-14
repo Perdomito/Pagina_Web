@@ -55,6 +55,7 @@ const [, setCargandoDatos] = useState(false);
   const [studentsQueDigeronSi, setEstudiantesQueDigeronSi] = useState({});
   const [nuevosContactos, setNuevosContactos] = useState({});
   
+  const [alertaModal, setAlertaModal] = useState({ visible: false, titulo: '', mensaje: '' });
   const [nuevoEstudiante, setNuevoEstudiante] = useState({
     numero: "",
     nombre: "",
@@ -134,45 +135,7 @@ useEffect(() => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [continenteSeleccionado, paisSeleccionado, mesSeleccionado, misioneros]);
-  // Cargar contactos desde la BD cuando se selecciona un país
-  useEffect(() => {
-    const cargarContactosDelPais = async () => {
-      if (!paisSeleccionado) return;
-      
-      try {
-        const contactosData = await contactosService.getAll({ pais_id: paisSeleccionado });
-        
-        // Convertir contactos a formato de students agrupados por misionero
-        const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-        const studentsPorMissionary = {};
-        
-        contactosData.forEach(contacto => {
-          const misioneroId = contacto.miembro_responsable_id;
-          if (!studentsPorMissionary[misioneroId]) {
-            studentsPorMissionary[misioneroId] = [];
-          }
-          
-          studentsPorMissionary[misioneroId].push({
-            id: contacto.id,
-            numero: contacto.id,
-            nombre: contacto.nombre,
-            pais: contacto.pais_nombre,
-            estudios: {}
-          });
-        });
-        
-        setEstudiantes(prev => ({
-          ...prev,
-          [clave]: studentsPorMissionary
-        }));
-        
-      } catch (error) {
-        console.error('Error al cargar contactos:', error);
-      }
-    };
-    
-    cargarContactosDelPais();
-  }, [paisSeleccionado, continenteSeleccionado, mesSeleccionado]);
+  // cargarContactosDelPais removido — cargarDatosGuardados maneja los estudiantes directamente
   // Cargar datos guardados desde la BD
   useEffect(() => {
     const cargarDatosGuardados = async () => {
@@ -243,6 +206,13 @@ try {
         
         // Procesar estudios (horas por estudiante por día)
         if (resumen.estudios && resumen.estudios.length > 0) {
+          // Cargar contactos para obtener nombres/teléfonos si no vienen en el resumen
+          let contactosMap = {};
+          try {
+            const contactosList = await contactosService.getAll({ pais_id: paisSeleccionado });
+            contactosList.forEach(c => { contactosMap[c.id] = c; });
+          } catch {}
+
           const studentsPorMissionary = {};
           
           resumen.estudios.forEach(est => {
@@ -251,39 +221,81 @@ try {
               studentsPorMissionary[misioneroId] = [];
             }
             
-            // Buscar si el estudiante ya existe
             let estudiante = studentsPorMissionary[misioneroId].find(e => e.id === est.contacto_id);
             if (!estudiante) {
-              // Buscar en students ya cargados para obtener nombre y teléfono
-              const claveBusqueda = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-              const studentsExistentes = students[claveBusqueda] || {};
-              let nombreContacto = est.contacto_nombre || '';
-              let telefonoContacto = '';
-              Object.values(studentsExistentes).forEach(lista => {
-                const found = lista.find(e => e.id === est.contacto_id);
-                if (found) { nombreContacto = found.nombre || nombreContacto; telefonoContacto = found.numero || ''; }
-              });
+              const contactoBD = contactosMap[est.contacto_id] || {};
               estudiante = {
                 id: est.contacto_id,
-                numero: telefonoContacto,
-                nombre: nombreContacto,
-                pais: '',
+                numero: contactoBD.telefono || contactoBD.phone || contactoBD.numero || contactoBD.celular || est.telefono || est.numero || '-',
+                nombre: contactoBD.nombre || est.contacto_nombre || '',
+                pais: contactoBD.pais_nombre || '',
                 estudios: {}
               };
               studentsPorMissionary[misioneroId].push(estudiante);
             }
             
-            // Agregar datos del día
             estudiante.estudios[est.dia] = {
               capitulo: est.capitulo,
               horas: est.horas
             };
           });
           
+          // Mergear con todos los contactos del país — incluir los que no tienen horas aún
+          Object.entries(contactosMap).forEach(([id, contacto]) => {
+            const misioneroId = contacto.miembro_responsable_id;
+            if (!misioneroId) return;
+            if (!studentsPorMissionary[misioneroId]) {
+              studentsPorMissionary[misioneroId] = [];
+            }
+            const yaExiste = studentsPorMissionary[misioneroId].find(e => e.id === contacto.id);
+            if (!yaExiste) {
+              studentsPorMissionary[misioneroId].push({
+                id: contacto.id,
+                numero: contacto.telefono || contacto.phone || contacto.numero || '-',
+                nombre: contacto.nombre,
+                pais: contacto.pais_nombre || '',
+                estudios: {}
+              });
+            }
+          });
+
+          // Ordenar por id para mantener orden de creación
+          Object.keys(studentsPorMissionary).forEach(mid => {
+            studentsPorMissionary[mid].sort((a, b) => a.id - b.id);
+          });
+
           setEstudiantes(prev => ({
             ...prev,
             [clave]: studentsPorMissionary
           }));
+        } else {
+          // No hay estudios guardados — cargar contactos del país como base
+          try {
+            const contactosData = await contactosService.getAll({ pais_id: paisSeleccionado });
+            const studentsPorMissionary = {};
+            contactosData.forEach(contacto => {
+              const misioneroId = contacto.miembro_responsable_id;
+              if (!studentsPorMissionary[misioneroId]) {
+                studentsPorMissionary[misioneroId] = [];
+              }
+              studentsPorMissionary[misioneroId].push({
+                id: contacto.id,
+                numero: contacto.telefono || String(contacto.id),
+                nombre: contacto.nombre,
+                pais: contacto.pais_nombre || '',
+                estudios: {}
+              });
+            });
+            Object.keys(studentsPorMissionary).forEach(mid => {
+              studentsPorMissionary[mid].sort((a, b) => a.id - b.id);
+            });
+            setEstudiantes(prev => ({
+              ...prev,
+              [clave]: studentsPorMissionary
+            }));
+          } catch (e) {
+            console.error('Error al cargar contactos fallback:', e);
+          }
         }
         
       } catch (error) {
@@ -473,53 +485,88 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   }).catch(err => console.error('Error autoguardando:', err));
 };
   
-  const agregarEstudiante = () => {
+  const agregarEstudiante = async () => {
     if (!nuevoEstudiante.nombre || !misioneroSeleccionado) {
-      toast.error("Complete al menos el nombre");
+      toast.error("Complete at least the name");
       return;
     }
-    
+
+    // Bloquear si es mes pasado
+    const mesIdx = MESES_ARR.indexOf(mesSeleccionado);
+    const mesActualIdx = MESES_ARR.indexOf(mesActualNombre);
+    if (mesIdx < mesActualIdx && añoActual === new Date().getFullYear()) {
+      toast.error("Cannot add students to a past month");
+      return;
+    }
+
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
-    const studentsActuales = students[clave]?.[misioneroSeleccionado] || [];
-    
-    const estudiante = {
-      id: Date.now(),
-      numero: nuevoEstudiante.numero || (studentsActuales.length + 1),
-      nombre: nuevoEstudiante.nombre,
-      pais: nuevoEstudiante.pais,
-      estudios: {}
-    };
-    
-    setEstudiantes(prev => ({
-      ...prev,
-      [clave]: {
-        ...prev[clave],
-        [misioneroSeleccionado]: [
-          ...(prev[clave]?.[misioneroSeleccionado] || []),
-          estudiante
-        ]
-      }
-    }));
-    
-    setMostrandoModalEstudiante(false);
-    setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
-    toast.success("✅ Estudiante agregado");
+
+    try {
+      const misionero = misioneros.find(m => m.id === misioneroSeleccionado);
+      const nuevoContacto = await contactosService.create({
+        nombre: nuevoEstudiante.nombre,
+        miembro_responsable: misionero?.nombre || '',
+        miembro_responsable_id: misioneroSeleccionado,
+        pais_id: paisSeleccionado,
+        telefono: nuevoEstudiante.numero || '',
+        notas: '',
+      });
+
+      const estudiante = {
+        id: nuevoContacto.id,
+        numero: nuevoEstudiante.numero || '',
+        nombre: nuevoEstudiante.nombre,
+        pais: nuevoEstudiante.pais,
+        estudios: {}
+      };
+
+      setEstudiantes(prev => ({
+        ...prev,
+        [clave]: {
+          ...prev[clave],
+          [misioneroSeleccionado]: [
+            ...(prev[clave]?.[misioneroSeleccionado] || []),
+            estudiante
+          ]
+        }
+      }));
+
+      setMostrandoModalEstudiante(false);
+      setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
+      toast.success("✅ Student added");
+    } catch {
+      toast.error("Error saving student");
+    }
   };
   
-  const eliminarEstudiante = (misioneroId, estudianteId) => {
-    if (!window.confirm("¿Está seguro de eliminar este estudiante?")) return;
-    
+  const eliminarEstudiante = async (misioneroId, estudianteId) => {
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
     
+    // Verificar si tiene datos (horas registradas en cualquier mes)
+    const estudiante = students[clave]?.[misioneroId]?.find(e => e.id === estudianteId);
+    const tieneHoras = estudiante?.estudios && Object.values(estudiante.estudios).some(d => parseFloat(d.horas) > 0);
+    
+    if (tieneHoras) {
+      setAlertaModal({ visible: true, titulo: "Cannot Delete Student", mensaje: "This student has study records and cannot be deleted. Only students with no registered hours can be removed." });
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this student?")) return;
+    
+    try {
+      await contactosService.delete(estudianteId);
+    } catch {}
+
+    // Solo quitar del mes actual, el histórico queda intacto
     setEstudiantes(prev => ({
       ...prev,
       [clave]: {
         ...prev[clave],
-        [misioneroId]: prev[clave][misioneroId].filter(e => e.id !== estudianteId)
+        [misioneroId]: (prev[clave]?.[misioneroId] || []).filter(e => e.id !== estudianteId)
       }
     }));
     
-    toast.success("Estudiante eliminado");
+    toast.success("Student removed");
   };
   
   const actualizarEstudiante = (misioneroId, estudianteId, campo, valor) => {
@@ -635,7 +682,7 @@ const nuevoPais = await administracionService.crearPaisConContinente({
     setNuevoNombrePais("");
     setMostrandoPromptPais(false);
     setContinenteParaPais(null);
-    toast.success("País creado exitosamente en la base de datos");
+    toast.success("Country created successfully");
     
   } catch (error) {
     console.error('Error al crear país:', error);
@@ -646,7 +693,7 @@ const nuevoPais = await administracionService.crearPaisConContinente({
 };
   
 const eliminarPais = async (continenteId, paisId) => {
-    if (!window.confirm("¿Eliminar este país?")) return;
+    if (!window.confirm("Delete this country?")) return;
     
     try {
       await administracionService.eliminarPais(paisId);
@@ -661,7 +708,7 @@ const eliminarPais = async (continenteId, paisId) => {
         return cont;
       }));
       
-      toast.success("✅ País eliminado de la BD");
+      toast.success("✅ Country deleted");
     } catch (error) {
       console.error('Error:', error);
       toast.error(error.response?.data?.error || 'Error al eliminar país');
@@ -692,7 +739,7 @@ const eliminarPais = async (continenteId, paisId) => {
   };
   
   const obtenerDiaSemana = (dia, mes, año) => {
-    const dias = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
+    const dias = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const mesIndex = meses.indexOf(mes);
     const fecha = new Date(año, mesIndex, dia);
     return dias[fecha.getDay()];
@@ -1023,7 +1070,7 @@ const eliminarPais = async (continenteId, paisId) => {
               <>
                 <button
                   onClick={() => setMostrandoEstadisticas(true)}
-                  className="btn-success no-print"
+                  className="no-print" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 18px", color: "white", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
                 >
                   <FaChartLine /> Statistics
                 </button>
@@ -1044,38 +1091,14 @@ const eliminarPais = async (continenteId, paisId) => {
                 setMissionarySeleccionado(null);
                 setVistaActual("resumen");
               }}
-              className="btn-secondary"
-              style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
+              style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 18px", color: "white", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
             >
-              <FaGlobe size={12} /> Change Region
+              <FaGlobe size={13} /> Change Region
             </button>
-            {misioneroSeleccionado && (
-              <>
-                <button
-                  onClick={() => {
-                    setMissionarySeleccionado(null);
-                    setVistaActual("resumen");
-                  }}
-                  className="btn-secondary"
-                  style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-                >
-                  <FaChartBar size={12} /> Summary
-                </button>
-                <button
-                  onClick={() => {
-                    setMissionarySeleccionado(null);
-                    setVistaActual("misioneros");
-                  }}
-                  className="btn-secondary"
-                  style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)", fontSize: "13px" }}
-                >
-                  <FaUser size={12} /> By Missionary
-                </button>
-              </>
-            )}
+
             <div style={{ flex: 1 }}></div>
             <div style={{ color: "white", fontSize: "16px", fontWeight: "600" }}>
-              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesSeleccionado}
+              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}
             </div>
           </div>
         )}
@@ -1146,7 +1169,7 @@ const eliminarPais = async (continenteId, paisId) => {
             >
               <div style={{ textAlign: "center", color: "#FF9800" }}>
                 <FaPlus size={32} style={{ marginBottom: "10px" }} />
-                <div style={{ fontSize: "16px", fontWeight: "700" }}>Nuevo País</div>
+                <div style={{ fontSize: "16px", fontWeight: "700" }}>New Country</div>
               </div>
             </div>
           </div>
@@ -1158,7 +1181,7 @@ const eliminarPais = async (continenteId, paisId) => {
         <div>
           <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
             <FaCalendarAlt style={{ marginRight: "10px" }} />
-            Seleccione un Mes
+            Select a Month
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "15px" }}>
             {meses.map((mes, index) => {
@@ -1171,7 +1194,7 @@ const eliminarPais = async (continenteId, paisId) => {
                 <div
                   key={mes}
                   className="card-item"
-                  onClick={() => !esFuturo && setMesSeleccionado(mes)}
+                  onClick={() => { if (!esFuturo) { setMesSeleccionado(null); setTimeout(() => setMesSeleccionado(mes), 500); } }}
                   style={{
                     background: esActual ? "linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%)" : 
                                 esPasado ? "#E8F5E9" : "#f5f7fa",
@@ -1184,7 +1207,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   }}
                 >
                   <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "6px" }}>
-                    {mes}
+                    {mesEnIngles?.[mes] || mes}
                   </div>
                   {esActual && (
                     <div style={{ fontSize: "12px", opacity: 0.9 }}>
@@ -1206,24 +1229,24 @@ const eliminarPais = async (continenteId, paisId) => {
       {/* VISTA PRINCIPAL */}
       {continenteSeleccionado && paisSeleccionado && mesSeleccionado && !misioneroSeleccionado && (
         <div>
-          <div style={{ display: "flex", gap: "10px", marginBottom: "30px", flexWrap: "wrap" }} className="no-print">
+          <div style={{ display: "flex", gap: "4px", marginBottom: "30px", background: "white", borderRadius: "50px", padding: "5px", boxShadow: "0 2px 12px rgba(0,0,0,0.1)", width: "fit-content" }} className="no-print">
             <button
               onClick={() => setVistaActual("resumen")}
-              className={vistaActual === "resumen" ? "btn-primary" : "btn-secondary"}
+              style={{ background: vistaActual === "resumen" ? "#1a5490" : "transparent", color: vistaActual === "resumen" ? "white" : "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }}
             >
-              <FaChartBar /> Summary
+              <FaChartBar size={13} /> Summary
             </button>
             <button
               onClick={() => setVistaActual("misioneros")}
-              className={vistaActual === "misioneros" ? "btn-primary" : "btn-secondary"}
+              style={{ background: vistaActual === "misioneros" ? "#1a5490" : "transparent", color: vistaActual === "misioneros" ? "white" : "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }}
             >
-              <FaUser /> By Missionary
+              <FaUser size={13} /> By Missionary
             </button>
             <button
               onClick={() => setVistaActual("nuevosEstudiantes")}
-              className={vistaActual === "nuevosEstudiantes" ? "btn-primary" : "btn-secondary"}
+              style={{ background: vistaActual === "nuevosEstudiantes" ? "#1a5490" : "transparent", color: vistaActual === "nuevosEstudiantes" ? "white" : "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }}
             >
-              <FaUserPlus /> New Students
+              <FaUserPlus size={13} /> New Students
             </button>
           </div>
 
@@ -1231,7 +1254,7 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "resumen" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                Report Control - {mesSeleccionado} {añoActual}
+                Report Control - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
               </h2>
               
               <div className="scroll-container">
@@ -1324,7 +1347,7 @@ const eliminarPais = async (continenteId, paisId) => {
               </div>
 
               {/* Evangelismo */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>Evangelism {mesSeleccionado}</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>Evangelism {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
@@ -1510,7 +1533,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   onClick={() => navigate("/miembros")}
                   className="btn-add-new"
                 >
-                  <FaPlus size={18} /> Añadir New Missionary
+                  <FaPlus size={18} /> Add Missionary
                 </button>
               </div>
             </div>
@@ -1520,12 +1543,12 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "nuevosEstudiantes" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                New Students - {mesSeleccionado} {añoActual}
+                New Students - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
               </h2>
               
               {/* ESTUDIANTES QUE SAID YES */}
               <h3 style={{ margin: "0 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
-                Estudiantes que Dijeron "SÍ"
+                Said Yes
               </h3>
               <div className="scroll-container">
                 <table className="tabla-estudios">
@@ -1591,7 +1614,7 @@ const eliminarPais = async (continenteId, paisId) => {
 
               {/* NUEVOS CONTACTS */}
               <h3 style={{ margin: "40px 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
-                Nuevos Contactos
+                New Contacts
               </h3>
               <div className="scroll-container">
                 <table className="tabla-estudios">
@@ -1661,30 +1684,42 @@ const eliminarPais = async (continenteId, paisId) => {
 
       {/* VISTA DETALLE MISIONERO */}
       {misioneroSeleccionado && (
-        <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+        <>
+          <div style={{ display: "flex", gap: "4px", marginBottom: "20px", background: "white", borderRadius: "50px", padding: "5px", boxShadow: "0 2px 12px rgba(0,0,0,0.1)", width: "fit-content" }} className="no-print">
+            <button
+              onClick={() => { setMissionarySeleccionado(null); setVistaActual("resumen"); }}
+              style={{ background: "transparent", color: "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+            >
+              <FaChartBar size={13} /> Summary
+            </button>
+            <button
+              onClick={() => { setMissionarySeleccionado(null); setVistaActual("misioneros"); }}
+              style={{ background: "transparent", color: "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+            >
+              <FaUser size={13} /> By Missionary
+            </button>
+            <button
+              onClick={() => { setMissionarySeleccionado(null); setVistaActual("nuevosEstudiantes"); }}
+              style={{ background: "transparent", color: "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+            >
+              <FaUserPlus size={13} /> New Students
+            </button>
+          </div>
+          <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
             <h2 style={{ margin: 0, color: "#1a5490", fontSize: "24px" }}>
-              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {mesSeleccionado} {añoActual}
+              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
             </h2>
-            <button
-              onClick={() => {
-                setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
-                setMostrandoModalEstudiante(true);
-              }}
-              className="btn-primary no-print"
-            >
-              <FaPlus /> New Student
-            </button>
           </div>
 
           <div className="scroll-container">
             <table className="tabla-estudios">
               <thead>
                 <tr>
-                  <th rowSpan="2" style={{ minWidth: "60px" }}>BORRAR</th>
+                  <th rowSpan="2" style={{ minWidth: "60px" }}>DEL</th>
                   <th rowSpan="2" style={{ minWidth: "130px" }}>PHONE No.</th>
                   <th rowSpan="2" style={{ minWidth: "220px" }}>NAME</th>
-                  <th rowSpan="2" style={{ minWidth: "160px" }}>PAÍS</th>
+                  <th rowSpan="2" style={{ minWidth: "160px" }}>COUNTRY</th>
                   {diasDelMes.map(dia => (
                     <th key={dia} colSpan="2" style={{ minWidth: "90px" }}>
                       {obtenerDiaSemana(dia, mesSeleccionado, añoActual)} {dia}
@@ -1717,6 +1752,7 @@ const eliminarPais = async (continenteId, paisId) => {
                         type="text"
                         value={estudiante.telefono || estudiante.numero || ""}
                         onChange={(e) => actualizarEstudiante(misioneroSeleccionado, estudiante.id, 'telefono', e.target.value)}
+                        placeholder="e.g. +1 809 000 0000"
                         style={{ width: "120px" }}
                       />
                     </td>
@@ -1805,18 +1841,19 @@ const eliminarPais = async (continenteId, paisId) => {
                   // Primero crear el contacto en la BD
                     try {
                       const misionero = misioneros.find(m => m.id === misioneroSeleccionado);
+const numeroTelefono = numeroInput?.value?.trim() || '';
                       const nuevoContacto = await contactosService.create({
                         nombre: nombre,
                         miembro_responsable: misionero?.nombre || '',
                         miembro_responsable_id: misioneroSeleccionado,
                         pais_id: paisSeleccionado,
-                        telefono: '',
+                        telefono: numeroTelefono,
                         notas: '',
                       });
                       
                       const nuevoEst = {
                         id: nuevoContacto.id,
-                        numero: nuevoContacto.id,
+                        numero: numeroTelefono,
                         nombre,
                         pais,
                         estudios: estudiosCapturados
@@ -1864,7 +1901,7 @@ const eliminarPais = async (continenteId, paisId) => {
                     if (promesasStudies.length > 0) {
                       await Promise.all(promesasStudies);
                     }
-                    toast.success('✅ Estudiante guardado en BD');
+                    toast.success('✅ Student saved');
                   } catch (error) {
                     console.error('Error al guardar contacto:', error);
                     toast.error('Error al guardar estudiante');
@@ -1895,7 +1932,7 @@ const eliminarPais = async (continenteId, paisId) => {
                       <input 
                         type="text" 
                         data-campo="numero" 
-                        placeholder="-" 
+                        placeholder="+1 809 000 0000" 
                         style={{ width: "120px" }}
                         onKeyDown={handleKeyDown}
                       />
@@ -1904,7 +1941,7 @@ const eliminarPais = async (continenteId, paisId) => {
                       <input 
                         type="text" 
                         data-campo="nombre" 
-                        placeholder="Nombre" 
+                        placeholder="Name" 
                         style={{ width: "210px" }}
                         onKeyDown={handleKeyDown}
                       />
@@ -1959,28 +1996,39 @@ const eliminarPais = async (continenteId, paisId) => {
           </div>
 
           <div className="no-print" style={{ marginTop: "20px" }}>
-            <button
-              onClick={() => {
-                setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
-                setMostrandoModalEstudiante(true);
-              }}
-              className="btn-add-new"
-            >
-              <FaPlus size={18} /> Añadir Estudiante
-            </button>
+            {(() => {
+              const mesIdx = MESES_ARR.indexOf(mesSeleccionado);
+              const mesActualIdx = MESES_ARR.indexOf(mesActualNombre);
+              const esPasado = mesIdx < mesActualIdx;
+              return !esPasado ? (
+                <button
+                  onClick={() => {
+                    setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
+                    setMostrandoModalEstudiante(true);
+                  }}
+                  className="btn-add-new"
+                >
+                  <FaPlus size={18} /> Add Student
+                </button>
+              ) : (
+                <div style={{ textAlign: "center", color: "#999", padding: "14px", fontSize: "14px" }}>
+                  Cannot add students to past months
+                </div>
+              );
+            })()}
           </div>
 
           {/* TABLA EVANGELISMO */}
           <div className="tabla-evangelismo">
             <h3 style={{ margin: "0 0 20px 0", color: "#4CAF50", fontSize: "20px" }}>
-              Otras Actividades
+              Other Activities
             </h3>
             
             <div className="scroll-container">
               <table className="tabla-estudios">
                 <thead>
                   <tr>
-                    <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>ACTIVIDAD</th>
+                    <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>ACTIVITY</th>
                     {diasDelMes.map(dia => (
                       <th key={dia} colSpan="2" style={{ minWidth: "120px", background: "#4CAF50 !important" }}>
                         {obtenerDiaSemana(dia, mesSeleccionado, añoActual)} {dia}
@@ -1991,7 +2039,7 @@ const eliminarPais = async (continenteId, paisId) => {
                     <th style={{ background: "#4CAF50 !important" }}></th>
                     {diasDelMes.map(dia => (
                       <React.Fragment key={dia}>
-                        <th style={{ fontSize: "11px", background: "#4CAF50 !important" }}>¿Dónde?</th>
+                        <th style={{ fontSize: "11px", background: "#4CAF50 !important" }}>Location</th>
                         <th style={{ fontSize: "11px", background: "#4CAF50 !important" }}>Hrs</th>
                       </React.Fragment>
                     ))}
@@ -2000,7 +2048,7 @@ const eliminarPais = async (continenteId, paisId) => {
                 <tbody>
                   <tr>
                     <td style={{ textAlign: "left", fontWeight: "700", background: "#C8E6C9" }}>
-                      EVANGELISMO VIRTUAL
+                      VIRTUAL EVANGELISM
                     </td>
                     {diasDelMes.map(dia => {
                       const evang = obtenerEvangelismoActual(misioneroSeleccionado);
@@ -2009,7 +2057,7 @@ const eliminarPais = async (continenteId, paisId) => {
                           <td>
                             <input
                               type="text"
-                              placeholder="Lugar"
+                              placeholder="Location"
                               value={evang.virtual?.[dia]?.donde || ""}
                               onChange={(e) => actualizarEvangelismo(misioneroSeleccionado, 'virtual', dia, 'donde', e.target.value)}
                               style={{ width: "100px" }}
@@ -2032,7 +2080,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   
                   <tr>
                     <td style={{ textAlign: "left", fontWeight: "700", background: "#C8E6C9" }}>
-                      EVANGELISMO IN-PERSON
+                      IN-PERSON EVANGELISM
                     </td>
                     {diasDelMes.map(dia => {
                       const evang = obtenerEvangelismoActual(misioneroSeleccionado);
@@ -2041,7 +2089,7 @@ const eliminarPais = async (continenteId, paisId) => {
                           <td>
                             <input
                               type="text"
-                              placeholder="Lugar"
+                              placeholder="Location"
                               value={evang.presencial?.[dia]?.donde || ""}
                               onChange={(e) => actualizarEvangelismo(misioneroSeleccionado, 'presencial', dia, 'donde', e.target.value)}
                               style={{ width: "100px" }}
@@ -2081,6 +2129,24 @@ const eliminarPais = async (continenteId, paisId) => {
             </div>
           </div>
         </div>
+        </>
+      )}
+
+      {/* Modal de advertencia */}
+      {alertaModal.visible && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 2000 }}>
+          <div style={{ background: "white", borderRadius: "16px", padding: "35px", maxWidth: "420px", width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+            <h3 style={{ margin: "0 0 12px", color: "#d32f2f", fontSize: "20px" }}>{alertaModal.titulo}</h3>
+            <p style={{ margin: "0 0 24px", color: "#555", lineHeight: "1.6" }}>{alertaModal.mensaje}</p>
+            <button
+              onClick={() => setAlertaModal({ visible: false, titulo: '', mensaje: '' })}
+              style={{ background: "#134069", color: "white", border: "none", borderRadius: "8px", padding: "12px 32px", fontSize: "15px", fontWeight: "600", cursor: "pointer" }}
+            >
+              Understood
+            </button>
+          </div>
+        </div>
       )}
 
       {mostrandoModalEstudiante && (
@@ -2101,7 +2167,7 @@ const eliminarPais = async (continenteId, paisId) => {
 
             <input
               type="text"
-              placeholder="Número (opcional)"
+              placeholder="Phone No. (e.g. +1 809 000 0000)"
               value={nuevoEstudiante.numero}
               onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, numero: e.target.value})}
               className="input-modern"
@@ -2109,7 +2175,7 @@ const eliminarPais = async (continenteId, paisId) => {
 
             <input
               type="text"
-              placeholder="Nombre *"
+              placeholder="Name *"
               value={nuevoEstudiante.nombre}
               onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, nombre: e.target.value})}
               className="input-modern"
@@ -2120,7 +2186,7 @@ const eliminarPais = async (continenteId, paisId) => {
               onChange={(e) => setNuevoEstudiante({...nuevoEstudiante, pais: e.target.value})}
               className="input-modern"
             >
-              <option value="">Seleccione país</option>
+              <option value="">Select country</option>
               {paisesDelContinente.map(pais => (
                 <option key={pais.id} value={pais.nombre}>{pais.nombre}</option>
               ))}
@@ -2186,7 +2252,7 @@ const eliminarPais = async (continenteId, paisId) => {
               value={nuevoNombrePais}
               onChange={(e) => setNuevoNombrePais(e.target.value)}
               className="input-modern"
-              placeholder="Ej: Panamá"
+              placeholder="E.g.: Panama"
               autoFocus
             />
 
@@ -2208,7 +2274,7 @@ const eliminarPais = async (continenteId, paisId) => {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
               <h3 style={{ margin: 0, color: "#1a5490", fontSize: "24px", fontWeight: "700" }}>
                 <FaChartLine style={{ marginRight: "10px" }} />
-                Statistics - {mesSeleccionado} {añoActual}
+                Statistics - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
               </h3>
               <button
                 onClick={() => setMostrandoEstadisticas(false)}
@@ -2253,7 +2319,7 @@ const eliminarPais = async (continenteId, paisId) => {
                     <th>Missionary</th>
                     <th>Studies</th>
                     <th>Hours</th>
-                    <th>Estudiantes</th>
+                    <th>Students</th>
                     <th>Average</th>
                   </tr>
                 </thead>
