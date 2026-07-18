@@ -6,9 +6,11 @@ import contactosService from '../services/ContactosService';
 import estudiosService from '../services/EstudiosService';
 import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
+import { useIdioma } from '../context/IdiomaContext';
 
 export default function Contactos() {
   const navigate = useNavigate();
+  const { t } = useIdioma();
   const [contactos, setContactos] = useState([]);
   const [miembros, setMiembros] = useState([]);
   const [paises, setPaises] = useState([]);
@@ -43,7 +45,7 @@ export default function Contactos() {
       setPaises(paisesData);
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al cargar datos');
+      toast.error(t('ct_errorCargarDatos'));
     } finally {
       setLoading(false);
     }
@@ -62,15 +64,15 @@ export default function Contactos() {
     try {
       if (contactoEditando) {
         await contactosService.update(contactoEditando.id, payload);
-        toast.success('Contacto actualizado');
+        toast.success(t('ct_contactoActualizado'));
       } else {
         await contactosService.create(payload);
-        toast.success('Contacto creado');
+        toast.success(t('ct_contactoCreado'));
       }
       cargarDatos();
       cerrarModal();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Error al guardar');
+      toast.error(error.response?.data?.error || t('ct_errorGuardar'));
     }
   };
 
@@ -82,13 +84,13 @@ export default function Contactos() {
         return;
       }
     } catch {}
-    if (!window.confirm("Delete this contact?")) return;
+    if (!window.confirm(t('confirmarEliminar'))) return;
     try {
       await contactosService.delete(id);
-      toast.success("Contact deleted");
+      toast.success(t('ct_contactoEliminado'));
       cargarDatos();
     } catch {
-      toast.error('Error deleting contact');
+      toast.error(t('ct_errorEliminarContacto'));
     }
   };
 
@@ -154,21 +156,21 @@ export default function Contactos() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
             <button onClick={() => navigate("/home")} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "10px 15px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
-              <FaArrowLeft /> Volver
+              <FaArrowLeft /> {t('volver')}
             </button>
-            <h1 style={{ color: "white", margin: 0 }}>Contact Management</h1>
+            <h1 style={{ color: "white", margin: 0 }}>{t('ct_titulo')}</h1>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
             <button onClick={() => abrirModal()} style={{ background: "#4CAF50", border: "none", borderRadius: "8px", padding: "12px 20px", color: "white", cursor: "pointer", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
-              <FaPlus /> Add Contact
+              <FaPlus /> {t('ct_agregarContacto')}
             </button>
             <div style={{ display: "flex", gap: "8px" }}>
               <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: "6px", padding: "4px 12px", color: "white", fontSize: "12px" }}>
-                <strong>{contactos.length}</strong> contact{contactos.length !== 1 ? 's' : ''}
+                <strong>{contactos.length}</strong> {t(contactos.length !== 1 ? 'ct_contactos' : 'ct_contacto')}
               </div>
               {totalDuplicados > 0 && (
                 <div style={{ background: "rgba(255,152,0,0.3)", border: "1px solid rgba(255,152,0,0.6)", borderRadius: "6px", padding: "4px 12px", color: "white", fontSize: "12px" }}>
-                  ⚠️ <strong>{totalDuplicados}</strong> duplicate{totalDuplicados !== 1 ? 's' : ''}
+                  ⚠️ <strong>{totalDuplicados}</strong> {t(totalDuplicados !== 1 ? 'ct_duplicados' : 'ct_duplicado')}
                 </div>
               )}
             </div>
@@ -181,21 +183,21 @@ export default function Contactos() {
         <div style={{ marginBottom: "16px" }}>
           <input
             type="text"
-            placeholder="🔍  Search by name, phone, country or missionary..."
+            placeholder={t('ct_buscarPlaceholder')}
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             style={{ width: "100%", padding: "13px 18px", borderRadius: "10px", border: "none", fontSize: "15px", boxSizing: "border-box", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
           />
           {busqueda && (
             <div style={{ marginTop: "8px", color: "rgba(255,255,255,0.8)", fontSize: "13px" }}>
-              {contactosFiltrados.length} result{contactosFiltrados.length !== 1 ? 's' : ''} for "{busqueda}"
+              {contactosFiltrados.length} {t(contactosFiltrados.length !== 1 ? 'ct_resultados' : 'ct_resultado')} {t('ct_para')} "{busqueda}"
             </div>
           )}
         </div>
 
         {loading ? (
           <div style={{ background: "white", padding: "40px", borderRadius: "12px", textAlign: "center" }}>
-            Cargando...
+            {t('cargando')}
           </div>
         ) : (
           <div style={{ background: "white", borderRadius: "12px", overflow: "hidden" }}>

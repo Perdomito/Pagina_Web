@@ -20,11 +20,13 @@ import toast from 'react-hot-toast';
 import axios from '../api/axios';
 import colors from '../utils/colors';
 import MenuLateral from '../components/MenuLateral';
-import SelectorIdiomaGoogle from '../components/SelectorIdiomaGoogle';
+import SelectorIdioma from '../components/SelectorIdioma';
+import { useIdioma } from '../context/IdiomaContext';
 
 export default function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { t, idioma } = useIdioma();
   const [permisosUsuario, setPermisosUsuario] = useState([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
@@ -32,7 +34,7 @@ export default function Home() {
 
   useEffect(() => {
     cargarPermisos();
-    if (user) {
+    if (user?.rol_id === 2) {
       cargarNotificaciones();
     }
   }, []);
@@ -76,22 +78,20 @@ export default function Home() {
 
   const handleLogout = () => {
     logout();
-    toast.success('Session closed');
+    toast.success(t('sesionCerrada'));
     navigate("/");
   };
 
   const getRolLabel = (rol_id) => {
-    if (rol_id === 1) return 'Administrator';
-    if (rol_id === 2) return 'Pastor';
-    if (rol_id === 3) return 'Missionary';
-    if (rol_id === 4) return 'Treasurer';
-    return 'Member';
+    if (rol_id === 1) return t('administrador');
+    if (rol_id === 2) return t('pastor');
+    return t('misionero');
   };
 
   const modulosConPermisos = [
     {
-      titulo: "Members",
-      desc: "Records, follow-up & visits.",
+      titulo: t('miembros'),
+      desc: t('miembrosDesc'),
       ruta: "/miembros",
       icon: <FaUsers size={32} />,
       color: "#dae93d",
@@ -99,8 +99,8 @@ export default function Home() {
       animacion: "bounce"
     },
     {
-      titulo: "Bible Studies",
-      desc: "Weekly control & tracking.",
+      titulo: t('estudiosBiblicos'),
+      desc: t('estudiosBiblicosDesc'),
       ruta: "/estudios-biblicos",
       icon: <FaBook size={32} />,
       color: "#f67195",
@@ -108,8 +108,8 @@ export default function Home() {
       animacion: "flip"
     },
     {
-      titulo: "Reports",
-      desc: "Results & goals achieved.",
+      titulo: t('reportes'),
+      desc: t('reportesDesc'),
       ruta: "/reportes",
       icon: <FaChartBar size={32} />,
       color: colors.success,
@@ -117,8 +117,8 @@ export default function Home() {
       animacion: "pulse"
     },
     {
-      titulo: "Contacts",
-      desc: "New & follow-up.",
+      titulo: t('contactos'),
+      desc: t('contactosDesc'),
       ruta: "/contactos",
       icon: <FaAddressBook size={32} />,
       color: "#7ee2f3",
@@ -126,8 +126,8 @@ export default function Home() {
       animacion: "shake"
     },
     {
-      titulo: "Administration",
-      desc: "Budget & financial control.",
+      titulo: t('administracion'),
+      desc: t('administracionDesc'),
       ruta: "/administracion",
       icon: <FaMoneyBillWave size={32} />,
       color: colors.danger,
@@ -135,8 +135,8 @@ export default function Home() {
       animacion: "spin-slow"
     },
     {
-      titulo: "Statistics",
-      desc: "Charts & reports by country.",
+      titulo: t('estadisticas'),
+      desc: t('estadisticasDesc'),
       ruta: "/estadisticas",
       icon: <FaChartLine size={32} />,
       color: "#673AB7",
@@ -144,8 +144,8 @@ export default function Home() {
       animacion: "pulse"
     },
     {
-      titulo: "Settings",
-      desc: "Users, roles & permissions.",
+      titulo: t('configuracion'),
+      desc: t('configuracionDesc'),
       ruta: "/configuracion",
       icon: <FaCog size={32} />,
       color: "#607D8B",
@@ -168,11 +168,7 @@ export default function Home() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
 
-        /* ── Google Translate oculto ── */
-        .goog-te-banner-frame { display: none !important; }
-        body { top: 0 !important; font-family: 'Lato', sans-serif; }
-        .skiptranslate { display: none !important; }
-        .goog-te-gadget { display: none !important; }
+        body { font-family: 'Lato', sans-serif; }
 
         /* ── Animaciones ── */
         @keyframes fadeIn {
@@ -331,7 +327,7 @@ export default function Home() {
 
           <div>
             <h1 className="home-title">Emanuel Church</h1>
-            <p className="home-subtitle">Control Panel</p>
+            <p className="home-subtitle">{t('panelControl')}</p>
           </div>
         </div>
 
@@ -397,16 +393,16 @@ export default function Home() {
                     justifyContent: "space-between",
                     alignItems: "center"
                   }}>
-                    <span style={{ fontWeight: "700", fontSize: "14px", color: "#1a5490" }}>Notifications</span>
+                    <span style={{ fontWeight: "700", fontSize: "14px", color: "#1a5490" }}>{t('notificaciones')}</span>
                     {notificaciones.filter(n => !n.leida).length > 0 && (
                       <button onClick={marcarTodasLeidas} style={{ background: "none", border: "none", color: "#1a5490", fontSize: "12px", cursor: "pointer", fontWeight: "600" }}>
-                        Mark all as read
+                        {t('marcarTodasLeidas')}
                       </button>
                     )}
                   </div>
                   {notificaciones.length === 0 ? (
                     <div style={{ padding: "24px", textAlign: "center", color: "#999", fontSize: "13px" }}>
-                      No notifications
+                      {t('sinNotificaciones')}
                     </div>
                   ) : (
                     notificaciones.map(n => (
@@ -434,7 +430,7 @@ export default function Home() {
                         <div>
                           <div style={{ fontSize: "13px", color: "#333", lineHeight: "1.4" }}>{n.mensaje}</div>
                           <div style={{ fontSize: "11px", color: "#999", marginTop: "3px" }}>
-                            {new Date(n.fecha).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {new Date(n.fecha).toLocaleDateString(idioma === 'es' ? 'es-ES' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                       </div>
@@ -444,7 +440,7 @@ export default function Home() {
               )}
             </div>
           )}
-          <SelectorIdiomaGoogle />
+          <SelectorIdioma />
 
           <div style={{
             background: "rgba(255,255,255,0.15)",
@@ -491,7 +487,7 @@ export default function Home() {
             onMouseOut={(e)  => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
           >
             <FaSignOutAlt />
-            Sign Out
+            {t('cerrarSesion')}
           </button>
         </div>
       </div>

@@ -3,25 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaPlus, FaTrash, FaPrint, FaSave, FaTimes, FaUser, FaCalendarAlt, FaBook, FaChartBar, FaGlobe, FaChartLine, FaUserPlus } from "react-icons/fa";
 import toast from 'react-hot-toast';
 
-// 
+//
 import contactosService from '../services/ContactosService';
 import miembrosService from '../services/MiembrosService';
 import estudiosService, { MESES } from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
-
-const mesEnIngles = {
-  "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
-  "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
-  "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
-  "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
-};
+import { useIdioma } from '../context/IdiomaContext';
 
 const MESES_ARR = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
 const toMesNum = (mes) => typeof mes === 'string' ? MESES_ARR.indexOf(mes) + 1 : mes;
 
 export default function EstudiosBiblicos() {
   const navigate = useNavigate();
-  
+  const { t } = useIdioma();
+
   const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
   const [paisSeleccionado, setPaisSeleccionado] = useState(null);
   const [mesSeleccionado, setMesSeleccionado] = useState(null);
@@ -95,7 +90,7 @@ const cargarDatosIniciales = async () => {
     
   } catch (error) {
     console.error('Error al cargar datos iniciales:', error);
-    toast.error('Error al cargar datos del sistema');
+    toast.error(t('eb_errorCargarDatos'));
   } finally {
     setCargandoDatos(false);
   }
@@ -487,7 +482,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   
   const agregarEstudiante = async () => {
     if (!nuevoEstudiante.nombre || !misioneroSeleccionado) {
-      toast.error("Complete at least the name");
+      toast.error(t('eb_completeNombre'));
       return;
     }
 
@@ -495,7 +490,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
     const mesIdx = MESES_ARR.indexOf(mesSeleccionado);
     const mesActualIdx = MESES_ARR.indexOf(mesActualNombre);
     if (mesIdx < mesActualIdx && añoActual === new Date().getFullYear()) {
-      toast.error("Cannot add students to a past month");
+      toast.error(t('eb_noAgregarMesPasadoToast'));
       return;
     }
 
@@ -533,9 +528,9 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
 
       setMostrandoModalEstudiante(false);
       setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
-      toast.success("✅ Student added");
+      toast.success(t('eb_estudianteAgregado'));
     } catch {
-      toast.error("Error saving student");
+      toast.error(t('eb_errorGuardarEstudiante'));
     }
   };
   
@@ -547,11 +542,11 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
     const tieneHoras = estudiante?.estudios && Object.values(estudiante.estudios).some(d => parseFloat(d.horas) > 0);
     
     if (tieneHoras) {
-      setAlertaModal({ visible: true, titulo: "Cannot Delete Student", mensaje: "This student has study records and cannot be deleted. Only students with no registered hours can be removed." });
+      setAlertaModal({ visible: true, titulo: t('eb_alertaTituloNoEliminar'), mensaje: t('eb_alertaMensajeNoEliminar') });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this student?")) return;
+    if (!window.confirm(t('eb_confirmarEliminarEstudiante'))) return;
     
     try {
       await contactosService.delete(estudianteId);
@@ -566,7 +561,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
       }
     }));
     
-    toast.success("Student removed");
+    toast.success(t('eb_estudianteEliminado'));
   };
   
   const actualizarEstudiante = (misioneroId, estudianteId, campo, valor) => {
@@ -633,7 +628,7 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
       horas: parseFloat(horasActual || 0)
     }).catch(err => {
       console.error('Error autoguardando:', err);
-      toast.error('Error al guardar el estudio');
+      toast.error(t('eb_errorGuardarEstudio'));
     });
   }
 };
@@ -641,12 +636,12 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
   
 const agregarPais = async () => {
   if (!nuevoNombrePais.trim()) {
-    toast.error("El nombre del país es requerido");
+    toast.error(t('eb_nombrePaisRequerido'));
     return;
   }
-  
+
   if (!continenteParaPais) {
-    toast.error("Selecciona un continente primero");
+    toast.error(t('eb_seleccionaContinentePrimero'));
     return;
   }
   
@@ -658,7 +653,7 @@ const agregarPais = async () => {
     const yaExiste = continente?.paises.some(p => p.nombre.toLowerCase() === nuevoNombrePais.trim().toLowerCase());
     
     if (yaExiste) {
-      toast.error("Este país ya existe en este continente");
+      toast.error(t('eb_paisYaExiste'));
       return;
     }
     
@@ -682,18 +677,18 @@ const nuevoPais = await administracionService.crearPaisConContinente({
     setNuevoNombrePais("");
     setMostrandoPromptPais(false);
     setContinenteParaPais(null);
-    toast.success("Country created successfully");
-    
+    toast.success(t('eb_paisCreado'));
+
   } catch (error) {
     console.error('Error al crear país:', error);
-    toast.error('Error al crear país: ' + (error.response?.data?.error || error.message));
+    toast.error(t('eb_errorCrearPais') + (error.response?.data?.error || error.message));
   } finally {
     setCargandoDatos(false);
   }
 };
   
 const eliminarPais = async (continenteId, paisId) => {
-    if (!window.confirm("Delete this country?")) return;
+    if (!window.confirm(t('eb_confirmarEliminarPais'))) return;
     
     try {
       await administracionService.eliminarPais(paisId);
@@ -708,16 +703,16 @@ const eliminarPais = async (continenteId, paisId) => {
         return cont;
       }));
       
-      toast.success("✅ Country deleted");
+      toast.success(t('eb_paisEliminado'));
     } catch (error) {
       console.error('Error:', error);
-      toast.error(error.response?.data?.error || 'Error al eliminar país');
+      toast.error(error.response?.data?.error || t('eb_errorEliminarPais'));
     }
   };
   
   const agregarMissionary = () => {
     if (!nuevoMissionary.trim()) {
-      toast.error("Ingrese un nombre");
+      toast.error(t('eb_ingreseNombre'));
       return;
     }
     
@@ -729,22 +724,24 @@ const eliminarPais = async (continenteId, paisId) => {
     setMissionarys([...misioneros, nuevoM]);
     setMostrandoModalMissionary(false);
     setNuevoMissionary("");
-    toast.success("✅ Missionary agregado");
+    toast.success(t('eb_misioneroAgregado'));
   };
-  
+
   const eliminarMissionary = (id) => {
-    if (!window.confirm("¿Eliminar este misionero?")) return;
+    if (!window.confirm(t('eb_confirmarEliminarMisionero'))) return;
     setMissionarys(misioneros.filter(m => m.id !== id));
-    toast.success("Missionary eliminado");
+    toast.success(t('eb_misioneroEliminado'));
   };
   
   const obtenerDiaSemana = (dia, mes, año) => {
     const dias = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const mesIndex = meses.indexOf(mes);
     const fecha = new Date(año, mesIndex, dia);
-    return dias[fecha.getDay()];
+    return t(`eb_dow_${dias[fecha.getDay()]}`);
   };
-  
+
+  const nombreMes = (mes) => mes ? t(`eb_mes_${mes}`) : mes;
+
   const paisesDelContinente = continenteSeleccionado 
     ? continentes.find(c => c.id === continenteSeleccionado)?.paises || []
     : [];
@@ -1058,12 +1055,12 @@ const eliminarPais = async (continenteId, paisId) => {
             }}
             className="no-print"
           >
-            <FaArrowLeft /> Back
+            <FaArrowLeft /> {t('volver')}
           </button>
 
           <h1 style={{ color: "white", margin: 0, fontSize: "28px", fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
             <FaBook style={{ marginRight: "10px" }} />
-            Bible Studies {añoActual}
+            {t('estudiosBiblicos')} {añoActual}
           </h1>
 <div style={{ display: "flex", gap: "10px" }}>
             {mesSeleccionado && (
@@ -1072,15 +1069,15 @@ const eliminarPais = async (continenteId, paisId) => {
                   onClick={() => setMostrandoEstadisticas(true)}
                   className="no-print" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 18px", color: "white", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
                 >
-                  <FaChartLine /> Statistics
+                  <FaChartLine /> {t('estadisticas')}
                 </button>
 
               </>
             )}
-      
+
           </div>
         </div>
-        
+
         {mesSeleccionado && (
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
             <button
@@ -1093,12 +1090,12 @@ const eliminarPais = async (continenteId, paisId) => {
               }}
               style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 18px", color: "white", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
             >
-              <FaGlobe size={13} /> Change Region
+              <FaGlobe size={13} /> {t('eb_cambiarRegion')}
             </button>
 
             <div style={{ flex: 1 }}></div>
             <div style={{ color: "white", fontSize: "16px", fontWeight: "600" }}>
-              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}
+              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {nombreMes(mesSeleccionado)}
             </div>
           </div>
         )}
@@ -1109,7 +1106,7 @@ const eliminarPais = async (continenteId, paisId) => {
         <div>
           <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
             <FaGlobe style={{ marginRight: "10px" }} />
-            Select a Continent
+            {t('eb_seleccionaContinente')}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px" }}>
             {continentes.map(cont => (
@@ -1123,7 +1120,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   {cont.nombre}
                 </div>
                 <div style={{ fontSize: "14px", color: "#666" }}>
-                  {cont.paises.length} countries
+                  {cont.paises.length} {t('eb_countries')}
                 </div>
               </div>
             ))}
@@ -1136,7 +1133,7 @@ const eliminarPais = async (continenteId, paisId) => {
       {continenteSeleccionado && !paisSeleccionado && (
         <div>
           <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
-            Select a Country
+            {t('eb_seleccionaPais')}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px" }}>
             {paisesDelContinente.map(pais => (
@@ -1207,7 +1204,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   }}
                 >
                   <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "6px" }}>
-                    {mesEnIngles?.[mes] || mes}
+                    {nombreMes(mes)}
                   </div>
                   {esActual && (
                     <div style={{ fontSize: "12px", opacity: 0.9 }}>
@@ -1254,7 +1251,7 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "resumen" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                Report Control - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                {t('eb_reporteControl')} - {nombreMes(mesSeleccionado)} {añoActual}
               </h2>
               
               <div className="scroll-container">
@@ -1347,7 +1344,7 @@ const eliminarPais = async (continenteId, paisId) => {
               </div>
 
               {/* Evangelismo */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>Evangelism {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>{t('eb_evangelismoTitulo')} {nombreMes(mesSeleccionado)}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
@@ -1422,7 +1419,7 @@ const eliminarPais = async (continenteId, paisId) => {
               </table>
 
               {/* NUEVOS ESTUDIANTES - RESUMEN */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>New Students {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>{t('eb_nuevosEstudiantesTab')} {nombreMes(mesSeleccionado)}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
@@ -1543,7 +1540,7 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "nuevosEstudiantes" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                New Students - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                {t('eb_nuevosEstudiantesTab')} - {nombreMes(mesSeleccionado)} {añoActual}
               </h2>
               
               {/* ESTUDIANTES QUE SAID YES */}
@@ -1708,7 +1705,7 @@ const eliminarPais = async (continenteId, paisId) => {
           <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
             <h2 style={{ margin: 0, color: "#1a5490", fontSize: "24px" }}>
-              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {nombreMes(mesSeleccionado)} {añoActual}
             </h2>
           </div>
 
@@ -2274,7 +2271,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
               <h3 style={{ margin: 0, color: "#1a5490", fontSize: "24px", fontWeight: "700" }}>
                 <FaChartLine style={{ marginRight: "10px" }} />
-                Statistics - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                {t('estadisticas')} - {nombreMes(mesSeleccionado)} {añoActual}
               </h3>
               <button
                 onClick={() => setMostrandoEstadisticas(false)}

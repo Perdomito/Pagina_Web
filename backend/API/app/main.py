@@ -63,6 +63,21 @@ async def startup():
             except Exception as e:
                 logger.warning(f"Could not create usuario_permisos table: {e}")
 
+            # Catalogo de permisos (modulos de la app)
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.permisos (
+                    id     INTEGER PRIMARY KEY,
+                    nombre VARCHAR(50) NOT NULL
+                )
+            """))
+            await conn.execute(text("""
+                INSERT INTO permisos (id, nombre) VALUES
+                    (1, 'Bible Studies'), (2, 'Reports'), (3, 'Members'),
+                    (4, 'Contacts'), (5, 'Administration'), (6, 'Statistics'),
+                    (7, 'Settings')
+                ON CONFLICT (id) DO NOTHING
+            """))
+
             # ── Tablas financieras (esquema versionado, idempotente) ───────
             # Definicion espejo de app/migrations/schema.sql. CREATE IF NOT
             # EXISTS: no-op si ya existen, las crea en un deploy nuevo.

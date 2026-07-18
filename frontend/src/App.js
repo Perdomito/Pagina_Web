@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { IdiomaProvider, useIdioma } from './context/IdiomaContext';
 
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -19,7 +20,8 @@ import InformeRegional from './pages/InformeRegional';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+  const { t } = useIdioma();
+
   if (loading) {
     return (
       <div style={{
@@ -31,7 +33,7 @@ const PrivateRoute = ({ children }) => {
         color: "white",
         fontSize: "18px"
       }}>
-        Cargando...
+        {t('cargando')}
       </div>
     );
   }
@@ -63,9 +65,11 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <IdiomaProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </IdiomaProvider>
   );
 }
 

@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import { useIdioma } from "../context/IdiomaContext";
 import toast from 'react-hot-toast';
 
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { t, idioma, setIdioma } = useIdioma();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -17,17 +19,17 @@ export default function Login() {
     e.preventDefault();
     setError("");
     if (email.trim() === "" || password.trim() === "") {
-      setError("Please fill in all fields.");
+      setError(t('camposObligatorios'));
       return;
     }
     setLoading(true);
     try {
       await login(email, password);
-      toast.success('Welcome!');
+      toast.success(t('bienvenidoToast'));
       navigate("/home");
     } catch (error) {
-      setError(error.message || 'Login error. Please try again.');
-      toast.error(error.message || 'Login error. Please try again.');
+      setError(error.message || t('errorLogin'));
+      toast.error(error.message || t('errorLogin'));
     } finally {
       setLoading(false);
     }
@@ -384,26 +386,49 @@ export default function Login() {
             </div>
 
             <h1 className="church-name">Emanuel Church</h1>
-            <p className="church-subtitle">Management System</p>
+            <p className="church-subtitle">{t('sistemaGestion')}</p>
             <div className="divider-left" />
             <p className="verse">
-              "I can do all things through Christ who strengthens me."
-              <span>— Philippians 4:13</span>
+              {t('versiculo')}
+              <span>{t('versiculoRef')}</span>
             </p>
           </div>
         </div>
 
         {/* ── PANEL DERECHO ── */}
         <div className="login-right">
+          {/* Selector de idioma ES/EN */}
+          <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '6px' }}>
+            {[{ codigo: 'es', etiqueta: '🇪🇸 ES' }, { codigo: 'en', etiqueta: '🇬🇧 EN' }].map(op => (
+              <button
+                key={op.codigo}
+                onClick={() => setIdioma(op.codigo)}
+                style={{
+                  border: idioma === op.codigo ? '1.5px solid #1a5490' : '1.5px solid #dde3ef',
+                  background: idioma === op.codigo ? '#eaf1f9' : 'white',
+                  color: '#1a5490',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {op.etiqueta}
+              </button>
+            ))}
+          </div>
+
           <div className="form-wrapper">
-            <h2 className="form-greeting">Welcome</h2>
-            <p className="form-desc">Enter your credentials to continue</p>
+            <h2 className="form-greeting">{t('bienvenido')}</h2>
+            <p className="form-desc">{t('ingresaCredenciales')}</p>
 
             {error && <div className="error-box">{error}</div>}
 
             <form onSubmit={hacerLogin}>
               <div>
-                <label className="field-label">Email Address</label>
+                <label className="field-label">{t('correo')}</label>
                 <div className="field-wrap">
                   <FaEnvelope className="field-icon" />
                   <input
@@ -418,7 +443,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="field-label">Password</label>
+                <label className="field-label">{t('contrasena')}</label>
                 <div className="field-wrap">
                   <FaLock className="field-icon" />
                   <input
@@ -441,14 +466,14 @@ export default function Login() {
 
               <button type="submit" className="btn-login" disabled={loading}>
                 {loading && <span className="spinner" />}
-                {loading ? 'Verifying...' : 'Sign In'}
+                {loading ? t('verificando') : t('iniciarSesion')}
               </button>
             </form>
 
             <div className="forgot-wrap">
               <div className="forgot-line" />
               <p className="forgot" onClick={() => navigate('/forgot-password')}>
-                Forgot your password?
+                {t('olvidoContrasena')}
               </p>
               <div className="forgot-line" />
             </div>
