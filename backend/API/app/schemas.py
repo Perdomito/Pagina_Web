@@ -1,7 +1,7 @@
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 
 def blank_to_none(v):
@@ -93,9 +93,17 @@ class RolPermisoCreate(RolPermisoBase):
 
 class RolPermisoUpdate(BaseModel):
     activo: Optional[bool] = None
+    tiene_acceso: Optional[bool] = None
 
 class RolPermisoOut(RolPermisoBase):
+    nombre: Optional[str] = None
+    tiene_acceso: bool = True
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def sync_tiene_acceso(self):
+        self.tiene_acceso = self.activo
+        return self
 
 
 # ── UsuarioPermisos ─────────────────────────────────────────────────────────
@@ -129,24 +137,51 @@ class UsuarioBase(BaseModel):
     ciudad_id: Optional[int] = None
     miembro_id: Optional[str] = None
 
-class UsuarioCreate(UsuarioBase):
+class UsuarioCreate(BaseModel):
+    id: Optional[str] = None
+    nombre: str
+    email: EmailStr
     password: str
+    rol: Optional[int] = None
+    rol_id: Optional[int] = None
+    activo: bool = False
+    region: Optional[str] = None
+    pais_id: Optional[int] = None
+    ciudad_id: Optional[int] = None
+    miembro_id: Optional[str] = None
+
+    @field_validator("rol", "rol_id", "pais_id", "ciudad_id", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
 
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     rol: Optional[int] = None
+    rol_id: Optional[int] = None
     activo: Optional[bool] = None
     region: Optional[str] = None
     pais_id: Optional[int] = None
     ciudad_id: Optional[int] = None
     miembro_id: Optional[str] = None
 
+    @field_validator("rol", "rol_id", "pais_id", "ciudad_id", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
+
 class UsuarioOut(UsuarioBase):
     fecha_registro: datetime
     rol_id: int = 0
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def sync_rol_id(self):
+        if not self.rol_id:
+            self.rol_id = self.rol
+        return self
 
 
 # ── Miembros ───────────────────────────────────────────────────────────────
