@@ -37,9 +37,9 @@ export default function Administracion() {
   const [mes, setMes]                 = useState(MESES[new Date().getMonth()]);
   const [año]                         = useState(new Date().getFullYear());
   const [paisNombre, setPaisNombre]   = useState("");
-  const [paisId, setPaisId]           = useState(1);
+  const [paisId, setPaisId]           = useState(null);
   const [listaPaises, setListaPaises]   = useState([]);
-  const [tasaCambio, setTasaCambio]   = useState(58.00);
+  const [tasaCambio, setTasaCambio]   = useState(1);
 
   // Cajas y bancos
   const [saldoCaja, setSaldoCaja]     = useState(0);
@@ -70,7 +70,13 @@ export default function Administracion() {
   useEffect(() => {
     if (user) {
       const pid = user.pais_id || 1;
+      // Tasa default por país
+      const tasasPais = { 'Colombia': 4200, 'República Dominicana': 58, 'México': 17, 'Argentina': 1000, 'Chile': 900, 'Perú': 3.7, 'Ecuador': 1, 'Bolivia': 6.9, 'Venezuela': 36, 'Paraguay': 7300, 'Uruguay': 38 };
+      const nombrePais = user.pais_nombre || '';
+      const tasaMatch = Object.entries(tasasPais).find(([p]) => nombrePais.toLowerCase().includes(p.toLowerCase()));
+      if (tasaMatch) setTasaCambio(tasaMatch[1]);
       setPaisId(pid);
+      setPaisNombre(user.pais_nombre || '');
       cargarDatos(pid);
     }
   }, [user]);
@@ -82,8 +88,10 @@ export default function Administracion() {
         administracionService.getTasaCambio()
       ]);
       setListaPaises(paises);
-      const p = paises.find(x => String(x.id) === String(pid));
-      if (p) setPaisNombre(p.nombre);
+      if (!paisNombre) {
+        const p = paises.find(x => String(x.id) === String(pid));
+        if (p) setPaisNombre(p.nombre);
+      }
       setTasaCambio(parseFloat(tasa));
     } catch {}
   };
@@ -222,7 +230,7 @@ export default function Administracion() {
         mes, anio: año,
         tipo_gasto: nuevoGasto.tipo || "otros_gastos",
         concepto: `${nuevoGasto.descripcion}${nuevoGasto.proveedor ? ` — ${nuevoGasto.proveedor}` : ""}`,
-        monto: total, moneda: "DOP", tasa_cambio: tasaCambio,
+        monto: total, moneda: "USD", tasa_cambio: tasaCambio,
         notas: nuevoGasto.observaciones || null,
         centro_costo: nuevoGasto.centro_costo || paisNombre
       });
@@ -320,37 +328,14 @@ export default function Administracion() {
           </div>
         </nav>
 
-        {/* Selector de país */}
+        {/* País del usuario */}
         <div style={{ padding:"14px 20px", borderTop:"1px solid rgba(255,255,255,0.1)", marginTop:"auto" }}>
-          <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>Country</div>
-          <select
-            value={paisId}
-            onChange={e => {
-              const id = parseInt(e.target.value);
-              setPaisId(id);
-              const p = listaPaises.find(x => x.id === id);
-              if (p) setPaisNombre(p.nombre);
-            }}
-            style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:6, color:"white", fontSize:12, fontWeight:600, width:"100%", padding:"5px 8px", outline:"none", fontFamily:"'Lato',sans-serif" }}
-          >
-            {listaPaises.map(p => (
-              <option key={p.id} value={p.id} style={{ background:P, color:"white" }}>{p.nombre}</option>
-            ))}
-          </select>
+          <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>Country</div>
+          <div style={{ color:"white", fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif" }}>{paisNombre || "Loading..."}</div>
+          <div style={{ color:"rgba(255,255,255,0.4)", fontSize:11, marginTop:2 }}>{user?.region || ""}</div>
         </div>
 
-        {/* Tasa de cambio */}
-        <div style={{ padding:"14px 20px", borderTop:"1px solid rgba(255,255,255,0.1)" }}>
-          <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>Exchange Rate</div>
-          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <FaDollarSign style={{ color:"rgba(255,255,255,0.5)", fontSize:11 }} />
-            <span style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>1 USD =</span>
-            <input type="number" step="0.01" value={tasaCambio}
-              onChange={e => { setTasaCambio(parseFloat(e.target.value)); administracionService.actualizarTasaCambio(parseFloat(e.target.value)).catch(()=>{}); }}
-              style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:6, color:"white", fontSize:13, fontWeight:700, width:60, padding:"3px 6px", textAlign:"center", outline:"none", fontFamily:"'Lato',sans-serif" }} />
-            <span style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>DOP</span>
-          </div>
-        </div>
+        
 
         <div className="adm-back" onClick={()=>navigate("/home")}>
           <FaArrowLeft style={{ fontSize:11 }} /> Back to Home
@@ -407,12 +392,12 @@ export default function Administracion() {
                 <div className="adm-stat">
                   <div className="adm-stat-lbl">Cash Available</div>
                   <div className="adm-stat-val" style={{ color:"#4CAF50" }}>${saldoCaja.toLocaleString()}</div>
-                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>DOP · Petty Cash</div>
+                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>USD · Petty Cash</div>
                 </div>
                 <div className="adm-stat">
                   <div className="adm-stat-lbl">Bank Balance</div>
                   <div className="adm-stat-val" style={{ color:P }}>${saldoBanco.toLocaleString()}</div>
-                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>DOP · Bank Account</div>
+                  <div style={{ fontSize:11, color:"#b0bcd0", marginTop:4 }}>USD · Bank Account</div>
                 </div>
                 <div className="adm-stat">
                   <div className="adm-stat-lbl">Total Income</div>
@@ -479,7 +464,7 @@ export default function Administracion() {
                   <tr>
                     <th>Account Code</th>
                     <th>Account / Cash Register</th>
-                    <th style={{ textAlign:"right" }}>Balance (DOP)</th>
+                    <th style={{ textAlign:"right" }}>Balance (USD)</th>
                     <th style={{ textAlign:"center" }}>Type</th>
                   </tr>
                 </thead>
@@ -525,7 +510,7 @@ export default function Administracion() {
                       <th>Date</th>
                       <th>From</th>
                       <th>To</th>
-                      <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                      <th style={{ textAlign:"right" }}>Amount (USD)</th>
                       <th>Notes</th>
                     </tr>
                   </thead>
@@ -567,7 +552,7 @@ export default function Administracion() {
                       <th>Type</th>
                       <th>Origin</th>
                       <th>Where</th>
-                      <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                      <th style={{ textAlign:"right" }}>Amount (USD)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -648,7 +633,7 @@ export default function Administracion() {
                         <th>Receipt No.</th>
                         <th>Date</th>
                         <th>Description</th>
-                        <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                        <th style={{ textAlign:"right" }}>Amount (USD)</th>
                         <th style={{ textAlign:"center", width:60 }}></th>
                       </tr>
                     </thead>
@@ -727,7 +712,7 @@ export default function Administracion() {
                         <th>Type</th>
                         <th>Origin</th>
                         <th>Account</th>
-                        <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                        <th style={{ textAlign:"right" }}>Amount (USD)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -767,7 +752,7 @@ export default function Administracion() {
                         <th>Description</th>
                         <th>Provider</th>
                         <th>Payment</th>
-                        <th style={{ textAlign:"right" }}>Amount (DOP)</th>
+                        <th style={{ textAlign:"right" }}>Amount (USD)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -827,7 +812,7 @@ export default function Administracion() {
                   <input type="date" value={nuevoTraslado.fecha} onChange={e=>setNuevoTraslado({...nuevoTraslado, fecha:e.target.value})} style={{...inputCls, marginBottom:0}} className="adm-input" />
                 </div>
                 <div>
-                  <label style={labelCls}>Amount (DOP)</label>
+                  <label style={labelCls}>Amount (USD)</label>
                   <input type="number" placeholder="0.00" value={nuevoTraslado.valor} onChange={e=>setNuevoTraslado({...nuevoTraslado, valor:e.target.value})} style={{...inputCls, marginBottom:0}} className="adm-input" />
                 </div>
               </div>

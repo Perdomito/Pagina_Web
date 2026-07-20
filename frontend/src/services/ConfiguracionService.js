@@ -12,12 +12,14 @@ const ConfiguracionService = {
   },
 
   crearUsuario: async (datos) => {
-    const response = await axios.post('/usuarios', datos);
+    const payload = { ...datos, rol: datos.rol_id || datos.rol };
+    const response = await axios.post('/usuarios', payload);
     return response.data;
   },
 
   actualizarUsuario: async (id, datos) => {
-    const response = await axios.patch(`/usuarios/${id}`, datos);
+    const payload = { ...datos, rol: datos.rol_id || datos.rol };
+    const response = await axios.patch(`/usuarios/${id}`, payload);
     return response.data;
   },
 
@@ -54,14 +56,31 @@ const ConfiguracionService = {
 
   getPermisosRol: async (rol_id) => {
     const response = await axios.get(`/roles/${rol_id}/permisos`);
-    return response.data;
+    // El backend usa "activo" en permisos de rol; el frontend trabaja con "tiene_acceso"
+    return response.data.map(p => ({ ...p, tiene_acceso: p.activo }));
   },
 
   actualizarPermisoRol: async (rol_id, permiso_id, tiene_acceso) => {
-    const response = await axios.patch(`/roles/${rol_id}/permisos/${permiso_id}`, {
-      tiene_acceso
-    });
-    return response.data;
+    let data;
+    try {
+      const response = await axios.patch(`/roles/${rol_id}/permisos/${permiso_id}`, {
+        activo: tiene_acceso
+      });
+      data = response.data;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        // La fila rol-permiso no existe todavía: crearla
+        const response = await axios.post(`/roles/${rol_id}/permisos`, {
+          rol_id,
+          permiso_id,
+          activo: tiene_acceso
+        });
+        data = response.data;
+      } else {
+        throw error;
+      }
+    }
+    return { ...data, tiene_acceso: data.activo };
   },
 
   getAllPaises: async () => {
@@ -75,10 +94,42 @@ const ConfiguracionService = {
   },
 
   actualizarPermisoUsuario: async (usuario_id, permiso_id, tiene_acceso) => {
-    const response = await axios.patch(`/usuarios/${usuario_id}/permisos/${permiso_id}`, {
-      tiene_acceso
-    });
-    return response.data;
+    // 1) Intentar actualizar la fila existente
+    try {
+      const response = await axios.patch(`/usuarios/${usuario_id}/permisos/${permiso_id}`, {
+        tiene_acceso
+      });
+      return response.data;
+    } catch (error) {
+      if (error.response?.status !== 404) throw error;
+    }
+
+    let ultimoError;
+    for (let intento = 0; intento < 40; intento++) {
+      try {
+        const response = await axios.post(`/usuarios/${usuario_id}/permisos`, {
+          usuario_id,
+          permiso_id,
+          tiene_acceso
+        });
+        return response.data;
+      } catch (e) {
+        ultimoError = e;
+        // Si entre reintentos la fila ya quedó creada, actualizarla y salir
+        if (e.response?.status === 400) {
+          const response = await axios.patch(`/usuarios/${usuario_id}/permisos/${permiso_id}`, {
+            tiene_acceso
+          });
+          return response.data;
+        }
+        // Solo insistir en errores de integridad (choque de ID); otros errores se propagan
+        const detalle = String(e.response?.data?.detail || '');
+        if (!detalle.includes('IntegrityError') && !detalle.includes('duplicate')) {
+          throw e;
+        }
+      }
+    }
+    throw ultimoError;
   },
 
   eliminarPermisoUsuario: async (usuario_id, permiso_id) => {

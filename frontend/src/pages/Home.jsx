@@ -154,9 +154,44 @@ export default function Home() {
     }
   ];
 
-  const tarjetasPermitidas = modulosConPermisos.filter(tarjeta =>
-    permisosUsuario.includes(tarjeta.permiso)
-  );
+  const tarjetasPermitidas = modulosConPermisos.filter(tarjeta => {
+    if (!permisosUsuario.includes(tarjeta.permiso)) return false;
+    // Administración solo para admin (1) o tesorero (4)
+    if (tarjeta.permiso === 'administracion' && user?.rol_id !== 1 && user?.rol_id !== 4) return false;
+    // Configuración solo para admin (1) o pastor (2)
+    if (tarjeta.permiso === 'configuracion' && user?.rol_id !== 1 && user?.rol_id !== 2) return false;
+    return true;
+  });
+
+
+  // Devuelve el código ISO del país para usar con flagcdn.com
+  const getCodigoPais = (paisNombre) => {
+    if (!paisNombre) return null;
+    const n = paisNombre.toLowerCase();
+    if (n.includes('colombia')) return 'co';
+    if (n.includes('dominicana') || n.includes('dominican')) return 'do';
+    if (n.includes('méxico') || n.includes('mexico')) return 'mx';
+    if (n.includes('argentina')) return 'ar';
+    if (n.includes('chile')) return 'cl';
+    if (n.includes('perú') || n.includes('peru')) return 'pe';
+    if (n.includes('ecuador')) return 'ec';
+    if (n.includes('bolivia')) return 'bo';
+    if (n.includes('venezuela')) return 've';
+    if (n.includes('paraguay')) return 'py';
+    if (n.includes('uruguay')) return 'uy';
+    if (n.includes('guatemala')) return 'gt';
+    if (n.includes('honduras')) return 'hn';
+    if (n.includes('costa rica')) return 'cr';
+    if (n.includes('panamá') || n.includes('panama')) return 'pa';
+    if (n.includes('cuba')) return 'cu';
+    if (n.includes('haití') || n.includes('haiti')) return 'ht';
+    if (n.includes('nicaragua')) return 'ni';
+    if (n.includes('salvador')) return 'sv';
+    if (n.includes('brasil') || n.includes('brazil')) return 'br';
+    if (n.includes('italia') || n.includes('italy')) return 'it';
+    if (n.includes('españa') || n.includes('spain')) return 'es';
+    return null;
+  };
 
   return (
     <div style={{
@@ -456,14 +491,25 @@ export default function Home() {
             alignItems: "center",
             gap: "10px"
           }}>
-            <FaUser size={14} />
+            <div style={{ width:34, height:34, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, overflow:"hidden" }}>
+              {getCodigoPais(user?.pais_nombre) ? (
+                <img
+                  src={`https://flagcdn.com/w80/${getCodigoPais(user?.pais_nombre)}.png`}
+                  alt={user?.pais_nombre}
+                  title={user?.pais_nombre}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <FaUser size={14} />
+              )}
+            </div>
             <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", fontFamily: "'Lato', sans-serif" }}>
-                {user?.nombre}
+              <div style={{ fontSize: "14px", fontWeight: "700", fontFamily: "'Lato', sans-serif", lineHeight:1.2 }}>
+                {user?.nombre?.split(' ')[0]}
               </div>
-              <div style={{ fontSize: "11px", opacity: 0.75, letterSpacing: "0.5px" }}>
+              <div style={{ fontSize: "11px", opacity: 0.7, letterSpacing: "0.3px" }}>
                 {getRolLabel(user?.rol_id)}
-                {user?.pais && ` · ${user.pais}`}
               </div>
             </div>
           </div>

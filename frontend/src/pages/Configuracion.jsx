@@ -8,14 +8,26 @@ import { useAuth } from '../context/AuthContext';
 export default function Configuracion() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Módulos del sistema — hardcoded para no depender del backend
+  const MODULOS_SISTEMA = [
+    { id: 1, nombre: 'bible_studies',  label: 'Bible Studies',  icono: '📖' },
+    { id: 2, nombre: 'reports',        label: 'Reports',        icono: '📊' },
+    { id: 3, nombre: 'members',        label: 'Members',        icono: '👥' },
+    { id: 4, nombre: 'contacts',       label: 'Contacts',       icono: '📞' },
+    { id: 5, nombre: 'administration', label: 'Administration', icono: '💰' },
+    { id: 6, nombre: 'statistics',     label: 'Statistics',     icono: '📈' },
+    { id: 7, nombre: 'settings',       label: 'Settings',       icono: '⚙️' },
+  ];
+
   
-  const [tabActivo, setTabActivo] = useState("usuarios");
+  const [tabActive, setTabActive] = useState("usuarios");
   const [cargando, setCargando] = useState(false);
   
   // Estados de datos
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [permisos, setPermisos] = useState([]);
+  const [permisos, setPermissions] = useState([]);
   const [paises, setPaises] = useState([]);
   
   // Estados de modales
@@ -23,10 +35,11 @@ export default function Configuracion() {
   const [tipoModal, setTipoModal] = useState("");
   const [usuarioEditando, setUsuarioEditando] = useState(null);
   const [rolSeleccionado, setRolSeleccionado] = useState(null);
-  const [usuarioPermisos, setUsuarioPermisos] = useState(null);
+  const [usuarioPermisos, setUsuarioPermissions] = useState(null);
   
   // Estados de formularios
   const [nuevoUsuario, setNuevoUsuario] = useState({
+    id: "",
     nombre: "",
     email: "",
     password: "",
@@ -41,77 +54,104 @@ export default function Configuracion() {
   const cargarDatosIniciales = async () => {
     try {
       setCargando(true);
-      
       const [usuariosData, rolesData, permisosData, paisesData] = await Promise.all([
-        configuracionService.getAllUsuarios(),
-        configuracionService.getAllRoles(),
-        configuracionService.getAllPermisos(),
-        configuracionService.getAllPaises()
+        configuracionService.getAllUsuarios().catch(() => []),
+        configuracionService.getAllRoles().catch(() => []),
+        configuracionService.getAllPermisos().catch(() => []),
+        configuracionService.getAllPaises().catch(() => [])
       ]);
-      
-      setUsuarios(usuariosData);
-      setRoles(rolesData);
-      setPermisos(permisosData);
-      setPaises(paisesData);
-      
+      setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
+      setRoles(Array.isArray(rolesData) ? rolesData : []);
+      setPermissions(Array.isArray(permisosData) ? permisosData : []);
+      setPaises(Array.isArray(paisesData) ? paisesData : []);
     } catch (error) {
-      console.error('Error al cargar datos:', error);
-      toast.error('Error al cargar datos');
+      console.error('Error:', error);
     } finally {
       setCargando(false);
     }
   };
   
+const generarIdUsuario = () => {
+    let max = 0;
+    usuarios.forEach(u => {
+      const m = String(u.id || '').match(/^U(\d+)$/i);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return 'U' + String(max + 1).padStart(3, '0');
+  };
+
   const abrirModalNuevoUsuario = () => {
     setTipoModal("nuevo_usuario");
     setUsuarioEditando(null);
-    setNuevoUsuario({ nombre: "", email: "", password: "", rol_id: "", pais_id: "" });
+    setNuevoUsuario({ id: generarIdUsuario(), nombre: "", email: "", password: "", rol_id: "", pais_id: "", activo: true });
     setMostrandoModal(true);
   };
   
-  const abrirModalEditarUsuario = (usuario) => {
+  const abrirModalEditUsuario = (usuario) => {
     setTipoModal("editar_usuario");
     setUsuarioEditando(usuario);
     setNuevoUsuario({
       nombre: usuario.nombre,
       email: usuario.email,
       password: "",
-      rol_id: usuario.rol_id,
-      pais_id: usuario.pais_id || ""
+          rol_id: usuario.rol_id || usuario.rol,
+      pais_id: usuario.pais_id || "",
+      activo: usuario.activo
     });
     setMostrandoModal(true);
   };
   
   const guardarUsuario = async () => {
+    if (tipoModal === 'nuevo_usuario' && !nuevoUsuario.id) {
+      toast.error("User ID is required");
+      return;
+    }
     if (!nuevoUsuario.nombre || !nuevoUsuario.email || !nuevoUsuario.rol_id) {
-      toast.error("Complete todos los campos obligatorios");
+      toast.error("Please complete all required fields");
       return;
     }
     
     if (tipoModal === "nuevo_usuario" && !nuevoUsuario.password) {
-      toast.error("La contraseña es obligatoria");
+      toast.error("Password is required");
+      return;
+    }
+    
+    if (tipoModal === "nuevo_usuario" && usuarios.some(u => (u.email || '').toLowerCase() === (nuevoUsuario.email || '').trim().toLowerCase())) {
+      toast.error("This email is already registered");
       return;
     }
     
     try {
       if (tipoModal === "nuevo_usuario") {
-        await configuracionService.crearUsuario(nuevoUsuario);
+        await configuracionService.crearUsuario({
+          ...nuevoUsuario,
+          rol: nuevoUsuario.rol_id,  // backend espera 'rol' no 'rol_id'
+          pais_id: nuevoUsuario.pais_id === "" ? null : nuevoUsuario.pais_id,
+          activo: nuevoUsuario.activo !== false
+        });
         toast.success("Usuario creado");
       } else {
-        await configuracionService.actualizarUsuario(usuarioEditando.id, nuevoUsuario);
+        const datosActualizar = {
+          ...nuevoUsuario,
+          rol: nuevoUsuario.rol_id,
+          pais_id: nuevoUsuario.pais_id === "" ? null : nuevoUsuario.pais_id
+        };
+        // No mandar password vacío: el backend lo tomaría como contraseña nueva
+        if (!datosActualizar.password) delete datosActualizar.password;
+        await configuracionService.actualizarUsuario(usuarioEditando.id, datosActualizar);
         toast.success("Usuario actualizado");
       }
       
       await cargarDatosIniciales();
       setMostrandoModal(false);
     } catch (error) {
-      console.error('Error al guardar usuario:', error);
-      toast.error("Error al guardar usuario");
+      console.error('Error saving user:', error);
+      toast.error("Error saving user");
     }
   };
   
   const eliminarUsuario = async (id) => {
-    if (!window.confirm("¿Eliminar este usuario?")) return;
+    if (!window.confirm("¿Delete este usuario?")) return;
     
     try {
       await configuracionService.eliminarUsuario(id);
@@ -119,39 +159,54 @@ export default function Configuracion() {
       await cargarDatosIniciales();
     } catch (error) {
       console.error('Error al eliminar:', error);
-      toast.error("Error al eliminar usuario");
+      toast.error("Error deleting user");
     }
   };
   
-  const verPermisosRol = async (rol) => {
+  const verPermissionsRol = async (rol) => {
     try {
-      const permisosRol = await configuracionService.getPermisosRol(rol.id);
-      setRolSeleccionado({ ...rol, permisos: permisosRol });
-      setUsuarioPermisos(null);
-      setTabActivo("permisos_rol");
+      const permisosRol = await configuracionService.getPermisosRol(rol.id).catch(() => []);
+      const permisosBase = MODULOS_SISTEMA.map(m => {
+        const fromBD = Array.isArray(permisosRol) ? permisosRol.find(p => p.permiso_id === m.id) : null;
+        return {
+          permiso_id: m.id,
+          nombre: m.nombre,
+          label: m.label,
+          icono: m.icono,
+          tiene_acceso: fromBD?.tiene_acceso || false
+        };
+      });
+      setRolSeleccionado({ ...rol, permisos: permisosBase });
+      setUsuarioPermissions(null);
+      setTabActive("permisos_rol");
     } catch (error) {
-      console.error('Error al cargar permisos:', error);
-      toast.error("Error al cargar permisos");
+      // Aun si falla, mostrar módulos hardcodeados
+      const permisosBase = MODULOS_SISTEMA.map(m => ({
+        permiso_id: m.id, nombre: m.nombre, label: m.label, icono: m.icono, tiene_acceso: false
+      }));
+      setRolSeleccionado({ ...rol, permisos: permisosBase });
+      setUsuarioPermissions(null);
+      setTabActive("permisos_rol");
     }
   };
   
-  const verPermisosPersonalizados = async (usuario) => {
+  const verPermissionsPersonalizados = async (usuario) => {
     try {
-      const [permisosRol, permisosUsuario] = await Promise.all([
-        configuracionService.getPermisosRol(usuario.rol_id),
+const [permisosRol, permisosUsuario] = await Promise.all([
+        configuracionService.getPermisosRol(usuario.rol_id || usuario.rol),
         configuracionService.getPermisosUsuario(usuario.id)
       ]);
       
-      setUsuarioPermisos({
+      setUsuarioPermissions({
         ...usuario,
         permisosRol,
         permisosPersonalizados: permisosUsuario
       });
       setRolSeleccionado(null);
-      setTabActivo("permisos_usuario");
+      setTabActive("permisos_usuario");
     } catch (error) {
-      console.error('Error al cargar permisos:', error);
-      toast.error("Error al cargar permisos del usuario");
+      console.error('Error loading permissions:', error);
+      toast.error("Error loading permissions del usuario");
     }
   };
   
@@ -166,8 +221,8 @@ export default function Configuracion() {
       setRolSeleccionado({ ...rolSeleccionado, permisos: permisosActualizados });
       
     } catch (error) {
-      console.error('Error al actualizar permiso:', error);
-      toast.error("Error al actualizar permiso");
+      console.error('Error updating permission:', error);
+      toast.error("Error updating permission");
     }
   };
   
@@ -176,12 +231,13 @@ export default function Configuracion() {
       await configuracionService.actualizarPermisoUsuario(usuarioPermisos.id, permisoId, !tieneAccesoActual);
       
       const permisosActualizados = await configuracionService.getPermisosUsuario(usuarioPermisos.id);
-      setUsuarioPermisos({ ...usuarioPermisos, permisosPersonalizados: permisosActualizados });
+      setUsuarioPermissions({ ...usuarioPermisos, permisosPersonalizados: permisosActualizados });
       
       toast.success("Permiso actualizado");
     } catch (error) {
-      console.error('Error al actualizar permiso:', error);
-      toast.error("Error al actualizar permiso");
+      console.error('Error updating permission:', error);
+      const detalle = error.response?.data?.detail;
+      toast.error(detalle ? String(detalle).slice(0, 140) : "Error updating permission");
     }
   };
   
@@ -205,46 +261,40 @@ export default function Configuracion() {
   
   if (cargando) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f7fa" }}>
-        <div style={{ fontSize: "18px", color: "#666" }}>Cargando...</div>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)" }}>
+        <div style={{ fontSize: "18px", color: "#666" }}>Loading...</div>
       </div>
     );
   }
   
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f7fa", padding: "20px" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)", padding: "28px", fontFamily: "'Lato', sans-serif" }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         .tab-button {
-          padding: 15px 30px;
+          padding: 12px 24px;
           border: none;
           background: transparent;
-          color: #666;
-          font-weight: 600;
-          font-size: 15px;
+          color: #5a6a85;
+          font-weight: 700;
+          font-size: 13px;
           cursor: pointer;
           border-bottom: 3px solid transparent;
-          transition: all 0.3s;
+          transition: all 0.2s;
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
+          font-family: 'Lato', sans-serif;
         }
-        
-        .tab-button:hover {
-          color: #0E5A61;
-        }
-        
-        .tab-button.active {
-          color: #0E5A61;
-          border-bottom-color: #0E5A61;
-        }
-        
+        .tab-button:hover { color: #134069; }
+        .tab-button.active { color: #134069; border-bottom-color: #134069; }
         .card {
           background: white;
           border-radius: 12px;
-          padding: 25px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          padding: 24px;
+          box-shadow: 0 2px 12px rgba(19,64,105,0.08);
+          border: 1px solid #e8edf5;
         }
-        
         .btn {
           display: inline-flex;
           align-items: center;
@@ -252,39 +302,25 @@ export default function Configuracion() {
           padding: 10px 20px;
           border: none;
           border-radius: 8px;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
-          transition: all 0.3s;
-          font-size: 14px;
+          transition: all 0.2s;
+          font-size: 13px;
+          font-family: 'Lato', sans-serif;
         }
-        
-        .btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .btn-primary {
-          background: #0E5A61;
-          color: white;
-        }
-        
-        .btn-success {
-          background: #4CAF50;
-          color: white;
-        }
-        
-        .btn-danger {
-          background: #f44336;
-          color: white;
-        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn-primary { background: #134069; color: white; }
+        .btn-success { background: #134069; color: white; }
+        .btn-danger { background: white; color: #d32f2f; border: 1.5px solid #d32f2f; }
+        .btn-outline { background: white; color: #134069; border: 1.5px solid #134069; }
         
         .btn-warning {
-          background: #FF9800;
+          background: #134069;
           color: white;
         }
         
         .btn-info {
-          background: #2196F3;
+          background: #134069;
           color: white;
         }
         
@@ -323,7 +359,7 @@ export default function Configuracion() {
         
         .input:focus {
           outline: none;
-          border-color: #0E5A61;
+          border-color: #134069;
         }
         
         .usuario-card {
@@ -335,7 +371,7 @@ export default function Configuracion() {
         }
         
         .usuario-card:hover {
-          border-color: #0E5A61;
+          border-color: #134069;
           box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         
@@ -389,7 +425,7 @@ export default function Configuracion() {
         }
         
         input:checked + .slider {
-          background-color: #4CAF50;
+          background-color: #134069;
         }
         
         input:checked + .slider:before {
@@ -406,28 +442,28 @@ export default function Configuracion() {
         
         .badge-rol {
           background: #e3f2fd;
-          color: #2196F3;
+          color: #134069;
         }
         
         .badge-personalizado {
           background: #fff3e0;
-          color: #FF9800;
+          color: #134069;
         }
       `}</style>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         {/* Header */}
-        <div className="card" style={{ marginBottom: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <button onClick={() => navigate("/home")} style={{ background: "none", border: "none", color: "#0E5A61", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", padding: 0 }}>
-                <FaArrowLeft /> Volver
-              </button>
-              <h1 style={{ margin: 0, color: "#0E5A61", fontSize: "28px" }}>⚙️ Configuración</h1>
-              <p style={{ color: "#666", margin: "5px 0 0", fontSize: "14px" }}>
-                Gestión de usuarios, roles y permisos
-              </p>
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
+          <button onClick={() => navigate("/home")} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", padding: "8px 14px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
+            <FaArrowLeft /> Back
+          </button>
+          <div>
+            <h1 style={{ margin: 0, color: "white", fontSize: "20px", fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>
+              ⚙️ Settings
+            </h1>
+            <p style={{ color: "rgba(255,255,255,0.6)", margin: "2px 0 0", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>
+              User, role & permission management
+            </p>
           </div>
         </div>
         
@@ -435,49 +471,49 @@ export default function Configuracion() {
         <div className="card" style={{ marginBottom: "20px", padding: "0" }}>
           <div style={{ display: "flex", borderBottom: "1px solid #f0f0f0", flexWrap: "wrap" }}>
             <button
-              onClick={() => { setTabActivo("usuarios"); setRolSeleccionado(null); setUsuarioPermisos(null); }}
-              className={`tab-button ${tabActivo === "usuarios" ? 'active' : ''}`}
+              onClick={() => { setTabActive("usuarios"); setRolSeleccionado(null); setUsuarioPermissions(null); }}
+              className={`tab-button ${tabActive === "usuarios" ? 'active' : ''}`}
             >
-              <FaUser /> Usuarios
+              <FaUser /> Users
             </button>
             <button
-              onClick={() => { setTabActivo("roles"); setRolSeleccionado(null); setUsuarioPermisos(null); }}
-              className={`tab-button ${tabActivo === "roles" ? 'active' : ''}`}
+              onClick={() => { setTabActive("roles"); setRolSeleccionado(null); setUsuarioPermissions(null); }}
+              className={`tab-button ${tabActive === "roles" ? 'active' : ''}`}
             >
               <FaLock /> Roles
             </button>
             {rolSeleccionado && (
               <button
-                onClick={() => setTabActivo("permisos_rol")}
-                className={`tab-button ${tabActivo === "permisos_rol" ? 'active' : ''}`}
+                onClick={() => setTabActive("permisos_rol")}
+                className={`tab-button ${tabActive === "permisos_rol" ? 'active' : ''}`}
               >
-                <FaShieldAlt /> Permisos del rol {rolSeleccionado.nombre}
+                <FaShieldAlt /> Role permissions {rolSeleccionado.nombre}
               </button>
             )}
             {usuarioPermisos && (
               <button
-                onClick={() => setTabActivo("permisos_usuario")}
-                className={`tab-button ${tabActivo === "permisos_usuario" ? 'active' : ''}`}
+                onClick={() => setTabActive("permisos_usuario")}
+                className={`tab-button ${tabActive === "permisos_usuario" ? 'active' : ''}`}
               >
-                <FaUserShield /> Permisos de {usuarioPermisos.nombre}
+                <FaUserShield /> Permissions de {usuarioPermisos.nombre}
               </button>
             )}
           </div>
         </div>
         
         {/* TAB USUARIOS */}
-        {tabActivo === "usuarios" && (
+        {tabActive === "usuarios" && (
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
-              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>👥 Usuarios del Sistema</h2>
+              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>👥 System Users</h2>
               <button onClick={abrirModalNuevoUsuario} className="btn btn-success">
-                <FaPlus /> Nuevo Usuario
+                <FaPlus /> New User
               </button>
             </div>
             
             {usuarios.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
-                Sin usuarios registrados
+                No users registered
               </div>
             ) : (
               usuarios.map(usuario => (
@@ -491,30 +527,30 @@ export default function Configuracion() {
                         📧 {usuario.email}
                       </div>
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        <span style={{ padding: "4px 12px", background: "#2196F3", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
+                        <span style={{ padding: "4px 12px", background: "white", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
                           {obtenerNombreRol(usuario.rol_id)}
                         </span>
                         {usuario.pais_id && (
-                          <span style={{ padding: "4px 12px", background: "#4CAF50", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
+                          <span style={{ padding: "4px 12px", background: "#2e7d32", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
                             📍 {obtenerNombrePais(usuario.pais_id)}
                           </span>
                         )}
-                        <span style={{ padding: "4px 12px", background: usuario.activo ? "#4CAF50" : "#f44336", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
-                          {usuario.activo ? "✓ Activo" : "✗ Inactivo"}
+                        <span style={{ padding: "4px 12px", background: usuario.activo ? "#e8f5e9" : "#ffebee", color: usuario.activo ? "#2e7d32" : "#c62828", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
+                          {usuario.activo ? "✓ Active" : "✗ Inactivo"}
                         </span>
                       </div>
                     </div>
                     
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                      <button onClick={() => verPermisosPersonalizados(usuario)} className="btn btn-info" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                        <FaUserShield /> Permisos
+                      <button onClick={() => verPermissionsPersonalizados(usuario)} className="btn btn-info" style={{ fontSize: "13px", padding: "8px 16px" }}>
+                        <FaUserShield /> Permissions
                       </button>
-                      <button onClick={() => abrirModalEditarUsuario(usuario)} className="btn btn-warning" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                        <FaEdit /> Editar
+                      <button onClick={() => abrirModalEditUsuario(usuario)} className="btn btn-warning" style={{ fontSize: "13px", padding: "8px 16px" }}>
+                        <FaEdit /> Edit
                       </button>
                       {usuario.id !== user?.id && (
                         <button onClick={() => eliminarUsuario(usuario.id)} className="btn btn-danger" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                          <FaTrash /> Eliminar
+                          <FaTrash /> Delete
                         </button>
                       )}
                     </div>
@@ -526,9 +562,9 @@ export default function Configuracion() {
         )}
         
         {/* TAB ROLES */}
-        {tabActivo === "roles" && (
+        {tabActive === "roles" && (
           <div className="card">
-            <h2 style={{ margin: "0 0 25px", fontSize: "20px", fontWeight: "700" }}>🔐 Roles del Sistema</h2>
+            <h2 style={{ margin: "0 0 25px", fontSize: "20px", fontWeight: "700" }}>🔐 System Roles</h2>
             
             {roles.map(rol => (
               <div key={rol.id} style={{ padding: "20px", border: "2px solid #f0f0f0", borderRadius: "12px", marginBottom: "15px" }}>
@@ -542,8 +578,8 @@ export default function Configuracion() {
                     </div>
                   </div>
                   
-                  <button onClick={() => verPermisosRol(rol)} className="btn btn-primary" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                    <FaShieldAlt /> Ver Permisos
+                  <button onClick={() => verPermissionsRol(rol)} className="btn btn-primary" style={{ fontSize: "13px", padding: "8px 16px" }}>
+                    <FaShieldAlt /> Ver Permissions
                   </button>
                 </div>
               </div>
@@ -552,20 +588,20 @@ export default function Configuracion() {
         )}
         
         {/* TAB PERMISOS ROL */}
-        {tabActivo === "permisos_rol" && rolSeleccionado && (
+        {tabActive === "permisos_rol" && rolSeleccionado && (
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>
-                  ✅ Permisos del rol {rolSeleccionado.nombre}
+                  ✅ Role permissions {rolSeleccionado.nombre}
                 </h2>
                 <p style={{ color: "#666", fontSize: "13px", margin: "5px 0 0" }}>
-                  Define a qué módulos tiene acceso este rol por defecto
+                  Defines which modules this role can access by default
                 </p>
               </div>
             </div>
             
-            {permisos.map(permiso => {
+            {MODULOS_SISTEMA.map(permiso => {
               const permisoRol = rolSeleccionado.permisos?.find(p => p.permiso_id === permiso.id);
               const tieneAcceso = permisoRol?.tiene_acceso || false;
               
@@ -573,10 +609,10 @@ export default function Configuracion() {
                 <div key={permiso.id} className="permiso-item">
                   <div>
                     <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>
-                      {permiso.nombre.split('_').map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)).join(' ')}
+                      {permiso.icono} {permiso.label}
                     </div>
                     <div style={{ fontSize: "12px", color: "#999" }}>
-                      {permiso.descripcion}
+                      {permiso.descripcion || ''}
                     </div>
                   </div>
                   
@@ -595,35 +631,34 @@ export default function Configuracion() {
         )}
         
         {/* TAB PERMISOS USUARIO */}
-        {tabActivo === "permisos_usuario" && usuarioPermisos && (
+        {tabActive === "permisos_usuario" && usuarioPermisos && (
           <div className="card">
             <div style={{ marginBottom: "25px" }}>
               <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>
-                🔑 Permisos personalizados de {usuarioPermisos.nombre}
+                🔑 Custom permissions for {usuarioPermisos.nombre}
               </h2>
               <p style={{ color: "#666", fontSize: "13px", margin: "5px 0 0" }}>
-                Rol base: <strong>{obtenerNombreRol(usuarioPermisos.rol_id)}</strong>
-              </p>
+                    Rol base: <strong>{obtenerNombreRol(usuarioPermisos.rol_id || usuarioPermisos.rol)}</strong>              </p>
               <p style={{ color: "#999", fontSize: "12px", margin: "5px 0 0", fontStyle: "italic" }}>
-                Los permisos personalizados se SUMAN a los del rol. Los azules son del rol, los naranjas son personalizados.
+                Custom permissions are added to role permissions. Los azules son del rol, los naranjas son personalizados.
               </p>
             </div>
             
-            {permisos.map(permiso => {
+            {MODULOS_SISTEMA.map(permiso => {
               const permisoPersonalizado = tienePermisoPersonalizado(permiso.id);
-              const permisoRolActivo = tienePermisoRol(permiso.id);
-              const tieneAcceso = permisoPersonalizado ? permisoPersonalizado.tiene_acceso : !!permisoRolActivo;
+              const permisoRolActive = tienePermisoRol(permiso.id);
+              const tieneAcceso = permisoPersonalizado ? permisoPersonalizado.tiene_acceso : !!permisoRolActive;
               
               return (
                 <div key={permiso.id} className="permiso-item">
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>
-                      {permiso.nombre.split('_').map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)).join(' ')}
-                      {permisoRolActivo && <span className="permiso-badge badge-rol">Rol</span>}
-                      {permisoPersonalizado && <span className="permiso-badge badge-personalizado">Personalizado</span>}
+                      {permiso.icono} {permiso.label}
+                      {permisoRolActive && <span className="permiso-badge badge-rol">Role</span>}
+                      {permisoPersonalizado && <span className="permiso-badge badge-personalizado">Custom</span>}
                     </div>
                     <div style={{ fontSize: "12px", color: "#999" }}>
-                      {permiso.descripcion}
+                      {permiso.descripcion || ''}
                     </div>
                   </div>
                   
@@ -646,13 +681,23 @@ export default function Configuracion() {
           <div className="modal-overlay" onClick={() => setMostrandoModal(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <h3 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: "700" }}>
-                {tipoModal === "nuevo_usuario" ? "➕ Nuevo Usuario" : "✏️ Editar Usuario"}
+                {tipoModal === "nuevo_usuario" ? "➕ New User" : "✏️ Edit User"}
               </h3>
               
+              {tipoModal === "nuevo_usuario" && (
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="User ID (e.g. LP01)"
+                  value={nuevoUsuario.id}
+                  onChange={(e) => setNuevoUsuario({...nuevoUsuario, id: e.target.value.toUpperCase()})}
+                  style={{ marginBottom: 12 }}
+                />
+              )}
               <input
                 type="text"
                 className="input"
-                placeholder="Nombre completo"
+                placeholder="Full name"
                 value={nuevoUsuario.nombre}
                 onChange={(e) => setNuevoUsuario({...nuevoUsuario, nombre: e.target.value})}
               />
@@ -695,11 +740,20 @@ export default function Configuracion() {
                 ))}
               </select>
               
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", margin: "4px 0 12px", fontSize: "14px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={!!nuevoUsuario.activo}
+                  onChange={(e) => setNuevoUsuario({...nuevoUsuario, activo: e.target.checked})}
+                />
+                Active user
+              </label>
+              
               <div style={{ display: "flex", gap: "10px" }}>
                 <button onClick={guardarUsuario} className="btn btn-success" style={{ flex: 1, justifyContent: "center" }}>
                   <FaSave /> Guardar
                 </button>
-                <button onClick={() => setMostrandoModal(false)} className="btn btn-danger" style={{ flex: 1, justifyContent: "center" }}>
+                <button onClick={() => setMostrandoModal(false)} className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }}>
                   <FaTimes /> Cancelar
                 </button>
               </div>

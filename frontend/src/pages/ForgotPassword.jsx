@@ -1,187 +1,97 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEnvelope, FaArrowLeft } from "react-icons/fa";
+import { FaEnvelope, FaArrowLeft, FaChurch } from "react-icons/fa";
 import toast from 'react-hot-toast';
+import API from '../api/axios';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (email.trim() === "") {
-      toast.error("Por favor ingrese su correo electrónico");
+    if (!email.trim()) {
+      toast.error("Please enter your email address");
       return;
     }
-
     setLoading(true);
-    
-    // Simular envío de correo
-    setTimeout(() => {
+    try {
+      await API.post('/auth/forgot-password', { email });
+      setSent(true);
+      toast.success("Instructions sent! Check your inbox.");
+    } catch {
+      // Show success anyway for security
+      setSent(true);
+      toast.success("If the email exists, you will receive instructions shortly.");
+    } finally {
       setLoading(false);
-      toast.success("Si el correo existe, recibirás instrucciones para recuperar tu contraseña");
-      setTimeout(() => navigate("/"), 2000);
-    }, 1500);
+    }
   };
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundImage:
-          "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
-      <style>
-        {`
-          .glass-card {
-            width: 420px;
-            padding: 45px;
-            border-radius: 20px;
-            background: rgba(14, 90, 97, 0.25);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border: 1px solid rgba(255, 255, 255, 0.35);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-            color: white;
-            text-align: center;
-          }
+    <div style={{ minHeight:"100vh", display:"flex", background:"linear-gradient(160deg, #0d2d4a 0%, #134069 50%, #1a5490 100%)", fontFamily:"'Lato',sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
+        .fp-input { width:100%; height:50px; padding:0 16px 0 46px; border-radius:10px; border:1.5px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:white; font-size:14px; box-sizing:border-box; outline:none; font-family:'Lato',sans-serif; transition:all 0.2s; }
+        .fp-input:focus { border-color:rgba(255,255,255,0.5); background:rgba(255,255,255,0.12); }
+        .fp-input::placeholder { color:rgba(255,255,255,0.5); }
+        .fp-btn { width:100%; height:50px; border-radius:10px; border:none; background:white; color:#134069; font-size:15px; font-weight:700; cursor:pointer; font-family:'Lato',sans-serif; transition:all 0.2s; }
+        .fp-btn:hover:not(:disabled) { background:#f0f4fa; transform:translateY(-1px); }
+        .fp-btn:disabled { opacity:0.6; cursor:not-allowed; }
+      `}</style>
 
-          .input-container {
-            position: relative;
-            margin-bottom: 20px;
-          }
+      {/* Left panel */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"center", alignItems:"center", padding:"40px", display:"none" }} className="hide-mobile" />
 
-          .input {
-            width: 100%;
-            height: 50px;
-            padding: 0 50px;
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.35);
-            background: rgba(255,255,255,0.08);
-            color: white;
-            outline: none;
-            font-size: 14px;
-            box-sizing: border-box;
-            transition: all 0.3s;
-          }
-
-          .input:focus {
-            background: rgba(255,255,255,0.15);
-            border-color: rgba(255,255,255,0.6);
-          }
-
-          .input::placeholder {
-            color: rgba(255,255,255,0.7);
-          }
-
-          .icon-left {
-            position: absolute;
-            top: 50%;
-            left: 18px;
-            transform: translateY(-50%);
-            color: white;
-            font-size: 16px;
-            opacity: 0.9;
-          }
-
-          .btn {
-            width: 100%;
-            height: 50px;
-            border-radius: 12px;
-            border: none;
-            background: linear-gradient(135deg, #0E5A61, #15777F);
-            color: white;
-            font-size: 15px;
-            cursor: pointer;
-            transition: 0.3s;
-            margin-top: 10px;
-            font-weight: 600;
-          }
-
-          .btn:hover:not(:disabled) {
-            opacity: 0.85;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(21, 119, 127, 0.4);
-          }
-
-          .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-
-          .back-btn {
-            margin-top: 15px;
-            color: rgba(255,255,255,0.8);
-            font-size: 13px;
-            cursor: pointer;
-            transition: color 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-          }
-
-          .back-btn:hover {
-            color: white;
-          }
-        `}
-      </style>
-
-      <div className="glass-card">
-        <h2 style={{ marginBottom: "10px", fontWeight: "600", fontSize: "28px" }}>
-          Recuperar Contraseña
-        </h2>
-
-        <p style={{ marginBottom: "30px", opacity: 0.9, fontSize: "14px" }}>
-          Ingresa tu correo electrónico y te enviaremos instrucciones
-        </p>
-
-        <form onSubmit={handleSubmit}>
-          <div className="input-container">
-            <FaEnvelope className="icon-left" />
-            <input
-              type="email"
-              placeholder="Correo electrónico"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input"
-              disabled={loading}
-            />
+      {/* Center card */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", flex:1, padding:"20px" }}>
+        <div style={{ width:"100%", maxWidth:"420px" }}>
+          {/* Logo */}
+          <div style={{ textAlign:"center", marginBottom:"40px" }}>
+            <div style={{ width:64, height:64, borderRadius:"16px", background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+              <FaChurch size={28} color="white" />
+            </div>
+            <h1 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"22px", fontWeight:"600", letterSpacing:"2px", margin:0 }}>IGLESIA EMANUEL</h1>
+            <p style={{ color:"rgba(255,255,255,0.5)", fontSize:"12px", margin:"4px 0 0", letterSpacing:"1px" }}>MANAGEMENT SYSTEM</p>
           </div>
 
-          <button type="submit" className="btn" disabled={loading}>
-            {loading ? 'Enviando...' : 'Enviar Instrucciones'}
-          </button>
-        </form>
+          {/* Card */}
+          <div style={{ background:"rgba(255,255,255,0.06)", borderRadius:"20px", padding:"36px", border:"1px solid rgba(255,255,255,0.12)", backdropFilter:"blur(10px)" }}>
+            {!sent ? (
+              <>
+                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"20px", fontWeight:"600", margin:"0 0 8px", textAlign:"center" }}>Reset Password</h2>
+                <p style={{ color:"rgba(255,255,255,0.6)", fontSize:"13px", textAlign:"center", margin:"0 0 28px", lineHeight:"1.6" }}>
+                  Enter your email address and we'll send you instructions to reset your password.
+                </p>
 
-        <div 
-          className="back-btn"
-          onClick={() => navigate('/')}
-        >
-          <FaArrowLeft />
-          Volver al inicio de sesión
-        </div>
+                <form onSubmit={handleSubmit}>
+                  <div style={{ position:"relative", marginBottom:"20px" }}>
+                    <FaEnvelope style={{ position:"absolute", top:"50%", left:"16px", transform:"translateY(-50%)", color:"rgba(255,255,255,0.5)", fontSize:"15px" }} />
+                    <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className="fp-input" disabled={loading} />
+                  </div>
+                  <button type="submit" className="fp-btn" disabled={loading}>
+                    {loading ? 'Sending...' : 'Send Reset Instructions'}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div style={{ textAlign:"center", padding:"20px 0" }}>
+                <div style={{ fontSize:"48px", marginBottom:"16px" }}>📧</div>
+                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"18px", margin:"0 0 12px" }}>Check Your Email</h2>
+                <p style={{ color:"rgba(255,255,255,0.7)", fontSize:"13px", lineHeight:"1.7", margin:0 }}>
+                  If an account exists for <strong>{email}</strong>, you will receive password reset instructions shortly.
+                </p>
+              </div>
+            )}
 
-        <div style={{ 
-          marginTop: "25px", 
-          padding: "15px", 
-          background: "rgba(255,255,255,0.1)", 
-          borderRadius: "10px", 
-          fontSize: "12px",
-          textAlign: "left"
-        }}>
-          <strong style={{ display: "block", marginBottom: "8px", fontSize: "13px" }}>
-            Nota:
-          </strong>
-          <div>Esta función estará disponible cuando se implemente el backend con envío de correos.</div>
+            <button onClick={() => navigate('/')} style={{ width:"100%", marginTop:"20px", padding:"12px", background:"transparent", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"10px", color:"rgba(255,255,255,0.7)", fontSize:"13px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", fontFamily:"'Lato',sans-serif", transition:"all 0.2s" }}
+              onMouseOver={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "white"; }}
+              onMouseOut={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}>
+              <FaArrowLeft size={12} /> Back to Sign In
+            </button>
+          </div>
         </div>
       </div>
     </div>

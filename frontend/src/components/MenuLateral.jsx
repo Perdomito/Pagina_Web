@@ -18,58 +18,58 @@ export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
 
   const modulos = [
     { 
-      titulo: "Miembros",
-      desc: "Registros, seguimiento, visitas.",
+      titulo: "Members",
+      desc: "Records, follow-up & visits.",
       ruta: "/miembros",
       icon: <FaUsers size={20} />,
       permiso: "miembros"
     },
     { 
-      titulo: "Estudios Bíblicos",
-      desc: "Control semanal tipo Excel.",
+      titulo: "Bible Studies",
+      desc: "Weekly control & tracking.",
       ruta: "/estudios-biblicos",
       icon: <FaBook size={20} />,
       permiso: "estudios_biblicos"
     },
     { 
-      titulo: "Reportes",
-      desc: "Resultados y metas cumplidas.",
+      titulo: "Reports",
+      desc: "Results & goals achieved.",
       ruta: "/reportes",
       icon: <FaChartBar size={20} />,
       permiso: "reportes"
     },
     { 
-      titulo: "Contactos",
-      desc: "Nuevos, pendientes y seguimiento.",
+      titulo: "Contacts",
+      desc: "New & follow-up contacts.",
       ruta: "/contactos",
       icon: <FaAddressBook size={20} />,
       permiso: "contactos"
     },
     { 
-      titulo: "Administración",
-      desc: "Presupuesto, control financiero.",
+      titulo: "Administration",
+      desc: "Budget & financial control.",
       ruta: "/administracion",
       icon: <FaMoneyBillWave size={20} />,
       permiso: "administracion"
     },
     { 
-      titulo: "Estadísticas",
-      desc: "Gráficos y reportes por país.",
+      titulo: "Statistics",
+      desc: "Charts & reports by country.",
       ruta: "/estadisticas",
       icon: <FaChartLine size={20} />,
       permiso: "reportes"
     },
     { 
-      titulo: "Estudios",
-      desc: "🚧 En construcción - Próximamente",
+      titulo: "Studies",
+      desc: "🚧 Under construction - Coming soon",
       ruta: null,
       icon: <FaHammer size={20} />,
       permiso: "estudios_biblicos",
       enConstruccion: true
     },
     { 
-      titulo: "Configuración",
-      desc: "Usuarios, roles y permisos.",
+      titulo: "Settings",
+      desc: "Users, roles & permissions.",
       ruta: "/configuracion",
       icon: <FaCog size={20} />,
       permiso: "configuracion"
@@ -255,7 +255,7 @@ export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
             textAlign: 'center'
           }}
         >
-          © {new Date().getFullYear()} Iglesia Emanuel
+          © {new Date().getFullYear()} Emanuel Church
         </div>
       </div>
     </>

@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import contactosService from '../services/ContactosService';
+import { useAuth } from '../context/AuthContext';
 import estudiosService from '../services/EstudiosService';
 import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
 
 export default function Contactos() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [contactos, setContactos] = useState([]);
   const [miembros, setMiembros] = useState([]);
@@ -123,7 +125,12 @@ export default function Contactos() {
   };
 
   // Filtrar por búsqueda
-  const contactosFiltrados = contactos.filter(c => {
+  // Filtrar por país del usuario
+  const contactosPorPais = (user?.rol_id === 1 || !user?.pais_id)
+    ? contactos
+    : contactos.filter(c => c.pais_id === user.pais_id);
+
+  const contactosFiltrados = contactosPorPais.filter(c => {
     const q = busqueda.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -146,7 +153,7 @@ export default function Contactos() {
   const esDuplicadoNombre = (c) => nombreCount[c.nombre?.trim().toLowerCase()] > 1;
   const esDuplicadoTel = (c) => c.telefono && c.telefono !== '-' && telefonoCount[c.telefono?.trim()] > 1;
   const tieneDuplicado = (c) => esDuplicadoNombre(c) || esDuplicadoTel(c);
-  const totalDuplicados = contactos.filter(tieneDuplicado).length;
+  const totalDuplicados = contactosPorPais.filter(tieneDuplicado).length;
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0E5A61, #15777F)", padding: "20px" }}>
@@ -156,7 +163,14 @@ export default function Contactos() {
             <button onClick={() => navigate("/home")} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "10px 15px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
               <FaArrowLeft /> Volver
             </button>
+            <div>
             <h1 style={{ color: "white", margin: 0 }}>Contact Management</h1>
+            {user?.pais_nombre && (
+              <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>
+                {user.pais_nombre} · {user.region || ""}
+              </p>
+            )}
+          </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
             <button onClick={() => abrirModal()} style={{ background: "#4CAF50", border: "none", borderRadius: "8px", padding: "12px 20px", color: "white", cursor: "pointer", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -164,7 +178,7 @@ export default function Contactos() {
             </button>
             <div style={{ display: "flex", gap: "8px" }}>
               <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: "6px", padding: "4px 12px", color: "white", fontSize: "12px" }}>
-                <strong>{contactos.length}</strong> contact{contactos.length !== 1 ? 's' : ''}
+                <strong>{contactosPorPais.length}</strong> contact{contactosPorPais.length !== 1 ? 's' : ''}
               </div>
               {totalDuplicados > 0 && (
                 <div style={{ background: "rgba(255,152,0,0.3)", border: "1px solid rgba(255,152,0,0.6)", borderRadius: "6px", padding: "4px 12px", color: "white", fontSize: "12px" }}>
@@ -213,7 +227,7 @@ export default function Contactos() {
                 {contactosFiltrados.length === 0 ? (
                   <tr>
                     <td colSpan="5" style={{ padding: "40px", textAlign: "center", color: "#999" }}>
-                      {busqueda ? `No results for "${busqueda}"` : 'No contacts registered'}
+                      {busqueda ? `No results for "${busqueda}"` : 'No contacts registered for this country'}
                     </td>
                   </tr>
                 ) : (

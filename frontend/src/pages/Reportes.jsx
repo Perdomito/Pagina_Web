@@ -7,6 +7,7 @@ import autoTable from "jspdf-autotable";
 import estudiosService from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
 import miembrosService from '../services/MiembrosService';
+import { useAuth } from '../context/AuthContext';
 
 // Estilos para impresión del misionero
 const estilosImpresion = `
@@ -61,10 +62,12 @@ const estilosImpresion = `
 `;
 
 export default function Reportes() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [continenteSeleccionado, setContinenteSeleccionado] = useState("");
   const [paisSeleccionado, setPaisSeleccionado] = useState("");
+  // Pre-seleccionar el país del usuario
   const [tipoReporte, setTipoReporte] = useState("mensual");
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState("");
   const [observaciones, setObservaciones] = useState("");
@@ -83,6 +86,22 @@ export default function Reportes() {
       try {
         const continentesData = await administracionService.getAllContinentes();
         setContinentes(continentesData);
+        
+        // Auto-seleccionar la región del usuario
+        if (user?.region) {
+          const contUsuario = continentesData.find(c => 
+            c.nombre?.toLowerCase().includes(user.region?.toLowerCase()) ||
+            user.region?.toLowerCase().includes(c.nombre?.toLowerCase())
+          );
+          if (contUsuario) {
+            setContinenteSeleccionado(String(contUsuario.id));
+            // Auto-seleccionar el país del usuario
+            if (user?.pais_id) {
+              const paisUsuario = contUsuario.paises?.find(p => p.id === user.pais_id);
+              if (paisUsuario) setPaisSeleccionado(String(user.pais_id));
+            }
+          }
+        }
       } catch (error) {
         console.error('Error al cargar continentes:', error);
       }
@@ -333,28 +352,32 @@ export default function Reportes() {
       
       doc.setFont("helvetica");
       doc.setFontSize(20);
-      doc.setTextColor(14, 90, 97);
-      doc.text("Reporte de Evangelización", pageWidth / 2, 20, { align: "center" });
+      doc.setTextColor(19, 64, 105);
+      doc.text("Evangelism Report", pageWidth / 2, 20, { align: "center" });
       
       doc.setFontSize(14);
       doc.setTextColor(100, 100, 100);
-      const paisNombre = paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre || "";
+      const paisNombrePDF = paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre || "";
       const periodoTexto = obtenerPeriodos().find(p => p.valor === periodoSeleccionado)?.etiqueta || "";
-      doc.text(`${tipoReporte === "semanal" ? "Semanal" : "Mensual"} - ${paisNombre}`, pageWidth / 2, 30, { align: "center" });
+      doc.text(`${tipoReporte === "semanal" ? "Weekly" : "Monthly"} - ${paisNombrePDF}`, pageWidth / 2, 30, { align: "center" });
       doc.text(periodoTexto, pageWidth / 2, 38, { align: "center" });
       
-      doc.setDrawColor(14, 90, 97);
+      doc.setDrawColor(19, 64, 105);
       doc.setLineWidth(0.5);
       doc.line(20, 42, pageWidth - 20, 42);
       
       const datosTabla = [
-        ["Métrica", "Valor"],
-        ["Estudiantes Actuales de la Biblia", reporteActual.estudiantesActuales.toString()],
-        ["Evangelismo Online (horas)", reporteActual.evangelismoOnline.toString()],
-        ["Evangelismo Presencial (horas)", reporteActual.evangelismoPresencial.toString()],
-        [`Estudios en ${tipoReporte === "semanal" ? "la Semana" : "el Mes"}`, reporteActual.numeroEstudios.toString()],
-        [`Nuevos Contactos ${tipoReporte === "semanal" ? "esta Semana" : "este Mes"}`, reporteActual.nuevosContactos.toString()],
-        ["Contactos que Tomaron el Estudio", reporteActual.contactosEstudian.toString()]
+        ["Metric", "Value"],
+        ["Active Bible Students", reporteActual.estudiantesActuales.toString()],
+        ["Online Evangelism (hours)", reporteActual.evangelismoOnline.toString()],
+        ["In-Person Evangelism (hours)", reporteActual.evangelismoPresencial.toString()],
+        [`Studies in ${tipoReporte === "semanal" ? "the Week" : "the Month"}`, reporteActual.numeroEstudios.toString()],
+        [`New Contacts ${tipoReporte === "semanal" ? "this Week" : "this Month"}`, reporteActual.nuevosContactos.toString()],
+        ["Contacts who Took Study", reporteActual.contactosEstudian.toString()],
+        ["Students up to Chapter 4", (reporteActual.hastRomanos4 || 0).toString()],
+        ["Students up to Chapter 8", (reporteActual.terminadoRomanos8 || 0).toString()],
+        ["Students past Chapter 8", (reporteActual.terminado4Leyes || 0).toString()],
+        ["Said Yes", (reporteActual.probabilidadMiembro || 0).toString()]
       ];
       
       autoTable(doc, {
@@ -363,7 +386,7 @@ export default function Reportes() {
         body: datosTabla.slice(1),
         theme: 'grid',
         headStyles: {
-          fillColor: [14, 90, 97],
+          fillColor: [19, 64, 105],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
           fontSize: 11
@@ -377,7 +400,7 @@ export default function Reportes() {
         margin: { left: 20, right: 20 }
       });
       
-      const nombreArchivo = `Reporte_${paisNombre.replace(/\s+/g, '_')}_${periodoTexto.replace(/\s+/g, '_')}.pdf`;
+      const nombreArchivo = `Reporte_${paisNombrePDF.replace(/\s+/g, '_')}_${periodoTexto.replace(/\s+/g, '_')}.pdf`;
       doc.save(nombreArchivo);
     }
   };

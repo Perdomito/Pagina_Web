@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaPlus, FaTrash, FaPrint, FaSave, FaTimes, FaUser, FaCalendarAlt, FaBook, FaChartBar, FaGlobe, FaChartLine, FaUserPlus } from "react-icons/fa";
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 // 
 import contactosService from '../services/ContactosService';
@@ -22,6 +23,7 @@ const toMesNum = (mes) => typeof mes === 'string' ? MESES_ARR.indexOf(mes) + 1 :
 export default function EstudiosBiblicos() {
   const navigate = useNavigate();
   
+  const { user } = useAuth();
   const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
   const [paisSeleccionado, setPaisSeleccionado] = useState(null);
   const [mesSeleccionado, setMesSeleccionado] = useState(null);
@@ -1106,28 +1108,72 @@ const eliminarPais = async (continenteId, paisId) => {
 
       {/* SELECCIÓN DE CONTINENTE */}
       {!continenteSeleccionado && (
-        <div>
-          <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
+        <div style={{ position: "relative" }}>
+          <h2 style={{ margin: "0 0 8px 0", color: "#134069", fontFamily: "'Cinzel',serif", fontSize: "18px", position: "relative" }}>
             <FaGlobe style={{ marginRight: "10px" }} />
-            Select a Continent
+            Select a Region
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px" }}>
-            {continentes.map(cont => (
-              <div
-                key={cont.id}
-                className="card-item"
-                onClick={() => setContinenteSeleccionado(cont.id)}
-              >
-
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a5490", marginBottom: "10px" }}>
-                  {cont.nombre}
+          {user?.region && (
+            <p style={{ color: "#8a97b0", fontSize: "13px", margin: "0 0 20px", fontFamily: "'Lato',sans-serif" }}>
+              Your region: <strong style={{ color: "#134069" }}>{user.region}</strong>
+            </p>
+          )}
+<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px", position: "relative" }}>
+{continentes.map(cont => {
+              const esDelUsuario = (user?.pais_id && cont.paises?.some(p => p.id === user.pais_id)) ||
+                (user?.region && (
+                  cont.nombre?.toLowerCase().includes(user.region?.toLowerCase()) ||
+                  user.region?.toLowerCase().includes(cont.nombre?.toLowerCase())
+                ));
+              const puedeEntrar = user?.rol_id === 1 || esDelUsuario || (!user?.pais_id && !user?.region);
+              return (
+                <div
+                  key={cont.id}
+                  className="card-item"
+                    onClick={() => { if (puedeEntrar) setContinenteSeleccionado(cont.id); }}
+                  style={{
+                    opacity: puedeEntrar ? 1 : 0.45,
+                    cursor: puedeEntrar ? "pointer" : "not-allowed",
+                    border: esDelUsuario ? "2px solid #134069" : "1px solid #e8edf5",
+                    background: esDelUsuario ? "#f0f4fa" : "white",
+                    borderRadius: "12px",
+                    padding: "20px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    position: "relative"
+                  }}
+                >
+                  {esDelUsuario && (
+                    <div style={{ position: "absolute", top: 10, right: 10, background: "#134069", color: "white", fontSize: "10px", fontWeight: "700", borderRadius: "6px", padding: "2px 8px", fontFamily: "'Lato',sans-serif" }}>
+                      YOUR REGION
+                    </div>
+                  )}
+                  <div style={{ fontSize: "18px", fontWeight: "700", color: esDelUsuario ? "#134069" : "#1a2d5a", marginBottom: "6px", fontFamily: "'Cinzel',serif" }}>
+                    {cont.nombre}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#8a97b0", fontFamily: "'Lato',sans-serif" }}>
+                    {cont.paises?.length || 0} countries
+                  </div>
                 </div>
-                <div style={{ fontSize: "14px", color: "#666" }}>
-                  {cont.paises.length} countries
-                </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
 
+          {/* Mapamundi centrado debajo de las tarjetas */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "-90px" }}>
+            <img
+              src="/mapamundi.png"
+              alt="World map"
+              onError={(e) => { e.target.style.display = 'none'; }}
+              style={{
+                width: "100%",
+                maxWidth: "1100px",
+                maxHeight: "450px",
+                objectFit: "contain",
+                opacity: 0.9,
+                pointerEvents: "none"
+              }}
+            />
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes, FaInfoCircle } from "rea
 import toast from 'react-hot-toast';
 import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
+import { useAuth } from '../context/AuthContext';
 
 const PRIMARY = "#1a5490";
 const PRIMARY_LIGHT = "#2a72b8";
@@ -31,6 +32,7 @@ const labelStyle = {
 };
 
 export default function Miembros() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [miembros, setMiembros] = useState([]);
   const [paises, setPaises] = useState([]);
@@ -116,7 +118,12 @@ export default function Miembros() {
     return m;
   }, [paises]);
 
-  const miembrosFiltrados = miembros.filter(m => {
+  // Filtrar por país del usuario si no es admin
+  const miembrosPorPais = (user?.rol_id === 1 || !user?.pais_id) 
+    ? miembros 
+    : miembros.filter(m => m.pais_id === user.pais_id);
+
+  const miembrosFiltrados = miembrosPorPais.filter(m => {
     const p = paisesMap.get(m.pais_id);
     const paisLabel = (p?.iso || p?.nombre || '').toLowerCase();
     const t = filtro.toLowerCase();
@@ -355,6 +362,11 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
               <h1 style={{ color: "white", margin: 0, fontFamily: "'Cinzel', serif", fontSize: "26px", fontWeight: "700", letterSpacing: "1px" }}>
                 Member Management
               </h1>
+              {user?.pais_nombre && (
+                <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>
+                  {user.pais_nombre} · {user.region || ""}
+                </p>
+              )}
             </div>
           </div>
 
@@ -384,7 +396,7 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
             <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:10, padding:"10px 20px", color:"white" }}>
               <span style={{ fontSize:11, opacity:0.8 }}>TOTAL MEMBERS </span>
               <strong style={{ fontSize:18 }}>{miembrosFiltrados.length}</strong>
-              {filtro && <span style={{ fontSize:11, opacity:0.7 }}> of {miembros.length}</span>}
+              {filtro && <span style={{ fontSize:11, opacity:0.7 }}> of {miembrosPorPais.length}</span>}
             </div>
           </div>
         )}
