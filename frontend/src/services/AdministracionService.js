@@ -1,14 +1,60 @@
 import axios from '../api/axios';
 
+const normalizarIso = (pais = {}) => pais.codigo_iso || pais.iso || '';
+
+const normalizarContinenteId = (pais = {}, continentes = []) => {
+  if (pais.continente_id != null) {
+    return pais.continente_id;
+  }
+
+  if (!pais.continente) {
+    return null;
+  }
+
+  const match = continentes.find(
+    (cont) => (cont.nombre || '').trim().toLowerCase() === String(pais.continente).trim().toLowerCase()
+  );
+
+  return match?.id ?? null;
+};
+
+const normalizarPais = (pais = {}, continentes = []) => {
+  const continenteId = normalizarContinenteId(pais, continentes);
+  const continente = pais.continente
+    || continentes.find((cont) => cont.id === continenteId)?.nombre
+    || '';
+  const iso = normalizarIso(pais);
+
+  return {
+    ...pais,
+    iso,
+    codigo_iso: iso,
+    continente,
+    continente_id: continenteId,
+    activo: pais.activo ?? true,
+  };
+};
+
 const administracionService = {
   getAllPaises: async () => {
-    const response = await axios.get('/paises');
-    return response.data;
+    const [paisesResponse, continentesResponse] = await Promise.all([
+      axios.get('/paises'),
+      axios.get('/continentes').catch(() => ({ data: [] }))
+    ]);
+
+    const paises = paisesResponse.data || [];
+    const continentes = continentesResponse.data || [];
+
+    return paises.map((pais) => normalizarPais(pais, continentes));
   },
 
   getPaisById: async (id) => {
-    const response = await axios.get(`/paises/${id}`);
-    return response.data;
+    const [paisResponse, continentesResponse] = await Promise.all([
+      axios.get(`/paises/${id}`),
+      axios.get('/continentes').catch(() => ({ data: [] }))
+    ]);
+
+    return normalizarPais(paisResponse.data || {}, continentesResponse.data || []);
   },
 
   getMiembrosPorPais: async (pais_id) => {
@@ -53,8 +99,10 @@ const administracionService = {
 
   getAllContinentes: async () => {
     const response = await axios.get('/continentes');
-    const continentes = response.data;
-    const paises = await axios.get('/paises').then(r => r.data).catch(() => []);
+    const continentes = response.data || [];
+    const paisesRaw = await axios.get('/paises').then(r => r.data).catch(() => []);
+    const paises = paisesRaw.map((pais) => normalizarPais(pais, continentes));
+
     return continentes.map(cont => ({
       ...cont,
       paises: paises
@@ -63,7 +111,9 @@ const administracionService = {
           id: p.id,
           nombre: p.nombre,
           continente: cont.nombre,
-          codigo_iso: p.iso || '',
+          iso: p.iso || '',
+          codigo_iso: p.codigo_iso || p.iso || '',
+          continente_id: p.continente_id,
           activo: true
         }))
     }));

@@ -26,20 +26,30 @@ async def obtener_estadisticas(
         anio = anio_result.scalar() or 2025
 
     total_usuarios = (await db.execute(select(func.count(Usuario.id)))).scalar() or 0
-    total_miembros = (await db.execute(select(func.count(Miembro.id)))).scalar() or 0
-    total_contactos = (await db.execute(select(func.count(Contacto.id)))).scalar() or 0
-    total_reportes = (await db.execute(select(func.count(Reporte.id)))).scalar() or 0
+
+    miembros_query = select(func.count(Miembro.id))
+    contactos_query = select(func.count(Contacto.id))
+    reportes_query = select(func.count(Reporte.id)).where(extract("year", Reporte.fecha) == anio)
+
+    if pais_id is not None:
+        miembros_query = miembros_query.where(Miembro.pais_id == pais_id)
+        contactos_query = contactos_query.where(Contacto.pais_id == pais_id)
+        reportes_query = reportes_query.where(Reporte.pais_id == pais_id)
+
+    total_miembros = (await db.execute(miembros_query)).scalar() or 0
+    total_contactos = (await db.execute(contactos_query)).scalar() or 0
+    total_reportes = (await db.execute(reportes_query)).scalar() or 0
 
     anios_result = await db.execute(
         select(EstadisticaPais.anio).distinct().order_by(EstadisticaPais.anio.desc())
     )
     anios_disponibles = [a for a in anios_result.scalars().all()]
 
-    comparacion = await _build_comparacion_estudios(db, anio)
-    rendimiento = await _build_rendimiento_profesores(db, anio)
-    evangelismo = await _build_evangelismo_profesores(db, anio)
-    crecimiento_est = await _build_crecimiento_estudiantes(db, anio)
-    crecimiento_miembros = await _build_crecimiento_miembros(db, anio)
+    comparacion = await _build_comparacion_estudios(db, anio, pais_id)
+    rendimiento = await _build_rendimiento_profesores(db, anio, pais_id)
+    evangelismo = await _build_evangelismo_profesores(db, anio, pais_id)
+    crecimiento_est = await _build_crecimiento_estudiantes(db, anio, pais_id)
+    crecimiento_miembros = await _build_crecimiento_miembros(db, anio, pais_id)
     resumen_pais = await _build_resumen_pais(db, pais_id)
 
     return EstadisticasOut(
@@ -58,16 +68,20 @@ async def obtener_estadisticas(
     )
 
 
-async def _build_comparacion_estudios(db: AsyncSession, anio: int) -> ComparacionEstudios:
+async def _build_comparacion_estudios(db: AsyncSession, anio: int, pais_id: int | None = None) -> ComparacionEstudios:
     anio_anterior = anio - 1
     data_actual = [0] * 12
     data_anterior = [0] * 12
 
-    result = await db.execute(
+    query = (
         select(EstadisticaPais.mes, func.sum(EstadisticaPais.cantidad_estudios))
         .where(EstadisticaPais.anio.in_([anio, anio_anterior]))
         .group_by(EstadisticaPais.anio, EstadisticaPais.mes)
     )
+    if pais_id is not None:
+        query = query.where(EstadisticaPais.pais_id == pais_id)
+
+    result = await db.execute(query)
     for row in result.all():
         mes_idx = (row[0] or 1) - 1
         if 0 <= mes_idx < 12:
@@ -93,8 +107,8 @@ async def _build_comparacion_estudios(db: AsyncSession, anio: int) -> Comparacio
     )
 
 
-async def _build_rendimiento_profesores(db: AsyncSession, anio: int) -> RendimientoProfesores:
-    result = await db.execute(
+async def _build_rendimiento_profesores(db: AsyncSession, anio: int, pais_id: int | None = None) -> RendimientoProfesores:
+    query = (
         select(
             Reporte.miembro_id,
             Miembro.nombre,
@@ -105,6 +119,10 @@ async def _build_rendimiento_profesores(db: AsyncSession, anio: int) -> Rendimie
         .group_by(Reporte.miembro_id, Miembro.nombre)
         .order_by(func.count(Reporte.id).desc())
     )
+    if pais_id is not None:
+        query = query.where(Reporte.pais_id == pais_id)
+
+    result = await db.execute(query)
     profesores = []
     for row in result.all():
         total = row[2] or 0
@@ -118,8 +136,8 @@ async def _build_rendimiento_profesores(db: AsyncSession, anio: int) -> Rendimie
     return RendimientoProfesores(anio=anio, profesores=profesores)
 
 
-async def _build_evangelismo_profesores(db: AsyncSession, anio: int) -> EvangelismoProfesores:
-    result = await db.execute(
+async def _build_evangelismo_profesores(db: AsyncSession, anio: int, pais_id: int | None = None) -> EvangelismoProfesores:
+    query = (
         select(
             Reporte.miembro_id,
             Miembro.nombre,
@@ -130,6 +148,10 @@ async def _build_evangelismo_profesores(db: AsyncSession, anio: int) -> Evangeli
         .group_by(Reporte.miembro_id, Miembro.nombre)
         .order_by(func.sum(Reporte.tiempo_evangelizacion).desc())
     )
+    if pais_id is not None:
+        query = query.where(Reporte.pais_id == pais_id)
+
+    result = await db.execute(query)
     profesores = []
     for row in result.all():
         horas = 0
@@ -140,9 +162,10 @@ async def _build_evangelismo_profesores(db: AsyncSession, anio: int) -> Evangeli
             id=row[0] or "", nombre=row[1] or "", total_horas=round(horas, 1)
         ))
 
-    anios_result = await db.execute(
-        select(func.distinct(extract("year", Reporte.fecha))).order_by(extract("year", Reporte.fecha).desc())
-    )
+    anios_query = select(func.distinct(extract("year", Reporte.fecha))).order_by(extract("year", Reporte.fecha).desc())
+    if pais_id is not None:
+        anios_query = anios_query.where(Reporte.pais_id == pais_id)
+    anios_result = await db.execute(anios_query)
     anios_disponibles = [int(a) for a in anios_result.scalars().all() if a is not None]
 
     return EvangelismoProfesores(
@@ -154,33 +177,42 @@ async def _build_evangelismo_profesores(db: AsyncSession, anio: int) -> Evangeli
     )
 
 
-async def _build_crecimiento_estudiantes(db: AsyncSession, anio: int) -> CrecimientoEstudiantes:
+async def _build_crecimiento_estudiantes(db: AsyncSession, anio: int, pais_id: int | None = None) -> CrecimientoEstudiantes:
     serie = [0] * 12
-    result = await db.execute(
+    query = (
         select(EstadisticaPais.mes, func.sum(EstadisticaPais.cantidad_estudios))
         .where(EstadisticaPais.anio == anio)
         .group_by(EstadisticaPais.mes)
     )
+    if pais_id is not None:
+        query = query.where(EstadisticaPais.pais_id == pais_id)
+
+    result = await db.execute(query)
     for row in result.all():
         if row[0] and 1 <= row[0] <= 12:
             serie[row[0] - 1] = int(row[1] or 0)
     return CrecimientoEstudiantes(serie=serie, labels=MESES_LABELS, anio=anio)
 
 
-async def _build_crecimiento_miembros(db: AsyncSession, anio: int) -> SeriesPorTipo:
+async def _build_crecimiento_miembros(db: AsyncSession, anio: int, pais_id: int | None = None) -> SeriesPorTipo:
     tipos = ["Todos", "Comprometido", "Registrado", "Voluntario"]
     series_por_tipo = {}
 
-    anios_result = await db.execute(
-        select(func.distinct(EstadisticaPais.anio)).order_by(EstadisticaPais.anio.desc())
-    )
+    anios_query = select(func.distinct(EstadisticaPais.anio)).order_by(EstadisticaPais.anio.desc())
+    if pais_id is not None:
+        anios_query = anios_query.where(EstadisticaPais.pais_id == pais_id)
+    anios_result = await db.execute(anios_query)
     anios_disponibles = [a for a in anios_result.scalars().all() if a is not None]
 
-    result = await db.execute(
+    query = (
         select(EstadisticaPais.mes, func.sum(EstadisticaPais.cantidad_miembros))
         .where(EstadisticaPais.anio == anio)
         .group_by(EstadisticaPais.mes)
     )
+    if pais_id is not None:
+        query = query.where(EstadisticaPais.pais_id == pais_id)
+
+    result = await db.execute(query)
     data = {}
     for row in result.all():
         if row[0] and 1 <= row[0] <= 12:
