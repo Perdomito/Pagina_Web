@@ -69,12 +69,12 @@ async def agregar_permiso(rol_id: int, data: RolPermisoCreate, db: AsyncSession 
     await db.refresh(obj)
     return obj
 
-
 @router.patch("/{rol_id}/permisos/{permiso_id}", response_model=RolPermisoOut)
 async def actualizar_permiso(rol_id: int, permiso_id: int, data: RolPermisoUpdate, db: AsyncSession = Depends(get_db)):
     obj = await db.get(RolPermiso, (rol_id, permiso_id))
     if not obj:
-        raise HTTPException(404, "Permiso no encontrado")
+        obj = RolPermiso(rol_id=rol_id, permiso_id=permiso_id, activo=False)
+        db.add(obj)
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(obj, k, v)
     await db.flush()
