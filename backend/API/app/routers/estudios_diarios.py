@@ -16,7 +16,11 @@ async def listar(
     mes: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(EstudioDiario).order_by(EstudioDiario.anio.desc(), EstudioDiario.mes.desc(), EstudioDiario.dia.desc())
+    # El id al final deja el orden determinista: la UI se queda con la ultima
+    # fila de cada dia, que es la version mas reciente de los contadores.
+    q = select(EstudioDiario).order_by(
+        EstudioDiario.anio.desc(), EstudioDiario.mes.desc(), EstudioDiario.dia.desc(), EstudioDiario.id
+    )
     if miembro_id:
         q = q.where(EstudioDiario.miembro_id == miembro_id)
     if pais_id:
@@ -39,6 +43,31 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("", response_model=EstudioDiarioOut, status_code=201)
 async def crear(data: EstudioDiarioCreate, db: AsyncSession = Depends(get_db)):
+    # Los contadores diarios (dijeron si / nuevos contactos / potenciales) no
+    # llevan contacto ni tipo y la UI los reenvia en cada tecla: sin este
+    # upsert quedaba una fila por pulsacion y los reportes sumaban de mas.
+    if data.contacto_id is None and data.tipo is None:
+        existente = (
+            await db.execute(
+                select(EstudioDiario)
+                .where(
+                    EstudioDiario.miembro_id == data.miembro_id,
+                    EstudioDiario.anio == data.anio,
+                    EstudioDiario.mes == data.mes,
+                    EstudioDiario.dia == data.dia,
+                    EstudioDiario.contacto_id.is_(None),
+                    EstudioDiario.tipo.is_(None),
+                )
+                .order_by(EstudioDiario.id.desc())
+            )
+        ).scalars().first()
+        if existente:
+            for k, v in data.model_dump().items():
+                setattr(existente, k, v)
+            await db.flush()
+            await db.refresh(existente)
+            return existente
+
     obj = EstudioDiario(**data.model_dump())
     db.add(obj)
     await db.flush()

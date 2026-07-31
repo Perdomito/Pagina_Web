@@ -8,7 +8,7 @@ from app.routers import (
     estadisticas_paises, roles, configuracion, usuarios,
     ciudades_mision, ingresos, miembros_info_adicional,
     saldos_caja_banco, traslados, auth, continentes,
-    estudios_diarios, estadisticas, archivos,
+    estudios_diarios, estadisticas, archivos, iglesias,
 )
 
 app = FastAPI(
@@ -134,6 +134,10 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE miembros ADD COLUMN IF NOT EXISTS avance_audio TEXT
             """))
+            # Contactos potenciales registrados dia a dia (se acumulan en reportes)
+            await conn.execute(text("""
+                ALTER TABLE estudios_diarios ADD COLUMN IF NOT EXISTS potenciales INTEGER NOT NULL DEFAULT 0
+            """))
             await conn.execute(text("""
                 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pais_id INTEGER
             """))
@@ -170,6 +174,32 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE saldos_caja_banco ADD COLUMN IF NOT EXISTS codigo_contable_banco VARCHAR(20)
             """))
+            # Iglesias: una fila por iglesia de cada ciudad. Alimenta el contador
+            # "cantidad de iglesias" por pais de Estadisticas.
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.iglesias (
+                    id                      SERIAL PRIMARY KEY,
+                    ciudad_id               INTEGER NOT NULL REFERENCES public.ciudades(id) ON DELETE RESTRICT,
+                    pais_id                 INTEGER REFERENCES public.paises(id) ON DELETE SET NULL,
+                    nombre                  TEXT NOT NULL,
+                    direccion               TEXT,
+                    pastor_encargado_id     VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    pastor_encargado_nombre TEXT,
+                    fecha_apertura          DATE,
+                    cantidad_miembros       INTEGER DEFAULT 0,
+                    activa                  BOOLEAN NOT NULL DEFAULT TRUE,
+                    notas                   TEXT,
+                    fecha_creacion          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    fecha_actualizacion     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_iglesias_pais ON public.iglesias (pais_id)
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_iglesias_ciudad ON public.iglesias (ciudad_id)
+            """))
+
             # Tabla de archivos adjuntos (ingresos/gastos)
             await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS public.archivos (
@@ -216,6 +246,10 @@ async def startup():
                 ("fk_cotizaciones_pais", "cotizaciones", "FOREIGN KEY (pais_id) REFERENCES paises(id) ON DELETE SET NULL"),
                 ("fk_cotizaciones_ciudad", "cotizaciones", "FOREIGN KEY (ciudad_id) REFERENCES ciudades(id) ON DELETE SET NULL"),
                 ("fk_rol_permisos_rol", "rol_permisos", "FOREIGN KEY (rol_id) REFERENCES roles(id)"),
+                ("fk_rol_permisos_permiso", "rol_permisos",
+                 "FOREIGN KEY (permiso_id) REFERENCES permisos(id) ON DELETE CASCADE"),
+                ("fk_usuario_permisos_permiso", "usuario_permisos",
+                 "FOREIGN KEY (permiso_id) REFERENCES permisos(id) ON DELETE CASCADE"),
             ]
             for cname, table, definition in fk_definitions:
                 await conn.execute(text(f"""
@@ -276,6 +310,7 @@ app.include_router(continentes.router)
 app.include_router(estudios_diarios.router)
 app.include_router(estadisticas.router)
 app.include_router(archivos.router)
+app.include_router(iglesias.router)
 
 
 @app.get("/", tags=["Estado"])

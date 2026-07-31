@@ -62,6 +62,7 @@ class Pais(Base):
     ejecuciones = relationship("Ejecucion", back_populates="pais_rel")
     estadisticas = relationship("EstadisticaPais", back_populates="pais_rel")
     ciudades = relationship("Ciudad", back_populates="pais_rel")
+    iglesias = relationship("Iglesia", back_populates="pais_rel")
     ingresos = relationship("Ingreso", back_populates="pais_rel")
     saldos = relationship("SaldoCajaBanco", back_populates="pais_rel")
     traslados = relationship("Traslado", back_populates="pais_rel")
@@ -87,6 +88,31 @@ class Ciudad(Base):
     contactos = relationship("Contacto", back_populates="ciudad_rel")
     reportes = relationship("Reporte", back_populates="ciudad_rel")
     misiones = relationship("CiudadMision", back_populates="ciudad_rel")
+    iglesias = relationship("Iglesia", back_populates="ciudad_rel")
+
+
+class Iglesia(Base):
+    __tablename__ = "iglesias"
+
+    id = Column(Integer, primary_key=True)
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="RESTRICT"), nullable=False)
+    # Redundante con ciudades.pais_iso2, pero las estadisticas y los permisos
+    # filtran por pais_id en todas partes: guardarlo evita el join en cada consulta.
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    nombre = Column(Text, nullable=False)
+    direccion = Column(Text)
+    pastor_encargado_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    pastor_encargado_nombre = Column(Text)
+    fecha_apertura = Column(Date)
+    cantidad_miembros = Column(Integer, default=0)
+    activa = Column(Boolean, default=True, nullable=False)
+    notas = Column(Text)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    ciudad_rel = relationship("Ciudad", back_populates="iglesias")
+    pais_rel = relationship("Pais", back_populates="iglesias")
+    pastor_rel = relationship("Miembro")
 
 
 class Rol(Base):
@@ -111,10 +137,11 @@ class RolPermiso(Base):
     __tablename__ = "rol_permisos"
 
     rol_id = Column(Integer, ForeignKey("roles.id"), primary_key=True)
-    permiso_id = Column(Integer, primary_key=True)
+    permiso_id = Column(Integer, ForeignKey("permisos.id", ondelete="CASCADE"), primary_key=True)
     activo = Column(Boolean, default=True)
 
     rol = relationship("Rol", back_populates="permisos")
+    permiso_rel = relationship("Permiso")
 
 
 class UsuarioPermiso(Base):
@@ -122,8 +149,10 @@ class UsuarioPermiso(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(String(30), ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
-    permiso_id = Column(Integer, nullable=False)
+    permiso_id = Column(Integer, ForeignKey("permisos.id", ondelete="CASCADE"), nullable=False)
     tiene_acceso = Column(Boolean, default=True)
+
+    permiso_rel = relationship("Permiso")
 
 
 class Usuario(Base):
@@ -327,7 +356,9 @@ class CiudadMision(Base):
     __tablename__ = "ciudades_mision"
 
     id = Column(Integer, primary_key=True)
-    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="SET NULL"), nullable=False)
+    # La columna es NOT NULL: el SET NULL que declaraba antes era imposible de
+    # aplicar. La BD real tiene CASCADE y es lo que se refleja aqui.
+    ciudad_id = Column(Integer, ForeignKey("ciudades.id", ondelete="CASCADE"), nullable=False)
     region = Column(String(150))
     estado_presencia = Column(String(30), nullable=False, default="En proceso")
     fecha_inicio_trabajo = Column(Date)
@@ -431,6 +462,7 @@ class EstudioDiario(Base):
     donde = Column(String(255))
     dijeron_si = Column(Integer, default=0)
     nuevos_contactos = Column(Integer, default=0)
+    potenciales = Column(Integer, default=0)
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     miembro_rel = relationship("Miembro", back_populates="estudios_diarios")
