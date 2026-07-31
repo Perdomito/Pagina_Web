@@ -77,12 +77,23 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | nombre     | String(30)    | NO        | ''      |
 | descripcion| String(100)   | SI        |         |
 
+#### `permisos`
+
+Catalogo de modulos de la app. Lo siembra el `startup()` con los 7 modulos que
+espera la UI: Bible Studies, Reports, Members, Contacts, Administration,
+Statistics, Settings.
+
+| Campo  | Tipo        | Nulleable | Default |
+|--------|-------------|-----------|---------|
+| id     | Integer PK  | NO        |         |
+| nombre | String(50)  | NO        |         |
+
 #### `rol_permisos`
 
 | Campo      | Tipo                     | Nulleable | Default |
 |------------|--------------------------|-----------|---------|
 | rol_id     | Integer FK → roles       | NO        | PK      |
-| permiso_id | Integer                  | NO        | PK      |
+| permiso_id | Integer FK → permisos    | NO        | PK, CASCADE |
 | activo     | Boolean                  | SI        | true    |
 
 #### `usuario_permisos`
@@ -91,7 +102,7 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 |-------------|----------------------------|-----------|----------|
 | id          | Integer PK                 | NO        |          |
 | usuario_id  | String(30) FK → usuarios   | NO        | CASCADE  |
-| permiso_id  | Integer                    | NO        |          |
+| permiso_id  | Integer FK → permisos      | NO        | CASCADE  |
 | tiene_acceso| Boolean                    | SI        | true     |
 
 ---
@@ -158,16 +169,43 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | Campo                    | Tipo                      | Nulleable | Default       |
 |--------------------------|---------------------------|-----------|---------------|
 | id                       | Integer PK                | NO        |               |
-| ciudad_id                | Integer FK → ciudades     | NO        | SET NULL      |
+| ciudad_id                | Integer FK → ciudades     | NO        | CASCADE       |
 | region                   | String(150)               | SI        |               |
 | estado_presencia         | String(30)                | NO        | 'En proceso'  |
 | fecha_inicio_trabajo     | Date                      | SI        |               |
-| pastor_encargado_id      | String(30)                | SI        |               |
+| pastor_encargado_id      | String(30) FK → miembros  | SI        | SET NULL      |
 | pastor_encargado_nombre  | Text                      | SI        |               |
 | cantidad_miembros_activos| Integer                   | SI        | 0             |
 | notas                    | Text                      | SI        |               |
 | fecha_creacion           | DateTime                  | NO        | utcnow        |
 | fecha_actualizacion      | DateTime                  | NO        | utcnow        |
+
+#### `iglesias`
+
+Una fila por iglesia de cada ciudad. Es la fuente del contador "cantidad de
+iglesias" por pais que muestra Estadisticas. `pais_id` es redundante con la
+ciudad, pero se guarda porque todas las consultas filtran por pais; si no se
+manda al crear, el endpoint lo deriva de la ciudad.
+
+| Campo                   | Tipo                      | Nulleable | Default    |
+|-------------------------|---------------------------|-----------|------------|
+| id                      | Integer PK                | NO        |            |
+| ciudad_id               | Integer FK → ciudades     | NO        | RESTRICT   |
+| pais_id                 | Integer FK → paises       | SI        | SET NULL   |
+| nombre                  | Text                      | NO        |            |
+| direccion               | Text                      | SI        |            |
+| pastor_encargado_id     | String(30) FK → miembros  | SI        | SET NULL   |
+| pastor_encargado_nombre | Text                      | SI        |            |
+| fecha_apertura          | Date                      | SI        |            |
+| cantidad_miembros       | Integer                   | SI        | 0          |
+| activa                  | Boolean                   | NO        | true       |
+| notas                   | Text                      | SI        |            |
+| fecha_creacion          | DateTime                  | NO        | utcnow     |
+| fecha_actualizacion     | DateTime                  | NO        | utcnow     |
+
+Indices: `idx_iglesias_pais (pais_id)`, `idx_iglesias_ciudad (ciudad_id)`.
+Cerrar una iglesia se hace con `activa = false`, no borrandola: el conteo por
+pais solo suma las activas y asi no se pierde el historico.
 
 #### `reportes`
 
@@ -194,7 +232,7 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | id              | Integer PK                   | NO        |            |
 | miembro_id      | String(30) FK → miembros     | NO        | CASCADE    |
 | pais_id         | Integer FK → paises          | SI        | SET NULL   |
-| contacto_id     | Integer FK → contactos       | SI        | SET NULL   |
+| contacto_id     | Integer FK → contactos       | SI        | RESTRICT   |
 | mes             | Integer                      | NO        |            |
 | anio            | Integer                      | NO        |            |
 | dia             | Integer                      | NO        |            |
@@ -204,7 +242,38 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | donde           | String(255)                  | SI        |            |
 | dijeron_si      | Integer                      | SI        | 0          |
 | nuevos_contactos| Integer                      | SI        | 0          |
+| potenciales     | Integer                      | NO        | 0          |
 | fecha_creacion  | DateTime                     | NO        | utcnow     |
+
+La tabla guarda **tres clases de fila** y se distinguen por `contacto_id` y `tipo`:
+
+| Clase | `contacto_id` | `tipo` | Campos que usa |
+|-------|---------------|--------|----------------|
+| Estudio de un contacto | id del contacto | NULL | `capitulo`, `horas` |
+| Evangelismo | NULL | 'Virtual' / 'Presencial' | `horas`, `donde` |
+| Contadores del dia | NULL | NULL | `dijeron_si`, `nuevos_contactos`, `potenciales` |
+
+Los contadores del dia son **uno por misionero y fecha**: el `POST` hace upsert
+sobre esa clave en vez de insertar (la UI reenvia el dia entero en cada tecla y
+antes quedaba una fila por pulsacion, inflando los totales de los reportes).
+
+#### `archivos`
+
+Adjuntos de ingresos y gastos. El binario vive en Supabase Storage; aqui solo
+queda la referencia. `referencia_id` apunta a `ingresos.id` o a `gastos_reales.id`
+segun `tipo`, por eso **no es una clave foranea**.
+
+| Campo          | Tipo         | Nulleable | Default    |
+|----------------|--------------|-----------|------------|
+| id             | Integer PK   | NO        |            |
+| tipo           | String(20)   | NO        | CHECK: 'ingreso' \| 'gasto' |
+| referencia_id  | Integer      | NO        |            |
+| nombre_original| Text         | SI        |            |
+| content_type   | String(100)  | SI        |            |
+| tamano_bytes   | BigInteger   | SI        |            |
+| storage_path   | Text         | SI        |            |
+| url            | Text         | NO        |            |
+| fecha_creacion | DateTime     | NO        | utcnow     |
 
 ---
 
@@ -366,7 +435,7 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 
 | Metodo | Ruta                     | Descripcion                    | Parametros                     |
 |--------|--------------------------|--------------------------------|--------------------------------|
-| GET    | `/miembros`              | Listar miembros                | `?tipo=&pais_id=`              |
+| GET    | `/miembros`              | Listar miembros                | `?tipo_miembro=&pais_id=`      |
 | GET    | `/miembros/{id}`         | Obtener miembro por ID         |                                |
 | POST   | `/miembros`              | Crear miembro                  | Body: MiembroCreate            |
 | PATCH  | `/miembros/{id}`         | Actualizar miembro             | Body: MiembroUpdate            |
@@ -404,7 +473,7 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 |--------|------------------------------|--------------------------|--------------------------------------|
 | GET    | `/estudios-diarios`          | Listar estudios diarios  | `?miembro_id=&pais_id=&anio=&mes=`   |
 | GET    | `/estudios-diarios/{id}`     | Obtener estudio         |                                      |
-| POST   | `/estudios-diarios`          | Crear estudio           | Body: EstudioDiarioCreate            |
+| POST   | `/estudios-diarios`          | Crear estudio, o actualizar los contadores del dia si ya existen (ver tabla) | Body: EstudioDiarioCreate |
 | PATCH  | `/estudios-diarios/{id}`     | Actualizar estudio      | Body: EstudioDiarioUpdate            |
 | DELETE | `/estudios-diarios/{id}`     | Eliminar estudio        |                                      |
 
@@ -420,13 +489,44 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 | PATCH  | `/reportes/{id}`         | Actualizar reporte             | Body: ReporteUpdate            |
 | DELETE | `/reportes/{id}`         | Eliminar reporte               |                                |
 
+### Iglesias
+
+`/iglesias`
+
+| Metodo | Ruta                          | Descripcion                                   | Parametros                     |
+|--------|-------------------------------|-----------------------------------------------|--------------------------------|
+| GET    | `/iglesias`                   | Listar iglesias (incluye `ciudad_nombre` y `pais_nombre`) | `?pais_id=&ciudad_id=&activa=` |
+| GET    | `/iglesias/conteo-por-pais`   | Cantidad de iglesias por pais                 | `?activa=` (true por defecto)  |
+| GET    | `/iglesias/{id}`              | Obtener iglesia                               |                                |
+| POST   | `/iglesias`                   | Crear iglesia; deriva `pais_id` de la ciudad si no se manda | Body: IglesiaCreate |
+| PATCH  | `/iglesias/{id}`              | Actualizar iglesia; al cambiar de ciudad recalcula el pais | Body: IglesiaUpdate |
+| DELETE | `/iglesias/{id}`              | Eliminar iglesia                              |                                |
+
+Errores: `404` si la ciudad no existe, `422` si el nombre viene vacio.
+
+### Archivos
+
+`/archivos`
+
+| Metodo | Ruta               | Descripcion                                    | Parametros                  |
+|--------|--------------------|------------------------------------------------|-----------------------------|
+| GET    | `/archivos`        | Listar adjuntos                                | `?tipo=&referencia_id=`     |
+| POST   | `/archivos`        | Subir adjunto a Supabase Storage (multipart)   | `tipo`, `referencia_id`, `file` |
+| DELETE | `/archivos/{id}`   | Eliminar adjunto                               |                             |
+
+Requiere `SUPABASE_URL` y `SUPABASE_SERVICE_KEY`; sin esas variables el `POST`
+responde `503`.
+
 ### Estadisticas Generales
 
 `/estadisticas`
 
-| Metodo | Ruta                     | Descripcion                                                      | Parametros |
-|--------|--------------------------|------------------------------------------------------------------|------------|
-| GET    | `/estadisticas`          | Dashboard: comparacion estudios, rendimiento, evangelismo, crecimiento | `?anio=`   |
+| Metodo | Ruta                     | Descripcion                                                      | Parametros        |
+|--------|--------------------------|------------------------------------------------------------------|-------------------|
+| GET    | `/estadisticas`          | Dashboard: comparacion estudios, rendimiento, evangelismo, crecimiento y `resumen_pais` | `?anio=&pais_id=` |
+
+`resumen_pais` (solo si se manda `pais_id`) devuelve `cantidad_miembros` y
+`cantidad_iglesias`, esta ultima contando las iglesias **activas** del pais.
 
 ### Estadisticas por Pais
 
@@ -622,20 +722,45 @@ API REST para la plataforma GNIT — gestión de miembros, contactos, estudios b
 
 El `startup()` de `app/main.py` se ejecuta en cada arranque y es **idempotente** (seguro de re-ejecutar):
 
-- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` para columnas nuevas (`usuarios.pais_id/ciudad_id/miembro_id`, `cotizaciones.pais_id/ciudad_id`, `miembros.cargo_funcion/ministerio_of/avance_audio`).
-- `CREATE TABLE IF NOT EXISTS` para las tablas financieras (`ingresos`, `traslados`, `saldos_caja_banco`) y `usuario_permisos` — definición espejo de `app/migrations/schema.sql`.
-- Claves foráneas idempotentes (vía `DO $$ ... pg_constraint`): `usuarios.rol/pais_id/ciudad_id/miembro_id`, `cotizaciones.pais_id/ciudad_id`, `rol_permisos.rol_id`.
-- Normalización de `ON DELETE SET NULL` en `saldos_caja_banco.pais_id` y `paises.continente_id`.
+- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` para columnas nuevas (`usuarios.pais_id/ciudad_id/miembro_id`, `cotizaciones.pais_id/ciudad_id`, `miembros.cargo_funcion/ministerio_of/avance_audio`, `estudios_diarios.potenciales`, `ingresos.numero`, `saldos_caja_banco.codigo_contable_caja/banco`).
+- `CREATE TABLE IF NOT EXISTS` para las tablas financieras (`ingresos`, `traslados`, `saldos_caja_banco`), `permisos`, `usuario_permisos`, `archivos` e `iglesias` (con sus índices) — definición espejo de `app/migrations/schema.sql`.
+- Claves foráneas idempotentes (vía `DO $$ ... pg_constraint`): `usuarios.rol/pais_id/ciudad_id/miembro_id`, `cotizaciones.pais_id/ciudad_id`, `rol_permisos.rol_id/permiso_id`, `usuario_permisos.permiso_id`.
+- Normalización de `ON DELETE` en `saldos_caja_banco.pais_id`, `paises.continente_id` y `estudios_diarios.contacto_id` (RESTRICT: no se borra un contacto con estudios registrados).
 
 No se necesita migración manual: al desplegar, la base se sincroniza sola con el esquema declarado en los modelos.
+
+## Tests
+
+```bash
+python -m pytest -q
+```
+
+Corren sobre SQLite en memoria construido desde los propios modelos (`tests/conftest.py`),
+así que **no tocan Neon ni producción**. Un modelo mal declarado —una FK que no
+resuelve, un tipo inválido— hace fallar la suite entera.
+
+Además de los casos de negocio, hay dos redes de seguridad que conviene conocer
+antes de tocar el esquema:
+
+- `tests/test_contratos.py` — cada payload que manda el frontend debe existir en
+  el schema de Pydantic. Evita el fallo silencioso de que la API devuelva `200`
+  descartando un campo que la UI sí envía.
+- `tests/test_relaciones.py` — fija el inventario completo de claves foráneas con
+  su `ON DELETE`. Si agregas una columna `*_id` sin relación, o cambias un
+  `ON DELETE`, el test falla y te obliga a actualizarlo a conciencia.
 
 ## Setup
 
 ```bash
 # Variables de entorno requeridas
-DATABASE_URL=postgresql://usuario:password@host:5432/neondb
+DATABASE_URL=postgresql+asyncpg://usuario:password@host/GNIT%20DB
 SECRET_KEY=clave-secreta-para-jwt
 ENVIRONMENT=development
+
+# Opcionales: sin ellas, POST /archivos responde 503
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+SUPABASE_BUCKET=archivos
 
 # Ejecutar con Docker
 docker build -t gnit-api .
