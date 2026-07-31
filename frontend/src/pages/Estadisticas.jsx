@@ -15,8 +15,6 @@ import {
 } from "chart.js";
 import administracionService from '../services/AdministracionService';
 import estudiosService from '../services/EstudiosService';
-import miembrosService from '../services/MiembrosService';
-import contactosService from '../services/ContactosService';
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext";
 import configuracionService from "../services/ConfiguracionService";
@@ -39,6 +37,33 @@ const formatearDecimal = (valor, decimales = 1) => Number(valor || 0).toFixed(de
 const formatearMes = (valor) => {
   if (!valor) return "";
   return valor.charAt(0).toUpperCase() + valor.slice(1).toLowerCase();
+};
+
+const construirResumenEstudios = (resumen) => {
+  const raw = resumen || [];
+  const entries = Array.isArray(raw) ? raw : Object.values(raw).find(v => Array.isArray(v)) || [];
+  const estudios = entries.filter(r => r && r.contacto_id != null);
+  const evangelismo = entries.filter(r => r && r.contacto_id == null && r.tipo != null);
+  const nuevos = entries.filter(r => r && r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0));
+  const contactosUnicos = [...new Set(estudios.map(e => e.contacto_id).filter(Boolean))];
+  const horasTotales = estudios.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+  const horasOnline = evangelismo
+    .filter(e => (e.tipo || '').toLowerCase().includes('virtual'))
+    .reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+  const horasPresencial = evangelismo
+    .filter(e => (e.tipo || '').toLowerCase().includes('presencial') || (e.tipo || '').toLowerCase().includes('person'))
+    .reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+  const dijeronSi = nuevos.reduce((s, e) => s + parseInt(e.dijeron_si || 0), 0);
+  const nuevosContactos = nuevos.reduce((s, e) => s + parseInt(e.nuevos_contactos || 0), 0);
+
+  return {
+    estudiantesActivos: contactosUnicos.length,
+    horasTotales: Math.round(horasTotales * 10) / 10,
+    horasOnline: Math.round(horasOnline * 10) / 10,
+    horasPresencial: Math.round(horasPresencial * 10) / 10,
+    dijeronSi,
+    nuevosContactos
+  };
 };
 
 const MESES_EVANGELISMO = [
@@ -107,11 +132,11 @@ export default function Estadisticas() {
   const mesActualPorDefecto = new Date().toLocaleString('es-ES', { month: 'long' }).toUpperCase();
   const [stats, setStats] = useState(null);
   const [continentes, setContinentes] = useState([]);
+  const [paisesDisponibles, setPaisesDisponibles] = useState([]);
   const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
   const [paisSeleccionado, setPaisSeleccionado] = useState(null);
   const [paisesDelContinente, setPaisesDelContinente] = useState([]);
   const [datosRealesEstudios, setDatosRealesEstudios] = useState(null);
-  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().toLocaleString('en-US', {month:'long'}).toUpperCase());
   const [anioSeleccionadoFiltro, setAnioSeleccionadoFiltro] = useState(new Date().getFullYear());
   const [statsProyeccion, setStatsProyeccion] = useState(null);
   const [resumenPaisFallback, setResumenPaisFallback] = useState(null);
@@ -123,6 +148,8 @@ export default function Estadisticas() {
   const [profesorSelectdo, setMissionarySelectdo] = useState("");
   const [tipoMiembroSelectdo, setTipoMiembroSelectdo] = useState("Todos");
   const [anioComparacionMiembros, setAnioComparacionMiembros] = useState(anioActualPorDefecto - 1);
+  const [paisCrecimientoSeleccionado, setPaisCrecimientoSeleccionado] = useState(null);
+  const [statsCrecimientoMiembros, setStatsCrecimientoMiembros] = useState(null);
   const [modoEvangelismoSelectdo, setModoEvangelismoSelectdo] = useState("monthly");
   const [anioEvangelismoSelectdo, setAnioEvangelismoSelectdo] = useState(anioActualPorDefecto);
   const [mesEvangelismoSelectdo, setMesEvangelismoSelectdo] = useState(mesActualPorDefecto);
@@ -130,8 +157,12 @@ export default function Estadisticas() {
   useEffect(() => {
     const cargarContinentes = async () => {
       try {
-        const data = await administracionService.getAllContinentes();
+        const [data, paises] = await Promise.all([
+          administracionService.getAllContinentes(),
+          administracionService.getAllPaises().catch(() => [])
+        ]);
         setContinentes(data);
+        setPaisesDisponibles(paises);
         if (data.length > 0) {
           setContinenteSeleccionado(data[0].id);
           setPaisesDelContinente(data[0].paises || []);
@@ -166,6 +197,12 @@ export default function Estadisticas() {
   }, [user]);
 
   useEffect(() => {
+    if (paisUsuarioResuelto && !paisCrecimientoSeleccionado) {
+      setPaisCrecimientoSeleccionado(paisUsuarioResuelto);
+    }
+  }, [paisUsuarioResuelto, paisCrecimientoSeleccionado]);
+
+  useEffect(() => {
     const cargarEstadisticas = async () => {
       try {
         setLoading(true);
@@ -190,33 +227,53 @@ export default function Estadisticas() {
   }, [anioSeleccionadoFiltro, paisSeleccionado, paisUsuarioResuelto]);
 
   useEffect(() => {
+    const cargarCrecimientoMiembros = async () => {
+      const paisFiltro = paisCrecimientoSeleccionado || paisUsuarioResuelto;
+      if (!paisFiltro) {
+        setStatsCrecimientoMiembros(null);
+        return;
+      }
+
+      try {
+        const data = await administracionService.getEstadisticasGenerales(
+          anioSeleccionadoFiltro,
+          { pais_id: paisFiltro }
+        );
+        setStatsCrecimientoMiembros(data);
+      } catch (error) {
+        console.error('Error loading member growth by country:', error);
+        setStatsCrecimientoMiembros(null);
+      }
+    };
+
+    cargarCrecimientoMiembros();
+  }, [anioSeleccionadoFiltro, paisCrecimientoSeleccionado, paisUsuarioResuelto]);
+
+  useEffect(() => {
     const cargarResumenPaisFallback = async () => {
       if (!paisUsuarioResuelto) {
         setResumenPaisFallback(null);
         return;
       }
 
-      if (stats?.resumen_pais) {
-        setResumenPaisFallback(stats.resumen_pais);
-        return;
-      }
-
       try {
         const pais = await administracionService.getPaisById(paisUsuarioResuelto);
-        const [miembros, ciudades, ciudadesMision] = await Promise.all([
+        const [miembros, statsPais] = await Promise.all([
           administracionService.getMiembrosPorPais(paisUsuarioResuelto),
-          administracionService.getCiudadesPorPaisIso2(pais.iso),
-          administracionService.getCiudadesMision()
+          administracionService.getEstadisticasGenerales(anioSeleccionadoFiltro, { pais_id: paisUsuarioResuelto }).catch(() => null)
         ]);
-
-        const ciudadesIds = new Set((ciudades || []).map((ciudad) => ciudad.id));
-        const cantidadIglesias = (ciudadesMision || []).filter((item) => ciudadesIds.has(item.ciudad_id)).length;
+        const cantidadMiembros = (miembros || []).length;
+        const cantidadIglesias = Math.max(
+          stats?.resumen_pais?.cantidad_iglesias ?? 0,
+          statsPais?.resumen_pais?.cantidad_iglesias ?? 0,
+          0
+        );
 
         setResumenPaisFallback({
           pais_id: pais.id,
           nombre_pais: pais.nombre,
           cantidad_iglesias: cantidadIglesias,
-          cantidad_miembros: (miembros || []).length
+          cantidad_miembros: cantidadMiembros
         });
       } catch (error) {
         console.error('Error loading country summary fallback:', error);
@@ -225,7 +282,7 @@ export default function Estadisticas() {
     };
 
     cargarResumenPaisFallback();
-  }, [paisUsuarioResuelto, stats?.resumen_pais]);
+  }, [anioSeleccionadoFiltro, paisUsuarioResuelto, stats?.resumen_pais]);
 
   useEffect(() => {
     const missionaries = stats?.rendimiento_missionaries?.missionaries || [];
@@ -245,16 +302,22 @@ export default function Estadisticas() {
   }, [stats, profesorSelectdo]);
 
   useEffect(() => {
-    const tiposDisponibles = stats?.crecimiento_miembros?.tipos_disponibles || ["Todos"];
+    const tiposDisponibles = statsCrecimientoMiembros?.crecimiento_miembros?.tipos_disponibles
+      || stats?.crecimiento_miembros?.tipos_disponibles
+      || ["Todos"];
 
     if (!tiposDisponibles.includes(tipoMiembroSelectdo)) {
       setTipoMiembroSelectdo("Todos");
     }
-  }, [stats, tipoMiembroSelectdo]);
+  }, [stats, statsCrecimientoMiembros, tipoMiembroSelectdo]);
 
   useEffect(() => {
-    const anioSelectdoActual = stats?.anio_seleccionado || anioActualPorDefecto;
-    const aniosComparables = (stats?.crecimiento_miembros?.anios_disponibles || [])
+    const anioSelectdoActual = statsCrecimientoMiembros?.anio_seleccionado || stats?.anio_seleccionado || anioActualPorDefecto;
+    const aniosComparables = (
+      statsCrecimientoMiembros?.crecimiento_miembros?.anios_disponibles
+      || stats?.crecimiento_miembros?.anios_disponibles
+      || []
+    )
       .filter((anio) => anio !== anioSelectdoActual);
 
     const anioPreferido = aniosComparables.includes(anioSelectdoActual - 1)
@@ -264,7 +327,7 @@ export default function Estadisticas() {
     if (!aniosComparables.includes(anioComparacionMiembros)) {
       setAnioComparacionMiembros(anioPreferido);
     }
-  }, [stats, anioActualPorDefecto, anioComparacionMiembros]);
+  }, [stats, statsCrecimientoMiembros, anioActualPorDefecto, anioComparacionMiembros]);
 
   // Cargar datos reales de estudios bíblicos
   useEffect(() => {
@@ -274,18 +337,7 @@ export default function Estadisticas() {
         const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
         const mesNombre = MESES[new Date().getMonth()];
         const resumen = await estudiosService.getResumenCompleto(paisSeleccionado, mesNombre, anioSeleccionadoFiltro);
-        const raw = resumen || [];
-        const entries = Array.isArray(raw) ? raw : Object.values(raw).find(v => Array.isArray(v)) || [];
-        const estudios = entries.filter(r => r && r.contacto_id != null);
-        const evangelismo = entries.filter(r => r && r.contacto_id == null && r.tipo != null);
-        const nuevos = entries.filter(r => r && r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0));
-        const contactosUnicos = [...new Set(estudios.map(e => e.contacto_id).filter(Boolean))];
-        const horasTotales = estudios.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
-        const horasOnline = evangelismo.filter(e => (e.tipo||'').toLowerCase().includes('virtual')).reduce((s,e) => s + parseFloat(e.horas||0), 0);
-        const horasPresencial = evangelismo.filter(e => (e.tipo||'').toLowerCase().includes('presencial')||(e.tipo||'').toLowerCase().includes('person')).reduce((s,e) => s + parseFloat(e.horas||0), 0);
-        const dijeronSi = nuevos.reduce((s,e) => s + parseInt(e.dijeron_si||0), 0);
-        const nuevosContactos = nuevos.reduce((s,e) => s + parseInt(e.nuevos_contactos||0), 0);
-        setDatosRealesEstudios({ estudiantesActivos: contactosUnicos.length, horasTotales: Math.round(horasTotales*10)/10, horasOnline: Math.round(horasOnline*10)/10, horasPresencial: Math.round(horasPresencial*10)/10, dijeronSi, nuevosContactos });
+        setDatosRealesEstudios(construirResumenEstudios(resumen));
       } catch {}
     };
     cargarDatosReales();
@@ -339,12 +391,13 @@ export default function Estadisticas() {
     ? Number((((totalEvangelismoActual - totalEvangelismoComparacion) / totalEvangelismoComparacion) * 100).toFixed(1))
     : (totalEvangelismoActual > 0 ? 100 : 0);
   const crecimientoEstudiantes = stats?.crecimiento_estudiantes || {};
-  const crecimientoMiembros = stats?.crecimiento_miembros || {};
+  const statsMiembros = statsCrecimientoMiembros || stats;
+  const crecimientoMiembros = statsMiembros?.crecimiento_miembros || {};
   const crecimientoEstudiantesProyeccion = statsProyeccion?.crecimiento_estudiantes || crecimientoEstudiantes;
   const crecimientoMiembrosProyeccion = statsProyeccion?.crecimiento_miembros || crecimientoMiembros;
   const comparacionEstudiosProyeccion = statsProyeccion?.comparacion_estudios || comparacion;
   const evangelismoProyeccion = statsProyeccion?.evangelismo_missionaries || {};
-  const anioSelectdo = stats?.anio_seleccionado || anioActualPorDefecto;
+  const anioSelectdo = statsMiembros?.anio_seleccionado || stats?.anio_seleccionado || anioActualPorDefecto;
   const aniosDisponibles = stats?.anios_disponibles || [anioSelectdo];
   const tiposMiembroDisponibles = crecimientoMiembros.tipos_disponibles || ["Todos"];
   const aniosComparacionDisponibles = (crecimientoMiembros.anios_disponibles || aniosDisponibles)
@@ -352,6 +405,9 @@ export default function Estadisticas() {
   const aniosComparacionMiembrosOpciones = aniosComparacionDisponibles.length
     ? aniosComparacionDisponibles
     : [anioSelectdo - 1];
+  const paisCrecimientoActivo = paisesDisponibles.find(
+    (pais) => Number(pais.id) === Number(paisCrecimientoSeleccionado || paisUsuarioResuelto)
+  ) || null;
   const seriesMiembrosPorTipo = crecimientoMiembros.series_por_tipo || {};
   const seriesTipoMiembroSelectdo = seriesMiembrosPorTipo[tipoMiembroSelectdo] || {};
   const serieCrecimientoMiembrosActual = seriesTipoMiembroSelectdo[anioSelectdo] || Array(12).fill(0);
@@ -364,7 +420,7 @@ export default function Estadisticas() {
   const profesorActivo = rendimientoMissionaryes.find(
     (profesor) => String(profesor.id) === profesorSelectdo
   ) || rendimientoMissionaryes[0] || null;
-  const resumenPais = stats?.resumen_pais || resumenPaisFallback || null;
+  const resumenPais = resumenPaisFallback || stats?.resumen_pais || null;
   const mesActualIndice = new Date().getMonth();
   const mesCorteProyeccion = anioSelectdo < anioActualPorDefecto
     ? MESES_EN_ANIO - 1
@@ -1247,6 +1303,30 @@ export default function Estadisticas() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
+                      País
+                    </label>
+                    <select
+                      value={paisCrecimientoSeleccionado || paisUsuarioResuelto || ""}
+                      onChange={(e) => setPaisCrecimientoSeleccionado(e.target.value ? Number(e.target.value) : null)}
+                      style={{
+                        width: "100%",
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #d0d5dd",
+                        background: "white",
+                        color: "#1f2937",
+                        fontSize: "14px"
+                      }}
+                    >
+                      {paisesDisponibles.map((pais) => (
+                        <option key={pais.id} value={pais.id}>
+                          {pais.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
                       Tipo de miembro
                     </label>
                     <select
@@ -1296,6 +1376,12 @@ export default function Estadisticas() {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+                  <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Country</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "#134069" }}>
+                      {paisCrecimientoActivo?.nombre || "N/A"}
+                    </div>
+                  </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
                     <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Main Year</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#8E24AA" }}>

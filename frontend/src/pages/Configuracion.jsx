@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaSave, FaTimes, FaUser, FaLock, FaShieldAlt, FaUserShield } from "react-icons/fa";
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaSave, FaTimes, FaUser, FaLock, FaShieldAlt, FaUserShield, FaGlobe } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import configuracionService from '../services/ConfiguracionService';
 import { useAuth } from '../context/AuthContext';
+import { useIdioma } from '../context/IdiomaContext';
 
 export default function Configuracion() {
   const navigate = useNavigate();
   const { user } = useAuth();
-
   // Módulos del sistema — hardcoded para no depender del backend
   const MODULOS_SISTEMA = [
     { id: 1, nombre: 'bible_studies',  label: 'Bible Studies',  icono: '📖' },
@@ -19,7 +19,7 @@ export default function Configuracion() {
     { id: 6, nombre: 'statistics',     label: 'Statistics',     icono: '📈' },
     { id: 7, nombre: 'settings',       label: 'Settings',       icono: '⚙️' },
   ];
-
+  const { t, tv, idioma, setIdioma } = useIdioma();
   
   const [tabActive, setTabActive] = useState("usuarios");
   const [cargando, setCargando] = useState(false);
@@ -65,7 +65,8 @@ export default function Configuracion() {
       setPermissions(Array.isArray(permisosData) ? permisosData : []);
       setPaises(Array.isArray(paisesData) ? paisesData : []);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error al cargar datos:', error);
+      toast.error(t('error'));
     } finally {
       setCargando(false);
     }
@@ -107,12 +108,12 @@ const generarIdUsuario = () => {
       return;
     }
     if (!nuevoUsuario.nombre || !nuevoUsuario.email || !nuevoUsuario.rol_id) {
-      toast.error("Please complete all required fields");
+      toast.error(t('camposObligatorios'));
       return;
     }
-    
+
     if (tipoModal === "nuevo_usuario" && !nuevoUsuario.password) {
-      toast.error("Password is required");
+      toast.error(t('cf_passwordObligatoria'));
       return;
     }
     
@@ -120,7 +121,7 @@ const generarIdUsuario = () => {
       toast.error("This email is already registered");
       return;
     }
-    
+
     try {
       if (tipoModal === "nuevo_usuario") {
         await configuracionService.crearUsuario({
@@ -129,7 +130,7 @@ const generarIdUsuario = () => {
           pais_id: nuevoUsuario.pais_id === "" ? null : nuevoUsuario.pais_id,
           activo: nuevoUsuario.activo !== false
         });
-        toast.success("Usuario creado");
+        toast.success(t('cf_usuarioCreado'));
       } else {
         const datosActualizar = {
           ...nuevoUsuario,
@@ -139,31 +140,31 @@ const generarIdUsuario = () => {
         // No mandar password vacío: el backend lo tomaría como contraseña nueva
         if (!datosActualizar.password) delete datosActualizar.password;
         await configuracionService.actualizarUsuario(usuarioEditando.id, datosActualizar);
-        toast.success("Usuario actualizado");
+        toast.success(t('cf_usuarioActualizado'));
       }
-      
+
       await cargarDatosIniciales();
       setMostrandoModal(false);
     } catch (error) {
-      console.error('Error saving user:', error);
-      toast.error("Error saving user");
+      console.error('Error al guardar usuario:', error);
+      toast.error(t('cf_errorGuardarUsuario'));
     }
   };
-  
+
   const eliminarUsuario = async (id) => {
-    if (!window.confirm("¿Delete este usuario?")) return;
-    
+    if (!window.confirm(t('cf_confirmarEliminarUsuario'))) return;
+
     try {
       await configuracionService.eliminarUsuario(id);
-      toast.success("Usuario eliminado");
+      toast.success(t('cf_usuarioEliminado'));
       await cargarDatosIniciales();
     } catch (error) {
       console.error('Error al eliminar:', error);
-      toast.error("Error deleting user");
+      toast.error(t('cf_errorEliminarUsuario'));
     }
   };
-  
-  const verPermissionsRol = async (rol) => {
+
+  const verPermisosRol = async (rol) => {
     try {
       const permisosRol = await configuracionService.getPermisosRol(rol.id).catch(() => []);
       const permisosBase = MODULOS_SISTEMA.map(m => {
@@ -180,6 +181,8 @@ const generarIdUsuario = () => {
       setUsuarioPermissions(null);
       setTabActive("permisos_rol");
     } catch (error) {
+      console.error('Error al cargar permisos:', error);
+      toast.error(t('cf_errorCargarPermisos'));
       // Aun si falla, mostrar módulos hardcodeados
       const permisosBase = MODULOS_SISTEMA.map(m => ({
         permiso_id: m.id, nombre: m.nombre, label: m.label, icono: m.icono, tiene_acceso: false
@@ -190,7 +193,7 @@ const generarIdUsuario = () => {
     }
   };
   
-  const verPermissionsPersonalizados = async (usuario) => {
+  const verPermisosPersonalizados = async (usuario) => {
     try {
 const [permisosRol, permisosUsuario] = await Promise.all([
         configuracionService.getPermisosRol(usuario.rol_id || usuario.rol),
@@ -205,39 +208,39 @@ const [permisosRol, permisosUsuario] = await Promise.all([
       setRolSeleccionado(null);
       setTabActive("permisos_usuario");
     } catch (error) {
-      console.error('Error loading permissions:', error);
-      toast.error("Error loading permissions del usuario");
+      console.error('Error al cargar permisos:', error);
+      toast.error(t('cf_errorCargarPermisosUsuario'));
     }
   };
-  
+
   const togglePermisoRol = async (permisoId, tieneAcceso) => {
     try {
       await configuracionService.actualizarPermisoRol(rolSeleccionado.id, permisoId, !tieneAcceso);
-      
-      const permisosActualizados = rolSeleccionado.permisos.map(p => 
+
+      const permisosActualizados = rolSeleccionado.permisos.map(p =>
         p.permiso_id === permisoId ? { ...p, tiene_acceso: !tieneAcceso } : p
       );
-      
+
       setRolSeleccionado({ ...rolSeleccionado, permisos: permisosActualizados });
-      
+
     } catch (error) {
-      console.error('Error updating permission:', error);
-      toast.error("Error updating permission");
+      console.error('Error al actualizar permiso:', error);
+      toast.error(t('cf_errorActualizarPermiso'));
     }
   };
-  
+
   const togglePermisoUsuario = async (permisoId, tieneAccesoActual) => {
     try {
       await configuracionService.actualizarPermisoUsuario(usuarioPermisos.id, permisoId, !tieneAccesoActual);
-      
+
       const permisosActualizados = await configuracionService.getPermisosUsuario(usuarioPermisos.id);
       setUsuarioPermissions({ ...usuarioPermisos, permisosPersonalizados: permisosActualizados });
       
-      toast.success("Permiso actualizado");
+      toast.success(t('cf_permisoActualizado'));
     } catch (error) {
-      console.error('Error updating permission:', error);
+      console.error('Error al actualizar permiso:', error);
       const detalle = error.response?.data?.detail;
-      toast.error(detalle ? String(detalle).slice(0, 140) : "Error updating permission");
+      toast.error(detalle ? String(detalle).slice(0, 140) : t('cf_errorActualizarPermiso'));
     }
   };
   
@@ -262,7 +265,7 @@ const [permisosRol, permisosUsuario] = await Promise.all([
   if (cargando) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)" }}>
-        <div style={{ fontSize: "18px", color: "#666" }}>Loading...</div>
+        <div style={{ fontSize: "18px", color: "#666" }}>{t('cargando')}</div>
       </div>
     );
   }
@@ -455,14 +458,14 @@ const [permisosRol, permisosUsuario] = await Promise.all([
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
           <button onClick={() => navigate("/home")} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", padding: "8px 14px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
-            <FaArrowLeft /> Back
+            <FaArrowLeft /> {t('volver')}
           </button>
           <div>
             <h1 style={{ margin: 0, color: "white", fontSize: "20px", fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>
-              ⚙️ Settings
+              ⚙️ {t('configuracion')}
             </h1>
             <p style={{ color: "rgba(255,255,255,0.6)", margin: "2px 0 0", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>
-              User, role & permission management
+              {t('gestionUsuariosRolesPermisos')}
             </p>
           </div>
         </div>
@@ -474,20 +477,26 @@ const [permisosRol, permisosUsuario] = await Promise.all([
               onClick={() => { setTabActive("usuarios"); setRolSeleccionado(null); setUsuarioPermissions(null); }}
               className={`tab-button ${tabActive === "usuarios" ? 'active' : ''}`}
             >
-              <FaUser /> Users
+              <FaUser /> {t('usuariosTab')}
             </button>
             <button
               onClick={() => { setTabActive("roles"); setRolSeleccionado(null); setUsuarioPermissions(null); }}
               className={`tab-button ${tabActive === "roles" ? 'active' : ''}`}
             >
-              <FaLock /> Roles
+              <FaLock /> {t('rolesTab')}
+            </button>
+            <button
+              onClick={() => { setTabActive("idioma"); setRolSeleccionado(null); setUsuarioPermissions(null); }}
+              className={`tab-button ${tabActive === "idioma" ? 'active' : ''}`}
+            >
+              <FaGlobe /> {t('idiomaTab')}
             </button>
             {rolSeleccionado && (
               <button
                 onClick={() => setTabActive("permisos_rol")}
                 className={`tab-button ${tabActive === "permisos_rol" ? 'active' : ''}`}
               >
-                <FaShieldAlt /> Role permissions {rolSeleccionado.nombre}
+                <FaShieldAlt /> {t('permisosDelRol')} {rolSeleccionado.nombre}
               </button>
             )}
             {usuarioPermisos && (
@@ -495,25 +504,68 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                 onClick={() => setTabActive("permisos_usuario")}
                 className={`tab-button ${tabActive === "permisos_usuario" ? 'active' : ''}`}
               >
-                <FaUserShield /> Permissions de {usuarioPermisos.nombre}
+                <FaUserShield /> {t('permisosDe')} {usuarioPermisos.nombre}
               </button>
             )}
           </div>
         </div>
-        
+
+        {/* TAB IDIOMA */}
+        {tabActive === "idioma" && (
+          <div className="card">
+            <h2 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: "700" }}>🌐 {t('idiomaTitulo')}</h2>
+            <p style={{ color: "#666", margin: "0 0 25px", fontSize: "14px" }}>
+              {t('idiomaDesc')}
+            </p>
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              {[
+                { codigo: 'es', nombre: t('español'), bandera: '🇪🇸' },
+                { codigo: 'en', nombre: t('ingles'), bandera: '🇬🇧' }
+              ].map(op => (
+                <button
+                  key={op.codigo}
+                  onClick={() => {
+                    setIdioma(op.codigo);
+                    toast.success(op.codigo === 'es' ? 'Idioma cambiado a Español' : 'Language changed to English');
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "18px 28px",
+                    borderRadius: "12px",
+                    border: idioma === op.codigo ? "2px solid #0E5A61" : "2px solid #e0e0e0",
+                    background: idioma === op.codigo ? "#e8f2f2" : "white",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    fontWeight: "600",
+                    color: "#333",
+                    transition: "all 0.2s",
+                    minWidth: "180px"
+                  }}
+                >
+                  <span style={{ fontSize: "26px" }}>{op.bandera}</span>
+                  {op.nombre}
+                  {idioma === op.codigo && <span style={{ marginLeft: "auto", color: "#0E5A61" }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* TAB USUARIOS */}
         {tabActive === "usuarios" && (
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
-              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>👥 System Users</h2>
+              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>👥 {t('usuariosSistema')}</h2>
               <button onClick={abrirModalNuevoUsuario} className="btn btn-success">
-                <FaPlus /> New User
+                <FaPlus /> {t('nuevoUsuario')}
               </button>
             </div>
             
             {usuarios.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
-                No users registered
+                {t('cf_sinUsuarios')}
               </div>
             ) : (
               usuarios.map(usuario => (
@@ -527,8 +579,8 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                         📧 {usuario.email}
                       </div>
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        <span style={{ padding: "4px 12px", background: "white", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
-                          {obtenerNombreRol(usuario.rol_id)}
+                        <span style={{ padding: "4px 12px", background: "#2196F3", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
+                          {tv(obtenerNombreRol(usuario.rol_id || usuario.rol))}
                         </span>
                         {usuario.pais_id && (
                           <span style={{ padding: "4px 12px", background: "#2e7d32", color: "white", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
@@ -536,21 +588,21 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                           </span>
                         )}
                         <span style={{ padding: "4px 12px", background: usuario.activo ? "#e8f5e9" : "#ffebee", color: usuario.activo ? "#2e7d32" : "#c62828", borderRadius: "12px", fontSize: "12px", fontWeight: "600" }}>
-                          {usuario.activo ? "✓ Active" : "✗ Inactivo"}
+                          {usuario.activo ? `✓ ${tv('activo')}` : `✗ ${tv('inactivo')}`}
                         </span>
                       </div>
                     </div>
-                    
+
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                      <button onClick={() => verPermissionsPersonalizados(usuario)} className="btn btn-info" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                        <FaUserShield /> Permissions
+                      <button onClick={() => verPermisosPersonalizados(usuario)} className="btn btn-info" style={{ fontSize: "13px", padding: "8px 16px" }}>
+                        <FaUserShield /> {t('cf_permisos')}
                       </button>
                       <button onClick={() => abrirModalEditUsuario(usuario)} className="btn btn-warning" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                        <FaEdit /> Edit
+                        <FaEdit /> {t('editar')}
                       </button>
                       {usuario.id !== user?.id && (
                         <button onClick={() => eliminarUsuario(usuario.id)} className="btn btn-danger" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                          <FaTrash /> Delete
+                          <FaTrash /> {t('eliminar')}
                         </button>
                       )}
                     </div>
@@ -564,22 +616,22 @@ const [permisosRol, permisosUsuario] = await Promise.all([
         {/* TAB ROLES */}
         {tabActive === "roles" && (
           <div className="card">
-            <h2 style={{ margin: "0 0 25px", fontSize: "20px", fontWeight: "700" }}>🔐 System Roles</h2>
-            
+            <h2 style={{ margin: "0 0 25px", fontSize: "20px", fontWeight: "700" }}>🔐 {t('cf_rolesSistema')}</h2>
+
             {roles.map(rol => (
               <div key={rol.id} style={{ padding: "20px", border: "2px solid #f0f0f0", borderRadius: "12px", marginBottom: "15px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "5px", color: "#333" }}>
-                      {rol.nombre === 'admin' ? '👑' : rol.nombre === 'pastor' ? '🌍' : '👤'} {rol.nombre.charAt(0).toUpperCase() + rol.nombre.slice(1)}
+                      {rol.nombre === 'admin' ? '👑' : rol.nombre === 'pastor' ? '🌍' : '👤'} {tv(rol.nombre)}
                     </div>
                     <div style={{ fontSize: "14px", color: "#666" }}>
                       {rol.descripcion}
                     </div>
                   </div>
-                  
-                  <button onClick={() => verPermissionsRol(rol)} className="btn btn-primary" style={{ fontSize: "13px", padding: "8px 16px" }}>
-                    <FaShieldAlt /> Ver Permissions
+
+                  <button onClick={() => verPermisosRol(rol)} className="btn btn-primary" style={{ fontSize: "13px", padding: "8px 16px" }}>
+                    <FaShieldAlt /> {t('cf_verPermisos')}
                   </button>
                 </div>
               </div>
@@ -593,10 +645,10 @@ const [permisosRol, permisosUsuario] = await Promise.all([
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>
-                  ✅ Role permissions {rolSeleccionado.nombre}
+                  ✅ {t('permisosDelRol')} {tv(rolSeleccionado.nombre)}
                 </h2>
                 <p style={{ color: "#666", fontSize: "13px", margin: "5px 0 0" }}>
-                  Defines which modules this role can access by default
+                  {t('cf_defineModulosRol')}
                 </p>
               </div>
             </div>
@@ -609,13 +661,13 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                 <div key={permiso.id} className="permiso-item">
                   <div>
                     <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>
-                      {permiso.icono} {permiso.label}
+                      {permiso.icono} {tv(permiso.nombre.replace(/_/g, ' '))}
                     </div>
                     <div style={{ fontSize: "12px", color: "#999" }}>
                       {permiso.descripcion || ''}
                     </div>
                   </div>
-                  
+
                   <label className="switch">
                     <input
                       type="checkbox"
@@ -629,18 +681,19 @@ const [permisosRol, permisosUsuario] = await Promise.all([
             })}
           </div>
         )}
-        
+
         {/* TAB PERMISOS USUARIO */}
         {tabActive === "permisos_usuario" && usuarioPermisos && (
           <div className="card">
             <div style={{ marginBottom: "25px" }}>
               <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700" }}>
-                🔑 Custom permissions for {usuarioPermisos.nombre}
+                🔑 {t('cf_permisosPersonalizadosDe')} {usuarioPermisos.nombre}
               </h2>
               <p style={{ color: "#666", fontSize: "13px", margin: "5px 0 0" }}>
-                    Rol base: <strong>{obtenerNombreRol(usuarioPermisos.rol_id || usuarioPermisos.rol)}</strong>              </p>
+                {t('cf_rolBase')}: <strong>{tv(obtenerNombreRol(usuarioPermisos.rol_id || usuarioPermisos.rol))}</strong>
+              </p>
               <p style={{ color: "#999", fontSize: "12px", margin: "5px 0 0", fontStyle: "italic" }}>
-                Custom permissions are added to role permissions. Los azules son del rol, los naranjas son personalizados.
+                {t('cf_permisosSumanExplicacion')}
               </p>
             </div>
             
@@ -653,9 +706,9 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                 <div key={permiso.id} className="permiso-item">
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>
-                      {permiso.icono} {permiso.label}
-                      {permisoRolActive && <span className="permiso-badge badge-rol">Role</span>}
-                      {permisoPersonalizado && <span className="permiso-badge badge-personalizado">Custom</span>}
+                      {permiso.icono} {tv(permiso.nombre.replace(/_/g, ' '))}
+                      {permisoRolActive && <span className="permiso-badge badge-rol">{t('cf_badgeRol')}</span>}
+                      {permisoPersonalizado && <span className="permiso-badge badge-personalizado">{t('cf_badgePersonalizado')}</span>}
                     </div>
                     <div style={{ fontSize: "12px", color: "#999" }}>
                       {permiso.descripcion || ''}
@@ -681,7 +734,7 @@ const [permisosRol, permisosUsuario] = await Promise.all([
           <div className="modal-overlay" onClick={() => setMostrandoModal(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <h3 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: "700" }}>
-                {tipoModal === "nuevo_usuario" ? "➕ New User" : "✏️ Edit User"}
+                {tipoModal === "nuevo_usuario" ? `➕ ${t('nuevoUsuario')}` : `✏️ ${t('cf_editarUsuarioTitulo')}`}
               </h3>
               
               {tipoModal === "nuevo_usuario" && (
@@ -697,44 +750,44 @@ const [permisosRol, permisosUsuario] = await Promise.all([
               <input
                 type="text"
                 className="input"
-                placeholder="Full name"
+                placeholder={t('cf_nombreCompleto')}
                 value={nuevoUsuario.nombre}
                 onChange={(e) => setNuevoUsuario({...nuevoUsuario, nombre: e.target.value})}
               />
-              
+
               <input
                 type="email"
                 className="input"
-                placeholder="Email"
+                placeholder={t('cf_email')}
                 value={nuevoUsuario.email}
                 onChange={(e) => setNuevoUsuario({...nuevoUsuario, email: e.target.value})}
               />
-              
+
               <input
                 type="password"
                 className="input"
-                placeholder={tipoModal === "nuevo_usuario" ? "Contraseña" : "Nueva contraseña (dejar vacío para no cambiar)"}
+                placeholder={tipoModal === "nuevo_usuario" ? t('contrasena') : t('cf_nuevaContrasenaOpcional')}
                 value={nuevoUsuario.password}
                 onChange={(e) => setNuevoUsuario({...nuevoUsuario, password: e.target.value})}
               />
-              
+
               <select
                 className="input"
                 value={nuevoUsuario.rol_id}
                 onChange={(e) => setNuevoUsuario({...nuevoUsuario, rol_id: parseInt(e.target.value)})}
               >
-                <option value="">Selecciona un rol</option>
+                <option value="">{t('cf_seleccionaRol')}</option>
                 {roles.map(rol => (
-                  <option key={rol.id} value={rol.id}>{rol.nombre}</option>
+                  <option key={rol.id} value={rol.id}>{tv(rol.nombre)}</option>
                 ))}
               </select>
-              
+
               <select
                 className="input"
                 value={nuevoUsuario.pais_id}
                 onChange={(e) => setNuevoUsuario({...nuevoUsuario, pais_id: parseInt(e.target.value)})}
               >
-                <option value="">Selecciona un país (opcional)</option>
+                <option value="">{t('cf_seleccionaPais')}</option>
                 {paises.map(pais => (
                   <option key={pais.id} value={pais.id}>{pais.nombre}</option>
                 ))}
@@ -751,10 +804,10 @@ const [permisosRol, permisosUsuario] = await Promise.all([
               
               <div style={{ display: "flex", gap: "10px" }}>
                 <button onClick={guardarUsuario} className="btn btn-success" style={{ flex: 1, justifyContent: "center" }}>
-                  <FaSave /> Guardar
+                  <FaSave /> {t('guardar')}
                 </button>
                 <button onClick={() => setMostrandoModal(false)} className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }}>
-                  <FaTimes /> Cancelar
+                  <FaTimes /> {t('cancelar')}
                 </button>
               </div>
             </div>

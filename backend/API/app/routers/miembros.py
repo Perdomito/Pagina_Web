@@ -7,16 +7,15 @@ from app.schemas import MiembroCreate, MiembroUpdate, MiembroOut
 
 router = APIRouter(prefix="/miembros", tags=["Miembros"])
 
-
 @router.get("", response_model=list[MiembroOut])
 async def listar(
-    tipo: TipoMiembroEnum | None = Query(None, description="Filtrar por tipo de miembro"),
+    tipo_miembro: TipoMiembroEnum | None = Query(None, description="Filtrar por tipo de miembro"),
     pais_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     q = select(Miembro).order_by(Miembro.nombre)
-    if tipo:
-        q = q.where(Miembro.tipo_miembro == tipo)
+    if tipo_miembro:
+        q = q.where(Miembro.tipo_miembro == tipo_miembro)
     if pais_id:
         q = q.where(Miembro.pais_id == pais_id)
     result = await db.execute(q)

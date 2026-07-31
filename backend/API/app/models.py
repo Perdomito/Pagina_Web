@@ -100,6 +100,13 @@ class Rol(Base):
     usuarios = relationship("Usuario", back_populates="rol_rel")
 
 
+class Permiso(Base):
+    __tablename__ = "permisos"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(50), nullable=False)
+
+
 class RolPermiso(Base):
     __tablename__ = "rol_permisos"
 
@@ -114,7 +121,7 @@ class UsuarioPermiso(Base):
     __tablename__ = "usuario_permisos"
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(String(30), ForeignKey("public.usuarios.id", ondelete="CASCADE"), nullable=False)
+    usuario_id = Column(String(30), ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
     permiso_id = Column(Integer, nullable=False)
     tiene_acceso = Column(Boolean, default=True)
 

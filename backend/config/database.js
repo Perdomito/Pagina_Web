@@ -3,15 +3,37 @@
 // ============================================
 const { Pool } = require('pg');
 
+function normalizeConnectionString(rawUrl) {
+  if (!rawUrl) return rawUrl;
+
+  try {
+    const url = new URL(rawUrl);
+
+    // Neon/pg viene avisando sobre cambios en sslmode=require.
+    // Esto mantiene el comportamiento estilo libpq y evita la advertencia.
+    if (url.searchParams.get('sslmode') === 'require' && !url.searchParams.has('uselibpqcompat')) {
+      url.searchParams.set('uselibpqcompat', 'true');
+    }
+
+    return url.toString();
+  } catch (error) {
+    console.warn('⚠️ No se pudo normalizar DATABASE_URL:', error.message);
+    return rawUrl;
+  }
+}
+
+const connectionString = normalizeConnectionString(process.env.DATABASE_URL);
+
 // Crear pool de conexiones
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: {
     rejectUnauthorized: false // Necesario para Neon y otras DBs en la nube
   },
   max: 20, // Máximo de conexiones
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
+  keepAlive: true,
 });
 
 // Función para probar la conexión
@@ -25,6 +47,13 @@ async function testConnection() {
     return true;
   } catch (error) {
     console.error('❌ Error conectando a PostgreSQL:', error.message);
+    if (connectionString) {
+      try {
+        const url = new URL(connectionString);
+        console.error('📍 Host configurado:', url.hostname);
+        console.error('🗂️ Base configurada:', url.pathname.replace('/', ''));
+      } catch (_) {}
+    }
     return false;
   }
 }

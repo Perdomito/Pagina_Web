@@ -8,6 +8,7 @@ import estudiosService from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
 import miembrosService from '../services/MiembrosService';
 import { useAuth } from '../context/AuthContext';
+import { useIdioma } from '../context/IdiomaContext';
 
 // Estilos para impresión del misionero
 const estilosImpresion = `
@@ -64,7 +65,9 @@ const estilosImpresion = `
 export default function Reportes() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+  const { t, idioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es);
+
   const [continenteSeleccionado, setContinenteSeleccionado] = useState("");
   const [paisSeleccionado, setPaisSeleccionado] = useState("");
   // Pre-seleccionar el país del usuario
@@ -133,7 +136,7 @@ export default function Reportes() {
         });
       }
     } else {
-      const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      const meses = [t('rp_mes0'), t('rp_mes1'), t('rp_mes2'), t('rp_mes3'), t('rp_mes4'), t('rp_mes5'), t('rp_mes6'), t('rp_mes7'), t('rp_mes8'), t('rp_mes9'), t('rp_mes10'), t('rp_mes11')];
       for (let i = 0; i < 12; i++) {
         const fecha = new Date(hoy);
         fecha.setMonth(fecha.getMonth() - i);
@@ -353,31 +356,30 @@ export default function Reportes() {
       doc.setFont("helvetica");
       doc.setFontSize(20);
       doc.setTextColor(19, 64, 105);
-      doc.text("Evangelism Report", pageWidth / 2, 20, { align: "center" });
-      
+      doc.text(t('rp_pdfTitulo'), pageWidth / 2, 20, { align: "center" });
+
       doc.setFontSize(14);
       doc.setTextColor(100, 100, 100);
       const paisNombrePDF = paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre || "";
       const periodoTexto = obtenerPeriodos().find(p => p.valor === periodoSeleccionado)?.etiqueta || "";
-      doc.text(`${tipoReporte === "semanal" ? "Weekly" : "Monthly"} - ${paisNombrePDF}`, pageWidth / 2, 30, { align: "center" });
+      doc.text(`${tipoReporte === "semanal" ? t('rp_semanal') : t('rp_mensual')} - ${paisNombrePDF}`, pageWidth / 2, 30, { align: "center" });
       doc.text(periodoTexto, pageWidth / 2, 38, { align: "center" });
-      
+
       doc.setDrawColor(19, 64, 105);
       doc.setLineWidth(0.5);
       doc.line(20, 42, pageWidth - 20, 42);
-      
+
       const datosTabla = [
-        ["Metric", "Value"],
-        ["Active Bible Students", reporteActual.estudiantesActuales.toString()],
-        ["Online Evangelism (hours)", reporteActual.evangelismoOnline.toString()],
-        ["In-Person Evangelism (hours)", reporteActual.evangelismoPresencial.toString()],
-        [`Studies in ${tipoReporte === "semanal" ? "the Week" : "the Month"}`, reporteActual.numeroEstudios.toString()],
-        [`New Contacts ${tipoReporte === "semanal" ? "this Week" : "this Month"}`, reporteActual.nuevosContactos.toString()],
-        ["Contacts who Took Study", reporteActual.contactosEstudian.toString()],
+        [t('rp_pdfMetrica'), t('rp_pdfValor')],
+        [t('rp_estudiantesActuales'), reporteActual.estudiantesActuales.toString()],
+        [t('rp_evangelismoOnline'), reporteActual.evangelismoOnline.toString()],
+        [t('rp_evangelismoPresencial'), reporteActual.evangelismoPresencial.toString()],
+        [tipoReporte === "semanal" ? t('rp_estudiosEnLaSemana') : t('rp_estudiosEnElMes'), reporteActual.numeroEstudios.toString()],
+        [tipoReporte === "semanal" ? t('rp_nuevosContactosEstaSemana') : t('rp_nuevosContactosEsteMes'), reporteActual.nuevosContactos.toString()],
+        [tx('Contactos que Aceptaron', 'Contacts who Accepted'), (reporteActual.probabilidadMiembro || 0).toString()],
         ["Students up to Chapter 4", (reporteActual.hastRomanos4 || 0).toString()],
         ["Students up to Chapter 8", (reporteActual.terminadoRomanos8 || 0).toString()],
-        ["Students past Chapter 8", (reporteActual.terminado4Leyes || 0).toString()],
-        ["Said Yes", (reporteActual.probabilidadMiembro || 0).toString()]
+        ["Students past Chapter 8", (reporteActual.terminado4Leyes || 0).toString()]
       ];
       
       autoTable(doc, {
@@ -400,7 +402,7 @@ export default function Reportes() {
         margin: { left: 20, right: 20 }
       });
       
-      const nombreArchivo = `Reporte_${paisNombrePDF.replace(/\s+/g, '_')}_${periodoTexto.replace(/\s+/g, '_')}.pdf`;
+      const nombreArchivo = `${t('rp_reporte')}_${paisNombrePDF.replace(/\s+/g, '_')}_${periodoTexto.replace(/\s+/g, '_')}.pdf`;
       doc.save(nombreArchivo);
     }
   };
@@ -418,7 +420,7 @@ export default function Reportes() {
           <div style={{ fontSize: "30px", fontWeight: "700", color: "#1a2d5a", fontFamily: "'Lato',sans-serif", lineHeight: 1 }}>{valor}</div>
           {diff !== null && diff !== 0 && (
             <div style={{ fontSize: "11px", color: diff > 0 ? "#4CAF50" : "#f44336", marginTop: "4px", fontFamily: "'Lato',sans-serif" }}>
-              {diff > 0 ? "▲" : "▼"} {Math.abs(diff)}% vs previous period
+              {diff > 0 ? "▲" : "▼"} {Math.abs(diff)}% {t('rp_vsPeriodoAnterior')}
             </div>
           )}
         </div>
@@ -446,12 +448,12 @@ export default function Reportes() {
         <div style={{ background: "#134069", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }} className="no-print">
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             <button onClick={handleVolver} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", padding: "8px 14px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
-              <FaArrowLeft /> Back
+              <FaArrowLeft /> {t('volver')}
             </button>
             <div>
               <h1 style={{ margin: 0, color: "white", fontSize: "18px", fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>
                 <FaChartLine style={{ marginRight: "10px", fontSize: "16px" }} />
-                Evangelism Reports
+                {t('rp_titulo')}
               </h1>
               {reporteActual && (
                 <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
@@ -462,7 +464,7 @@ export default function Reportes() {
           </div>
           <button onClick={handleImprimir} disabled={!reporteActual && !misioneroSeleccionado}
             style={{ background: (reporteActual || misioneroSeleccionado) ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "8px 16px", color: "white", cursor: (reporteActual || misioneroSeleccionado) ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
-            <FaFilePdf /> Export PDF
+            <FaFilePdf /> {t('rp_exportarPdf')}
           </button>
         </div>
 
@@ -470,10 +472,10 @@ export default function Reportes() {
         
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }} className="no-print">
           {[
-            { value: continenteSeleccionado, onChange: (v) => { setContinenteSeleccionado(v); setPaisSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: continentes.map(c => ({ val: c.id, label: c.nombre })), placeholder: "Select Region", disabled: false },
-            { value: paisSeleccionado, onChange: (v) => { setPaisSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: paisesDelContinente.map(p => ({ val: p.id, label: p.nombre })), placeholder: "Select Country", disabled: !continenteSeleccionado },
-            { value: tipoReporte, onChange: (v) => { setTipoReporte(v); setPeriodoSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: [{ val: "mensual", label: "Monthly Report" }, { val: "semanal", label: "Weekly Report" }], placeholder: null, disabled: false },
-            { value: periodoSeleccionado, onChange: (v) => { setPeriodoSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: obtenerPeriodos().map(p => ({ val: p.valor, label: p.etiqueta })), placeholder: "Select Period", disabled: false, key: tipoReporte },
+            { value: continenteSeleccionado, onChange: (v) => { setContinenteSeleccionado(v); setPaisSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: continentes.map(c => ({ val: c.id, label: c.nombre })), placeholder: t('rp_seleccionarRegion'), disabled: false },
+            { value: paisSeleccionado, onChange: (v) => { setPaisSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: paisesDelContinente.map(p => ({ val: p.id, label: p.nombre })), placeholder: t('rp_seleccionarPais'), disabled: !continenteSeleccionado },
+            { value: tipoReporte, onChange: (v) => { setTipoReporte(v); setPeriodoSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: [{ val: "mensual", label: t('rp_reporteMensual') }, { val: "semanal", label: t('rp_reporteSemanal') }], placeholder: null, disabled: false },
+            { value: periodoSeleccionado, onChange: (v) => { setPeriodoSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: obtenerPeriodos().map(p => ({ val: p.valor, label: p.etiqueta })), placeholder: t('rp_seleccionarPeriodo'), disabled: false, key: tipoReporte },
           ].map((sel, i) => (
             <select key={sel.key || i} value={sel.value} onChange={e => sel.onChange(e.target.value)} disabled={sel.disabled}
               style={{ padding: "10px 14px", borderRadius: "8px", border: "1.5px solid #dde3ef", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", outline: "none", cursor: sel.disabled ? "not-allowed" : "pointer", opacity: sel.disabled ? 0.5 : 1 }}>
@@ -487,7 +489,7 @@ export default function Reportes() {
           <>
             <div style={{ marginBottom: "24px", borderBottom: "2px solid #e8edf5", paddingBottom: "16px" }}>
               <h2 style={{ color: "#134069", fontSize: "20px", margin: "0 0 4px", fontFamily: "'Cinzel',serif", fontWeight: "600" }}>
-                {tipoReporte === "semanal" ? "Weekly" : "Monthly"} Report — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
+                {tipoReporte === "semanal" ? t('rp_semanal') : t('rp_mensual')} {t('rp_reporte')} — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
               </h2>
               <p style={{ color: "#8a97b0", fontSize: "13px", margin: 0, fontFamily: "'Lato',sans-serif" }}>
                 {obtenerPeriodos().find(p => p.valor === periodoSeleccionado)?.etiqueta}
@@ -495,32 +497,30 @@ export default function Reportes() {
             </div>
             
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px" }}>
-              <MetricaCard icono={<FaUsers />} titulo="Estudiantes Actuales de la Biblia" valor={reporteActual.estudiantesActuales} anterior={reporteAnterior?.estudiantesActuales} color="#2196F3" />
-              <MetricaCard icono={<FaClock />} titulo="Evangelismo Online (horas)" valor={reporteActual.evangelismoOnline} anterior={reporteAnterior?.evangelismoOnline} color="#9C27B0" />
-              <MetricaCard icono={<FaClock />} titulo="Evangelismo Presencial (horas)" valor={reporteActual.evangelismoPresencial} anterior={reporteAnterior?.evangelismoPresencial} color="#FF9800" />
-              <MetricaCard icono={<FaBookOpen />} titulo={`Estudios en ${tipoReporte === "semanal" ? "la Semana" : "el Mes"}`} valor={reporteActual.numeroEstudios} anterior={reporteAnterior?.numeroEstudios} color="#4CAF50" />
-              <MetricaCard icono={<FaUserPlus />} titulo={`Nuevos Contactos ${tipoReporte === "semanal" ? "esta Semana" : "este Mes"}`} valor={reporteActual.nuevosContactos} anterior={reporteAnterior?.nuevosContactos} color="#00BCD4" />
-              <MetricaCard icono={<FaCheckCircle />} titulo="Contactos que Tomaron el Estudio" valor={reporteActual.contactosEstudian} anterior={reporteAnterior?.contactosEstudian} color="#8BC34A" />
+              <MetricaCard icono={<FaUsers />} titulo={t('rp_estudiantesActuales')} valor={reporteActual.estudiantesActuales} anterior={reporteAnterior?.estudiantesActuales} color="#2196F3" />
+              <MetricaCard icono={<FaClock />} titulo={t('rp_evangelismoOnline')} valor={reporteActual.evangelismoOnline} anterior={reporteAnterior?.evangelismoOnline} color="#9C27B0" />
+              <MetricaCard icono={<FaClock />} titulo={t('rp_evangelismoPresencial')} valor={reporteActual.evangelismoPresencial} anterior={reporteAnterior?.evangelismoPresencial} color="#FF9800" />
+              <MetricaCard icono={<FaBookOpen />} titulo={tipoReporte === "semanal" ? t('rp_estudiosEnLaSemana') : t('rp_estudiosEnElMes')} valor={reporteActual.numeroEstudios} anterior={reporteAnterior?.numeroEstudios} color="#4CAF50" />
+              <MetricaCard icono={<FaUserPlus />} titulo={tipoReporte === "semanal" ? t('rp_nuevosContactosEstaSemana') : t('rp_nuevosContactosEsteMes')} valor={reporteActual.nuevosContactos} anterior={reporteAnterior?.nuevosContactos} color="#00BCD4" />
+              <MetricaCard icono={<FaCheckCircle />} titulo={tx('Contactos que Aceptaron', 'Contacts who Accepted')} valor={reporteActual.probabilidadMiembro} anterior={reporteAnterior?.probabilidadMiembro} color="#8BC34A" />
             </div>
             
             <div style={{ marginBottom: "24px" }} className="no-print">
               <button onClick={mostrandoDetalle ? () => setMostrandoDetalle(false) : cargarDetalleMisioneros}
                 style={{ background: mostrandoDetalle ? "#f0f4fa" : "#134069", color: mostrandoDetalle ? "#134069" : "white", border: mostrandoDetalle ? "1.5px solid #dde3ef" : "none", borderRadius: "8px", padding: "12px 24px", cursor: "pointer", fontSize: "14px", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "8px", fontFamily: "'Lato',sans-serif", boxShadow: mostrandoDetalle ? "none" : "0 4px 12px rgba(19,64,105,0.3)" }}>
-                <FaEye /> {mostrandoDetalle ? "Hide Missionary Detail" : "View Detail by Missionary"}
+                <FaEye /> {mostrandoDetalle ? t('rp_ocultarDetalleMisionero') : t('rp_verDetalleMisionero')}
               </button>
             </div>
             
             <div style={{ background: "#f4f6fb", borderRadius: "12px", padding: "20px", marginTop: "16px", border: "1px solid #e8edf5" }}>
               <h3 style={{ color: "#134069", fontSize: "15px", marginBottom: "16px", fontFamily: "'Cinzel',serif", fontWeight: "600" }}>
-                Progress Tracking
+                {t('rp_seguimientoProgreso')}
               </h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "15px" }}>
                 {[
-                  { label: "Students up to Chapter 4", value: reporteActual.hastRomanos4 },
-                  { label: "Students up to Chapter 8", value: reporteActual.terminadoRomanos8 },
-                  { label: "Students past Chapter 8", value: reporteActual.terminado4Leyes },
-                  { label: "Said Yes", value: reporteActual.probabilidadMiembro },
-                  { label: "Potential Sheep", value: reporteActual.ovejasPotenciales }
+                  { label: t('rp_estudiantesHastaCap4'), value: reporteActual.hastRomanos4 },
+                  { label: t('rp_estudiantesHastaCap8'), value: reporteActual.terminadoRomanos8 },
+                  { label: t('rp_estudiantesMasDeCap8'), value: reporteActual.terminado4Leyes }
                 ].map((item, idx) => (
                   <div key={idx} style={{ background: "white", padding: "15px", borderRadius: "8px", textAlign: "center" }}>
                     <div style={{ fontSize: "12px", color: "#999", marginBottom: "5px" }}>{item.label}</div>
@@ -532,12 +532,12 @@ export default function Reportes() {
             
             <div style={{ marginTop: "30px" }} className="no-print">
               <label style={{ display: "block", marginBottom: "8px", color: "#134069", fontWeight: "700", fontSize: "13px", letterSpacing: "0.5px", textTransform: "uppercase", fontFamily: "'Lato',sans-serif" }}>
-                Observaciones y Comentarios
+                {t('rp_observacionesComentarios')}
               </label>
               <textarea
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Añade observaciones o comentarios sobre este reporte..."
+                placeholder={t('rp_observacionesPlaceholder')}
                 style={{
                   width: "100%",
                   minHeight: "100px",
@@ -556,7 +556,7 @@ export default function Reportes() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ color: "#134069", fontSize: "18px", margin: "0 0 4px", fontFamily: "'Cinzel',serif", fontWeight: "600" }}>
-                Missionary Detail — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
+                {t('rp_detalleMisionero')} — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
               </h2>
             </div>
             
@@ -589,20 +589,20 @@ export default function Reportes() {
                     </h3>
                     {misionero.identidad && (
                       <p style={{ fontSize: "12px", color: "#999", margin: 0 }}>
-                        Cédula: {misionero.identidad}
+                        {t('rp_cedula')}: {misionero.identidad}
                       </p>
                     )}
                   </div>
-                  
+
                   <div style={{ display: "flex", gap: "15px", marginBottom: "15px" }}>
                     <div style={{ flex: 1, textAlign: "center", padding: "10px", background: "#f5f5f5", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#666" }}>Estudiantes</div>
+                      <div style={{ fontSize: "12px", color: "#666" }}>{t('rp_estudiantes')}</div>
                       <div style={{ fontSize: "24px", fontWeight: "700", color: "#2196F3" }}>
                         {misionero.totalEstudiantes}
                       </div>
                     </div>
                     <div style={{ flex: 1, textAlign: "center", padding: "10px", background: "#f5f5f5", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#666" }}>Horas</div>
+                      <div style={{ fontSize: "12px", color: "#666" }}>{t('rp_horas')}</div>
                       <div style={{ fontSize: "24px", fontWeight: "700", color: "#4CAF50" }}>
                         {misionero.totalHoras.toFixed(1)}
                       </div>
@@ -627,7 +627,7 @@ export default function Reportes() {
                       gap: "8px"
                     }}
                   >
-                    <FaEye /> Ver Detalle
+                    <FaEye /> {t('rp_verDetalle')}
                   </button>
                 </div>
               ))}
@@ -638,16 +638,16 @@ export default function Reportes() {
         {misioneroSeleccionado && (
           <div>
            <div className="print-misionero">
-              <h2>Reporte | {misioneroSeleccionado.nombre}</h2>
+              <h2>{t('rp_reporte')} | {misioneroSeleccionado.nombre}</h2>
               <div className="fecha">
-                Fecha: {new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                {t('rp_fecha')}: {new Date().toLocaleDateString(idioma === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </div>
               <ol>
-                <li>Tiempo diario de evangelización: {misioneroSeleccionado.totalHoras.toFixed(1)} horas</li>
-                <li>Número de contactos obtenidos: 0</li>
-                <li>Contactos que decidieron tomar estudio: 0</li>
-                <li>Número de estudios bíblicos: {estudiantesMisionero.length} est</li>
-                <li>Número total de estudiantes actuales: {misioneroSeleccionado.totalEstudiantes}</li>
+                <li>{t('rp_tiempoDiarioEvangelizacion')}: {misioneroSeleccionado.totalHoras.toFixed(1)} {t('rp_horasUnidad')}</li>
+                <li>{t('rp_numeroContactosObtenidos')}: 0</li>
+                <li>{t('rp_contactosDecidieronEstudio')}: 0</li>
+                <li>{t('rp_numeroEstudiosBiblicos')}: {estudiantesMisionero.length} {t('rp_estudiosAbrev')}</li>
+                <li>{t('rp_numeroTotalEstudiantes')}: {misioneroSeleccionado.totalEstudiantes}</li>
               </ol>
             </div>
             
@@ -669,11 +669,11 @@ export default function Reportes() {
                 }}>
                   <thead>
                     <tr style={{ background: "#134069", color: "white", fontFamily: "'Lato',sans-serif" }}>
-                      <th style={{ padding: "12px", textAlign: "left" }}>N°</th>
-                      <th style={{ padding: "12px", textAlign: "left" }}>Nombre</th>
+                      <th style={{ padding: "12px", textAlign: "left" }}>{t('rp_columnaNumero')}</th>
+                      <th style={{ padding: "12px", textAlign: "left" }}>{t('rp_columnaNombre')}</th>
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(dia => (
                         <th key={dia} colSpan="2" style={{ padding: "12px", textAlign: "center", fontSize: "12px" }}>
-                          Día {dia}
+                          {t('rp_dia')} {dia}
                         </th>
                       ))}
                     </tr>
@@ -681,8 +681,8 @@ export default function Reportes() {
                       <th colSpan="2"></th>
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(dia => (
                         <React.Fragment key={dia}>
-                          <th style={{ padding: "8px", fontSize: "11px" }}>Cap</th>
-                          <th style={{ padding: "8px", fontSize: "11px" }}>Hr</th>
+                          <th style={{ padding: "8px", fontSize: "11px" }}>{t('rp_cap')}</th>
+                          <th style={{ padding: "8px", fontSize: "11px" }}>{t('rp_hr')}</th>
                         </React.Fragment>
                       ))}
                     </tr>

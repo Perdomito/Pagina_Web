@@ -4,30 +4,26 @@ import { FaArrowLeft, FaPlus, FaTrash, FaPrint, FaSave, FaTimes, FaUser, FaCalen
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
-// 
+//
 import contactosService from '../services/ContactosService';
 import miembrosService from '../services/MiembrosService';
 import estudiosService, { MESES } from '../services/EstudiosService';
 import administracionService from '../services/AdministracionService';
-
-const mesEnIngles = {
-  "ENERO": "January", "FEBRERO": "February", "MARZO": "March",
-  "ABRIL": "April", "MAYO": "May", "JUNIO": "June",
-  "JULIO": "July", "AGOSTO": "August", "SEPTIEMBRE": "September",
-  "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
-};
+import { useIdioma } from '../context/IdiomaContext';
 
 const MESES_ARR = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
 const toMesNum = (mes) => typeof mes === 'string' ? MESES_ARR.indexOf(mes) + 1 : mes;
 
 export default function EstudiosBiblicos() {
   const navigate = useNavigate();
-  
   const { user } = useAuth();
+  const { t, idioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es); // texto bilingüe directo, para etiquetas que aún no están en el diccionario del traductor
   const [continenteSeleccionado, setContinenteSeleccionado] = useState(null);
   const [paisSeleccionado, setPaisSeleccionado] = useState(null);
   const [mesSeleccionado, setMesSeleccionado] = useState(null);
   const [misioneroSeleccionado, setMissionarySeleccionado] = useState(null);
+  const [busquedaEstudiante, setBusquedaEstudiante] = useState('');
   const [vistaActual, setVistaActual] = useState("resumen");
   
   const [mostrandoModalEstudiante, setMostrandoModalEstudiante] = useState(false);
@@ -37,7 +33,8 @@ export default function EstudiosBiblicos() {
   
   const [fechaActual] = useState(new Date());
   const mesActualNombre = fechaActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
-  const añoActual = fechaActual.getFullYear();
+  const [añoActual, setAñoActual] = useState(fechaActual.getFullYear());
+  const añosDisponibles = Array.from({ length: 5 }, (_, i) => fechaActual.getFullYear() - i); // ultimos 5 años
   
   //
 const [, setCargandoDatos] = useState(false);
@@ -97,7 +94,7 @@ const cargarDatosIniciales = async () => {
     
   } catch (error) {
     console.error('Error al cargar datos iniciales:', error);
-    toast.error('Error al cargar datos del sistema');
+    toast.error(t('eb_errorCargarDatos'));
   } finally {
     setCargandoDatos(false);
   }
@@ -312,7 +309,9 @@ try {
     if (!continenteSeleccionado || !paisSeleccionado || !mesSeleccionado) return [];
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
     const estud = students[clave] || {};
-    return misioneroId ? (estud[misioneroId] || []) : estud;
+    if (!misioneroId) return estud;
+    const lista = estud[misioneroId] || [];
+    return [...lista].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }));
   };
   
   const obtenerEvangelismoActual = (misioneroId = null) => {
@@ -357,8 +356,12 @@ try {
     misioneros.forEach(m => {
       const studentsLista = obtenerEstudiantesActuales(m.id);
       studentsLista.forEach(est => {
-        // Sumar HORAS en lugar de contar capítulos
-        total += parseInt(est.estudios?.[dia]?.horas || 0);
+        // Contar estudios reales (capitulo registrado), no sumar horas --
+        // sumar horas daba 0 para datos que no tienen ese campo cargado
+        const capitulo = est.estudios?.[dia]?.capitulo;
+        if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
+          total += 1;
+        }
       });
     });
     return total;
@@ -421,7 +424,7 @@ const actualizarEvangelismo = (misioneroId, tipo, dia, campo, valor) => {
       estudiosService.guardarEvangelismo({
         miembro_id: misioneroId,
         pais_id: paisSeleccionado,
-        mes: mesSeleccionado,
+        mes: toMesNum(mesSeleccionado),
         anio: añoActual,
         dia: parseInt(dia),
         tipo: tipo === 'virtual' ? 'Virtual' : 'Presencial',
@@ -451,7 +454,7 @@ const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
-    mes: mesSeleccionado,
+    mes: toMesNum(mesSeleccionado),
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(cantidad || 0),
@@ -479,7 +482,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
-    mes: mesSeleccionado,
+    mes: toMesNum(mesSeleccionado),
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(dijeronSiCantidad || 0),
@@ -489,7 +492,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   
   const agregarEstudiante = async () => {
     if (!nuevoEstudiante.nombre || !misioneroSeleccionado) {
-      toast.error("Complete at least the name");
+      toast.error(t('eb_completeNombre'));
       return;
     }
 
@@ -497,7 +500,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
     const mesIdx = MESES_ARR.indexOf(mesSeleccionado);
     const mesActualIdx = MESES_ARR.indexOf(mesActualNombre);
     if (mesIdx < mesActualIdx && añoActual === new Date().getFullYear()) {
-      toast.error("Cannot add students to a past month");
+      toast.error(t('eb_noAgregarMesPasadoToast'));
       return;
     }
 
@@ -535,9 +538,9 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
 
       setMostrandoModalEstudiante(false);
       setNuevoEstudiante({ numero: "", nombre: "", pais: "" });
-      toast.success("✅ Student added");
+      toast.success(t('eb_estudianteAgregado'));
     } catch {
-      toast.error("Error saving student");
+      toast.error(t('eb_errorGuardarEstudiante'));
     }
   };
   
@@ -549,11 +552,11 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
     const tieneHoras = estudiante?.estudios && Object.values(estudiante.estudios).some(d => parseFloat(d.horas) > 0);
     
     if (tieneHoras) {
-      setAlertaModal({ visible: true, titulo: "Cannot Delete Student", mensaje: "This student has study records and cannot be deleted. Only students with no registered hours can be removed." });
+      setAlertaModal({ visible: true, titulo: t('eb_alertaTituloNoEliminar'), mensaje: t('eb_alertaMensajeNoEliminar') });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this student?")) return;
+    if (!window.confirm(t('eb_confirmarEliminarEstudiante'))) return;
     
     try {
       await contactosService.delete(estudianteId);
@@ -568,7 +571,7 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
       }
     }));
     
-    toast.success("Student removed");
+    toast.success(t('eb_estudianteEliminado'));
   };
   
   const actualizarEstudiante = (misioneroId, estudianteId, campo, valor) => {
@@ -635,7 +638,7 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
       horas: parseFloat(horasActual || 0)
     }).catch(err => {
       console.error('Error autoguardando:', err);
-      toast.error('Error al guardar el estudio');
+      toast.error(t('eb_errorGuardarEstudio'));
     });
   }
 };
@@ -643,12 +646,12 @@ const actualizarEstudioEstudiante = (misioneroId, estudianteId, dia, campo, valo
   
 const agregarPais = async () => {
   if (!nuevoNombrePais.trim()) {
-    toast.error("El nombre del país es requerido");
+    toast.error(t('eb_nombrePaisRequerido'));
     return;
   }
-  
+
   if (!continenteParaPais) {
-    toast.error("Selecciona un continente primero");
+    toast.error(t('eb_seleccionaContinentePrimero'));
     return;
   }
   
@@ -660,7 +663,7 @@ const agregarPais = async () => {
     const yaExiste = continente?.paises.some(p => p.nombre.toLowerCase() === nuevoNombrePais.trim().toLowerCase());
     
     if (yaExiste) {
-      toast.error("Este país ya existe en este continente");
+      toast.error(t('eb_paisYaExiste'));
       return;
     }
     
@@ -684,18 +687,18 @@ const nuevoPais = await administracionService.crearPaisConContinente({
     setNuevoNombrePais("");
     setMostrandoPromptPais(false);
     setContinenteParaPais(null);
-    toast.success("Country created successfully");
-    
+    toast.success(t('eb_paisCreado'));
+
   } catch (error) {
     console.error('Error al crear país:', error);
-    toast.error('Error al crear país: ' + (error.response?.data?.error || error.message));
+    toast.error(t('eb_errorCrearPais') + (error.response?.data?.error || error.message));
   } finally {
     setCargandoDatos(false);
   }
 };
   
 const eliminarPais = async (continenteId, paisId) => {
-    if (!window.confirm("Delete this country?")) return;
+    if (!window.confirm(t('eb_confirmarEliminarPais'))) return;
     
     try {
       await administracionService.eliminarPais(paisId);
@@ -710,16 +713,16 @@ const eliminarPais = async (continenteId, paisId) => {
         return cont;
       }));
       
-      toast.success("✅ Country deleted");
+      toast.success(t('eb_paisEliminado'));
     } catch (error) {
       console.error('Error:', error);
-      toast.error(error.response?.data?.error || 'Error al eliminar país');
+      toast.error(error.response?.data?.error || t('eb_errorEliminarPais'));
     }
   };
   
   const agregarMissionary = () => {
     if (!nuevoMissionary.trim()) {
-      toast.error("Ingrese un nombre");
+      toast.error(t('eb_ingreseNombre'));
       return;
     }
     
@@ -731,22 +734,24 @@ const eliminarPais = async (continenteId, paisId) => {
     setMissionarys([...misioneros, nuevoM]);
     setMostrandoModalMissionary(false);
     setNuevoMissionary("");
-    toast.success("✅ Missionary agregado");
+    toast.success(t('eb_misioneroAgregado'));
   };
-  
+
   const eliminarMissionary = (id) => {
-    if (!window.confirm("¿Eliminar este misionero?")) return;
+    if (!window.confirm(t('eb_confirmarEliminarMisionero'))) return;
     setMissionarys(misioneros.filter(m => m.id !== id));
-    toast.success("Missionary eliminado");
+    toast.success(t('eb_misioneroEliminado'));
   };
-  
+
   const obtenerDiaSemana = (dia, mes, año) => {
     const dias = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const mesIndex = meses.indexOf(mes);
     const fecha = new Date(año, mesIndex, dia);
-    return dias[fecha.getDay()];
+    return t(`eb_dow_${dias[fecha.getDay()]}`);
   };
-  
+
+  const nombreMes = (mes) => mes ? t(`eb_mes_${mes}`) : mes;
+
   const paisesDelContinente = continenteSeleccionado 
     ? continentes.find(c => c.id === continenteSeleccionado)?.paises || []
     : [];
@@ -1060,12 +1065,12 @@ const eliminarPais = async (continenteId, paisId) => {
             }}
             className="no-print"
           >
-            <FaArrowLeft /> Back
+            <FaArrowLeft /> {t('volver')}
           </button>
 
           <h1 style={{ color: "white", margin: 0, fontSize: "28px", fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
             <FaBook style={{ marginRight: "10px" }} />
-            Bible Studies {añoActual}
+            {t('estudiosBiblicos')} {añoActual}
           </h1>
 <div style={{ display: "flex", gap: "10px" }}>
             {mesSeleccionado && (
@@ -1074,15 +1079,15 @@ const eliminarPais = async (continenteId, paisId) => {
                   onClick={() => setMostrandoEstadisticas(true)}
                   className="no-print" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 18px", color: "white", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
                 >
-                  <FaChartLine /> Statistics
+                  <FaChartLine /> {t('estadisticas')}
                 </button>
 
               </>
             )}
-      
+
           </div>
         </div>
-        
+
         {mesSeleccionado && (
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
             <button
@@ -1095,12 +1100,12 @@ const eliminarPais = async (continenteId, paisId) => {
               }}
               style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", border: "1.5px solid rgba(255,255,255,0.4)", borderRadius: "8px", padding: "8px 18px", color: "white", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
             >
-              <FaGlobe size={13} /> Change Region
+              <FaGlobe size={13} /> {t('eb_cambiarRegion')}
             </button>
 
             <div style={{ flex: 1 }}></div>
             <div style={{ color: "white", fontSize: "16px", fontWeight: "600" }}>
-              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}
+              {continentes.find(c => c.id === continenteSeleccionado)?.nombre} • {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre} • {nombreMes(mesSeleccionado)}
             </div>
           </div>
         )}
@@ -1111,7 +1116,7 @@ const eliminarPais = async (continenteId, paisId) => {
         <div style={{ position: "relative" }}>
           <h2 style={{ margin: "0 0 8px 0", color: "#134069", fontFamily: "'Cinzel',serif", fontSize: "18px", position: "relative" }}>
             <FaGlobe style={{ marginRight: "10px" }} />
-            Select a Region
+            {t('eb_seleccionaContinente')}
           </h2>
           {user?.region && (
             <p style={{ color: "#8a97b0", fontSize: "13px", margin: "0 0 20px", fontFamily: "'Lato',sans-serif" }}>
@@ -1152,7 +1157,7 @@ const eliminarPais = async (continenteId, paisId) => {
                     {cont.nombre}
                   </div>
                   <div style={{ fontSize: "13px", color: "#8a97b0", fontFamily: "'Lato',sans-serif" }}>
-                    {cont.paises?.length || 0} countries
+                    {cont.paises?.length || 0} {t('eb_countries')}
                   </div>
                 </div>
               );
@@ -1182,7 +1187,7 @@ const eliminarPais = async (continenteId, paisId) => {
       {continenteSeleccionado && !paisSeleccionado && (
         <div>
           <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
-            Select a Country
+            {t('eb_seleccionaPais')}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px" }}>
             {paisesDelContinente.map(pais => (
@@ -1225,16 +1230,31 @@ const eliminarPais = async (continenteId, paisId) => {
       {/* SELECCIÓN DE MES */}
       {continenteSeleccionado && paisSeleccionado && !mesSeleccionado && (
         <div>
-          <h2 style={{ margin: "0 0 20px 0", color: "#1a5490" }}>
-            <FaCalendarAlt style={{ marginRight: "10px" }} />
-            Select a Month
-          </h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+            <h2 style={{ margin: 0, color: "#1a5490" }}>
+              <FaCalendarAlt style={{ marginRight: "10px" }} />
+              {tx('Selecciona un Mes', 'Select a Month')}
+            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "13px", color: "#666", fontWeight: "600" }}>{tx('Año:', 'Year:')}</span>
+              <select
+                value={añoActual}
+                onChange={(e) => setAñoActual(Number(e.target.value))}
+                style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px", fontWeight: "600" }}
+              >
+                {añosDisponibles.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "15px" }}>
             {meses.map((mes, index) => {
               const mesIndex = meses.indexOf(mesActualNombre);
-              const esActual = mes === mesActualNombre;
-              const esPasado = index < mesIndex;
-              const esFuturo = index > mesIndex;
+              const esAñoReal = añoActual === fechaActual.getFullYear();
+              const esActual = mes === mesActualNombre && esAñoReal;
+              const esPasado = !esAñoReal ? (añoActual < fechaActual.getFullYear()) : index < mesIndex;
+              const esFuturo = esAñoReal && index > mesIndex;
               
               return (
                 <div
@@ -1253,16 +1273,16 @@ const eliminarPais = async (continenteId, paisId) => {
                   }}
                 >
                   <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "6px" }}>
-                    {mesEnIngles?.[mes] || mes}
+                    {nombreMes(mes)}
                   </div>
                   {esActual && (
                     <div style={{ fontSize: "12px", opacity: 0.9 }}>
-                      Current Month
+                      {tx('Mes Actual', 'Current Month')}
                     </div>
                   )}
                   {esFuturo && (
                     <div style={{ fontSize: "12px", color: "#999" }}>
-                      Not Available
+                      {tx('No Disponible', 'Not Available')}
                     </div>
                   )}
                 </div>
@@ -1280,19 +1300,19 @@ const eliminarPais = async (continenteId, paisId) => {
               onClick={() => setVistaActual("resumen")}
               style={{ background: vistaActual === "resumen" ? "#1a5490" : "transparent", color: vistaActual === "resumen" ? "white" : "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }}
             >
-              <FaChartBar size={13} /> Summary
+              <FaChartBar size={13} /> {tx('Resumen', 'Summary')}
             </button>
             <button
               onClick={() => setVistaActual("misioneros")}
               style={{ background: vistaActual === "misioneros" ? "#1a5490" : "transparent", color: vistaActual === "misioneros" ? "white" : "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }}
             >
-              <FaUser size={13} /> By Missionary
+              <FaUser size={13} /> {tx('Por Misionero', 'By Missionary')}
             </button>
             <button
               onClick={() => setVistaActual("nuevosEstudiantes")}
               style={{ background: vistaActual === "nuevosEstudiantes" ? "#1a5490" : "transparent", color: vistaActual === "nuevosEstudiantes" ? "white" : "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }}
             >
-              <FaUserPlus size={13} /> New Students
+              <FaUserPlus size={13} /> {tx('Nuevos Estudiantes', 'New Students')}
             </button>
           </div>
 
@@ -1300,14 +1320,14 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "resumen" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                Report Control - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                {t('eb_reporteControl')} - {nombreMes(mesSeleccionado)} {añoActual}
               </h2>
               
               <div className="scroll-container">
                 <table className="tabla-estudios">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: "150px" }}>NAME</th>
+                      <th style={{ minWidth: "150px" }}>{tx('NOMBRE', 'NAME')}</th>
                       <th style={{ minWidth: "90px" }}>TOTAL</th>
                       {diasDelMes.map(dia => (
                         <th key={dia} style={{ minWidth: "70px" }}>
@@ -1326,27 +1346,33 @@ const eliminarPais = async (continenteId, paisId) => {
                         <td style={{ fontWeight: "700", background: "#E3F2FD", fontSize: "17px" }}>
                           {(() => {
                             const studentsLista = obtenerEstudiantesActuales(misionero.id);
-                            let totalHours = 0;
+                            let totalStudies = 0;
                             diasDelMes.forEach(dia => {
                               studentsLista.forEach(est => {
-                                totalHours += parseInt(est.estudios?.[dia]?.horas || 0);
+                                const capitulo = est.estudios?.[dia]?.capitulo;
+                                if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
+                                  totalStudies += 1;
+                                }
                               });
                             });
-                            return totalHours;
+                            return totalStudies;
                           })()}
                         </td>
                         {diasDelMes.map(dia => {
                           const studentsLista = obtenerEstudiantesActuales(misionero.id);
-                          let horasDiaMissionary = 0;
-                          
-                          // Sumar HORAS de ese día
+                          let studiesDiaMissionary = 0;
+
+                          // Contar ESTUDIOS de ese dia (no sumar horas)
                           studentsLista.forEach(est => {
-                            horasDiaMissionary += parseInt(est.estudios?.[dia]?.horas || 0);
+                            const capitulo = est.estudios?.[dia]?.capitulo;
+                            if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
+                              studiesDiaMissionary += 1;
+                            }
                           });
-                          
+
                           return (
                             <td key={dia} style={{ fontSize: "15px" }}>
-                              {horasDiaMissionary}
+                              {studiesDiaMissionary}
                             </td>
                           );
                         })}
@@ -1361,17 +1387,20 @@ const eliminarPais = async (continenteId, paisId) => {
                       </tr>
                     ))}
                     <tr className="total-final">
-                      <td>DAILY TOTAL</td>
+                      <td>{tx('TOTAL DIARIO', 'DAILY TOTAL')}</td>
                       <td>
                         {misioneros.reduce((sum, m) => {
                           const studentsLista = obtenerEstudiantesActuales(m.id);
-                          let totalHours = 0;
+                          let totalStudies = 0;
                           diasDelMes.forEach(dia => {
                             studentsLista.forEach(est => {
-                              totalHours += parseInt(est.estudios?.[dia]?.horas || 0);
+                              const capitulo = est.estudios?.[dia]?.capitulo;
+                              if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
+                                totalStudies += 1;
+                              }
                             });
                           });
-                          return sum + totalHours;
+                          return sum + totalStudies;
                         }, 0)}
                       </td>
                       {diasDelMes.map(dia => (
@@ -1388,19 +1417,19 @@ const eliminarPais = async (continenteId, paisId) => {
                   onClick={() => navigate("/miembros")}
                   className="btn-add-new"
                 >
-                  <FaPlus size={18} /> Add Missionary
+                  <FaPlus size={18} /> {tx('Agregar Misionero', 'Add Missionary')}
                 </button>
               </div>
 
               {/* Evangelismo */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>Evangelism {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>{t('eb_evangelismoTitulo')} {nombreMes(mesSeleccionado)}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
-                    <th style={{ minWidth: "150px" }}>NAME</th>
-                    <th>TOTAL HOURS</th>
+                    <th style={{ minWidth: "150px" }}>{tx('NOMBRE', 'NAME')}</th>
+                    <th>{tx('TOTAL HORAS', 'TOTAL HOURS')}</th>
                     <th>VIRTUAL</th>
-                    <th>IN-PERSON</th>
+                    <th>{tx('PRESENCIAL', 'IN-PERSON')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1468,13 +1497,13 @@ const eliminarPais = async (continenteId, paisId) => {
               </table>
 
               {/* NUEVOS ESTUDIANTES - RESUMEN */}
-              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>New Students {mesEnIngles?.[mesSeleccionado] || mesSeleccionado}</h3>
+              <h3 style={{ margin: "40px 0 20px 0", color: "#1a5490", fontSize: "22px" }}>{t('eb_nuevosEstudiantesTab')} {nombreMes(mesSeleccionado)}</h3>
               <table className="tabla-estudios" style={{ maxWidth: "800px" }}>
                 <thead>
                   <tr>
-                    <th style={{ minWidth: "150px" }}>NAME</th>
-                    <th>SAID YES</th>
-                    <th>CONTACTS</th>
+                    <th style={{ minWidth: "150px" }}>{tx('NOMBRE', 'NAME')}</th>
+                    <th>{tx('DIJERON SÍ', 'SAID YES')}</th>
+                    <th>{tx('CONTACTOS', 'CONTACTS')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1521,11 +1550,16 @@ const eliminarPais = async (continenteId, paisId) => {
                 {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                   const studentsLista = obtenerEstudiantesActuales(misionero.id);
                   
-                  // Calcular horas de ESTUDIOS (solo students)
-                  let horasStudies = 0;
+                  // Contar ESTUDIOS reales (cuantos dias con capitulo registrado,
+                  // no la suma de horas -- antes mostraba horasStudies aqui, que
+                  // sale en 0 para datos que no tienen el campo horas cargado)
+                  let cantidadStudies = 0;
                   diasDelMes.forEach(dia => {
                     studentsLista.forEach(est => {
-                      horasStudies += parseInt(est.estudios?.[dia]?.horas || 0);
+                      const capitulo = est.estudios?.[dia]?.capitulo;
+                      if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
+                        cantidadStudies++;
+                      }
                     });
                   });
                   
@@ -1562,7 +1596,7 @@ const eliminarPais = async (continenteId, paisId) => {
                       <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "12px", borderTop: "1px solid #e0e0e0" }}>
                         <div>
                           <div style={{ fontSize: "12px", color: "#999" }}>Studies</div>
-                          <div style={{ fontSize: "22px", fontWeight: "700", color: "#1a5490" }}>{horasStudies}</div>
+                          <div style={{ fontSize: "22px", fontWeight: "700", color: "#1a5490" }}>{cantidadStudies}</div>
                         </div>
                         <div>
                           <div style={{ fontSize: "12px", color: "#999" }}>Hours</div>
@@ -1579,7 +1613,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   onClick={() => navigate("/miembros")}
                   className="btn-add-new"
                 >
-                  <FaPlus size={18} /> Add Missionary
+                  <FaPlus size={18} /> {tx('Agregar Misionero', 'Add Missionary')}
                 </button>
               </div>
             </div>
@@ -1589,18 +1623,18 @@ const eliminarPais = async (continenteId, paisId) => {
           {vistaActual === "nuevosEstudiantes" && (
             <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 25px 0", color: "#1a5490", fontSize: "24px" }}>
-                New Students - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                {t('eb_nuevosEstudiantesTab')} - {nombreMes(mesSeleccionado)} {añoActual}
               </h2>
               
               {/* ESTUDIANTES QUE SAID YES */}
               <h3 style={{ margin: "0 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
-                Said Yes
+                {tx('Dijeron Sí', 'Said Yes')}
               </h3>
               <div className="scroll-container">
                 <table className="tabla-estudios">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>NAME</th>
+                      <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>{tx('NOMBRE', 'NAME')}</th>
                       <th style={{ background: "#4CAF50 !important" }}>TOTAL</th>
                       {diasDelMes.map(dia => (
                         <th key={dia} style={{ minWidth: "90px", background: "#4CAF50 !important" }}>
@@ -1660,13 +1694,13 @@ const eliminarPais = async (continenteId, paisId) => {
 
               {/* NUEVOS CONTACTS */}
               <h3 style={{ margin: "40px 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
-                New Contacts
+                {tx('Nuevos Contactos', 'New Contacts')}
               </h3>
               <div className="scroll-container">
                 <table className="tabla-estudios">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>NAME</th>
+                      <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>{tx('NOMBRE', 'NAME')}</th>
                       <th style={{ background: "#4CAF50 !important" }}>TOTAL</th>
                       {diasDelMes.map(dia => (
                         <th key={dia} style={{ minWidth: "90px", background: "#4CAF50 !important" }}>
@@ -1736,26 +1770,34 @@ const eliminarPais = async (continenteId, paisId) => {
               onClick={() => { setMissionarySeleccionado(null); setVistaActual("resumen"); }}
               style={{ background: "transparent", color: "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
             >
-              <FaChartBar size={13} /> Summary
+              <FaChartBar size={13} /> {tx('Resumen', 'Summary')}
             </button>
             <button
               onClick={() => { setMissionarySeleccionado(null); setVistaActual("misioneros"); }}
               style={{ background: "transparent", color: "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
             >
-              <FaUser size={13} /> By Missionary
+              <FaUser size={13} /> {tx('Por Misionero', 'By Missionary')}
             </button>
             <button
               onClick={() => { setMissionarySeleccionado(null); setVistaActual("nuevosEstudiantes"); }}
               style={{ background: "transparent", color: "#555", border: "none", borderRadius: "50px", padding: "10px 24px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
             >
-              <FaUserPlus size={13} /> New Students
+              <FaUserPlus size={13} /> {tx('Nuevos Estudiantes', 'New Students')}
             </button>
           </div>
           <div style={{ background: "white", borderRadius: "12px", padding: "25px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "12px" }}>
             <h2 style={{ margin: 0, color: "#1a5490", fontSize: "24px" }}>
-              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+              {misioneros.find(m => m.id === misioneroSeleccionado)?.nombre} - {nombreMes(mesSeleccionado)} {añoActual}
             </h2>
+            <input
+              type="text"
+              value={busquedaEstudiante}
+              onChange={(e) => setBusquedaEstudiante(e.target.value)}
+              placeholder={tx('Buscar estudiante por nombre...', 'Search student by name...')}
+              className="no-print"
+              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px", minWidth: "220px" }}
+            />
           </div>
 
           <div className="scroll-container">
@@ -1763,9 +1805,9 @@ const eliminarPais = async (continenteId, paisId) => {
               <thead>
                 <tr>
                   <th rowSpan="2" style={{ minWidth: "60px" }}>DEL</th>
-                  <th rowSpan="2" style={{ minWidth: "130px" }}>PHONE No.</th>
-                  <th rowSpan="2" style={{ minWidth: "220px" }}>NAME</th>
-                  <th rowSpan="2" style={{ minWidth: "160px" }}>COUNTRY</th>
+                  <th rowSpan="2" style={{ minWidth: "130px" }}>{tx('TELÉFONO', 'PHONE No.')}</th>
+                  <th rowSpan="2" style={{ minWidth: "220px" }}>{tx('NOMBRE', 'NAME')}</th>
+                  <th rowSpan="2" style={{ minWidth: "160px" }}>{tx('PAÍS', 'COUNTRY')}</th>
                   {diasDelMes.map(dia => (
                     <th key={dia} colSpan="2" style={{ minWidth: "90px" }}>
                       {obtenerDiaSemana(dia, mesSeleccionado, añoActual)} {dia}
@@ -1782,7 +1824,9 @@ const eliminarPais = async (continenteId, paisId) => {
                 </tr>
               </thead>
               <tbody>
-                {obtenerEstudiantesActuales(misioneroSeleccionado).map(estudiante => (
+                {obtenerEstudiantesActuales(misioneroSeleccionado)
+                  .filter(estudiante => !busquedaEstudiante.trim() || (estudiante.nombre || '').toLowerCase().includes(busquedaEstudiante.trim().toLowerCase()))
+                  .map(estudiante => (
                   <tr key={estudiante.id}>
                     <td>
                       <button
@@ -1807,7 +1851,7 @@ const eliminarPais = async (continenteId, paisId) => {
                         type="text"
                         value={estudiante.nombre}
                         onChange={(e) => actualizarEstudiante(misioneroSeleccionado, estudiante.id, 'nombre', e.target.value)}
-                        style={{ width: "210px", textAlign: "left", fontWeight: "600" }}
+                        style={{ width: "210px", textAlign: "left", fontWeight: "600", textTransform: "uppercase" }}
                       />
                     </td>
                     <td>
@@ -2022,17 +2066,20 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                   </td>
                   {diasDelMes.map(dia => {
                     const studentsLista = obtenerEstudiantesActuales(misioneroSeleccionado);
-                    let totalHoursDia = 0;
-                    
-                    // Sumar HORAS de students ese día
+                    let studiesDia = 0;
+
+                    // Contar ESTUDIOS de students ese dia (no sumar horas)
                     studentsLista.forEach(est => {
-                      totalHoursDia += parseInt(est.estudios?.[dia]?.horas || 0);
+                      const capitulo = est.estudios?.[dia]?.capitulo;
+                      if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
+                        studiesDia += 1;
+                      }
                     });
-                    
+
                     return (
                       <React.Fragment key={dia}>
                         <td></td>
-                        <td style={{ fontSize: "17px" }}>{totalHoursDia}</td>
+                        <td style={{ fontSize: "17px" }}>{studiesDia}</td>
                       </React.Fragment>
                     );
                   })}
@@ -2058,7 +2105,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                 </button>
               ) : (
                 <div style={{ textAlign: "center", color: "#999", padding: "14px", fontSize: "14px" }}>
-                  Cannot add students to past months
+                  {tx('No se pueden agregar estudiantes a meses pasados', 'Cannot add students to past months')}
                 </div>
               );
             })()}
@@ -2067,14 +2114,14 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
           {/* TABLA EVANGELISMO */}
           <div className="tabla-evangelismo">
             <h3 style={{ margin: "0 0 20px 0", color: "#4CAF50", fontSize: "20px" }}>
-              Other Activities
+              {tx('Otras Actividades', 'Other Activities')}
             </h3>
             
             <div className="scroll-container">
               <table className="tabla-estudios">
                 <thead>
                   <tr>
-                    <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>ACTIVITY</th>
+                    <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>{tx('ACTIVIDAD', 'ACTIVITY')}</th>
                     {diasDelMes.map(dia => (
                       <th key={dia} colSpan="2" style={{ minWidth: "120px", background: "#4CAF50 !important" }}>
                         {obtenerDiaSemana(dia, mesSeleccionado, añoActual)} {dia}
@@ -2085,7 +2132,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                     <th style={{ background: "#4CAF50 !important" }}></th>
                     {diasDelMes.map(dia => (
                       <React.Fragment key={dia}>
-                        <th style={{ fontSize: "11px", background: "#4CAF50 !important" }}>Location</th>
+                        <th style={{ fontSize: "11px", background: "#4CAF50 !important" }}>{tx('Ubicación', 'Location')}</th>
                         <th style={{ fontSize: "11px", background: "#4CAF50 !important" }}>Hrs</th>
                       </React.Fragment>
                     ))}
@@ -2094,7 +2141,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                 <tbody>
                   <tr>
                     <td style={{ textAlign: "left", fontWeight: "700", background: "#C8E6C9" }}>
-                      VIRTUAL EVANGELISM
+                      {tx('EVANGELISMO VIRTUAL', 'VIRTUAL EVANGELISM')}
                     </td>
                     {diasDelMes.map(dia => {
                       const evang = obtenerEvangelismoActual(misioneroSeleccionado);
@@ -2103,7 +2150,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                           <td>
                             <input
                               type="text"
-                              placeholder="Location"
+                              placeholder={tx('Ubicación', 'Location')}
                               value={evang.virtual?.[dia]?.donde || ""}
                               onChange={(e) => actualizarEvangelismo(misioneroSeleccionado, 'virtual', dia, 'donde', e.target.value)}
                               style={{ width: "100px" }}
@@ -2126,7 +2173,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                   
                   <tr>
                     <td style={{ textAlign: "left", fontWeight: "700", background: "#C8E6C9" }}>
-                      IN-PERSON EVANGELISM
+                      {tx('EVANGELISMO PRESENCIAL', 'IN-PERSON EVANGELISM')}
                     </td>
                     {diasDelMes.map(dia => {
                       const evang = obtenerEvangelismoActual(misioneroSeleccionado);
@@ -2135,7 +2182,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                           <td>
                             <input
                               type="text"
-                              placeholder="Location"
+                              placeholder={tx('Ubicación', 'Location')}
                               value={evang.presencial?.[dia]?.donde || ""}
                               onChange={(e) => actualizarEvangelismo(misioneroSeleccionado, 'presencial', dia, 'donde', e.target.value)}
                               style={{ width: "100px" }}
@@ -2320,7 +2367,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
               <h3 style={{ margin: 0, color: "#1a5490", fontSize: "24px", fontWeight: "700" }}>
                 <FaChartLine style={{ marginRight: "10px" }} />
-                Statistics - {mesEnIngles?.[mesSeleccionado] || mesSeleccionado} {añoActual}
+                {t('estadisticas')} - {nombreMes(mesSeleccionado)} {añoActual}
               </h3>
               <button
                 onClick={() => setMostrandoEstadisticas(false)}
@@ -2330,74 +2377,85 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
               </button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "18px", marginBottom: "30px" }}>
-              <div style={{ background: "#E3F2FD", padding: "24px", borderRadius: "14px" }}>
-                <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>Total Studies</div>
-                <div style={{ fontSize: "38px", fontWeight: "700", color: "#1a5490" }}>
-                  {misioneros.reduce((sum, m) => sum + calcularTotalStudiesMissionary(m.id), 0)}
-                </div>
-              </div>
-              <div style={{ background: "#E8F5E9", padding: "24px", borderRadius: "14px" }}>
-                <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>Total Hours</div>
-                <div style={{ fontSize: "38px", fontWeight: "700", color: "#4CAF50" }}>
-                  {misioneros.reduce((sum, m) => sum + calcularTotalHoursMissionary(m.id), 0)}
-                </div>
-              </div>
-              <div style={{ background: "#FFF3E0", padding: "24px", borderRadius: "14px" }}>
-                <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>Total Students</div>
-                <div style={{ fontSize: "38px", fontWeight: "700", color: "#FF9800" }}>
-                  {Object.values(obtenerEstudiantesActuales()).reduce((sum, lista) => sum + (lista?.length || 0), 0)}
-                </div>
-              </div>
-              <div style={{ background: "#F3E5F5", padding: "24px", borderRadius: "14px" }}>
-                <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>Active Missionaries</div>
-                <div style={{ fontSize: "38px", fontWeight: "700", color: "#9C27B0" }}>
-                  {misioneros.filter(m => calcularTotalStudiesMissionary(m.id) > 0).length}
-                </div>
-              </div>
-            </div>
+            {(() => {
+              const misionerosDelPais = misioneros.filter(m => m.pais_id === paisSeleccionado);
+              const filas = misionerosDelPais.map(m => {
+                const estudios = calcularTotalStudiesMissionary(m.id);
+                const horas = calcularTotalHoursMissionary(m.id);
+                const estudiantes = obtenerEstudiantesActuales(m.id).length;
+                return { nombre: m.nombre, estudios, horas, estudiantes };
+              });
+              const totalEstudios = filas.reduce((s, f) => s + f.estudios, 0);
+              const totalHoras = filas.reduce((s, f) => s + f.horas, 0);
+              const totalEstudiantes = filas.reduce((s, f) => s + f.estudiantes, 0);
+              const misionerosActivos = filas.filter(f => f.estudios > 0 || f.horas > 0).length;
 
-            <h4 style={{ color: "#1a5490", marginBottom: "18px", fontSize: "18px" }}>By Missionary:</h4>
-            <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-              <table className="tabla-estudios">
-                <thead>
-                  <tr>
-                    <th>Missionary</th>
-                    <th>Studies</th>
-                    <th>Hours</th>
-                    <th>Students</th>
-                    <th>Average</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {misioneros.filter(m => m.pais_id === paisSeleccionado).map(m => {
-                    const estudios = calcularTotalStudiesMissionary(m.id);
-                    const horas = calcularTotalHoursMissionary(m.id);
-                    const studentsLista = obtenerEstudiantesActuales(m.id);
-                    const promedio = studentsLista.length > 0 ? (estudios / studentsLista.length).toFixed(1) : 0;
-                    
-                    return (
-                      <tr key={m.id}>
-                        <td style={{ textAlign: "left", fontWeight: "600" }}>{m.nombre}</td>
-                        <td>{estudios}</td>
-                        <td>{horas}</td>
-                        <td>{studentsLista.length}</td>
-                        <td>{promedio}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+              return (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "18px", marginBottom: "30px" }}>
+                    <div style={{ background: "#E3F2FD", padding: "24px", borderRadius: "14px" }}>
+                      <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>{tx('Total de Estudios', 'Total Studies')}</div>
+                      <div style={{ fontSize: "38px", fontWeight: "700", color: "#1a5490" }}>{totalEstudios}</div>
+                    </div>
+                    <div style={{ background: "#E8F5E9", padding: "24px", borderRadius: "14px" }}>
+                      <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>{tx('Total de Horas', 'Total Hours')}</div>
+                      <div style={{ fontSize: "38px", fontWeight: "700", color: "#4CAF50" }}>{totalHoras}</div>
+                    </div>
+                    <div style={{ background: "#FFF3E0", padding: "24px", borderRadius: "14px" }}>
+                      <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>{tx('Total de Estudiantes', 'Total Students')}</div>
+                      <div style={{ fontSize: "38px", fontWeight: "700", color: "#FF9800" }}>{totalEstudiantes}</div>
+                    </div>
+                    <div style={{ background: "#F3E5F5", padding: "24px", borderRadius: "14px" }}>
+                      <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>{tx('Misioneros Activos', 'Active Missionaries')}</div>
+                      <div style={{ fontSize: "38px", fontWeight: "700", color: "#9C27B0" }}>{misionerosActivos}</div>
+                    </div>
+                  </div>
+
+                  <h4 style={{ color: "#1a5490", marginBottom: "18px", fontSize: "18px" }}>{tx('Por Misionero:', 'By Missionary:')}</h4>
+                  <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                    {filas.length === 0 ? (
+                      <div style={{ color: "#999", textAlign: "center", padding: "20px" }}>{tx('Sin misioneros para este país', 'No missionaries for this country')}</div>
+                    ) : (
+                      <table className="tabla-estudios">
+                        <thead>
+                          <tr>
+                            <th>{tx('Misionero', 'Missionary')}</th>
+                            <th>{tx('Estudios', 'Studies')}</th>
+                            <th>{tx('Horas', 'Hours')}</th>
+                            <th>{tx('Estudiantes', 'Students')}</th>
+                            <th>{tx('Promedio', 'Average')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filas.map((f, i) => {
+                            const promedio = f.estudiantes > 0 ? (f.estudios / f.estudiantes).toFixed(1) : 0;
+                            return (
+                              <tr key={i}>
+                                <td style={{ textAlign: "left", fontWeight: "600" }}>{f.nombre}</td>
+                                <td>{f.estudios}</td>
+                                <td>{f.horas}</td>
+                                <td>{f.estudiantes}</td>
+                                <td>{promedio}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
 
             <div style={{ marginTop: "25px", textAlign: "right" }}>
               <button onClick={() => setMostrandoEstadisticas(false)} className="btn-secondary" style={{ padding: "12px 28px" }}>
-                Close
+                {tx('Cerrar', 'Close')}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

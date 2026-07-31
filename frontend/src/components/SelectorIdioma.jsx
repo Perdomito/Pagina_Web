@@ -1,75 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FaGlobe } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 import colors from '../utils/colors';
+import { useIdioma } from '../context/IdiomaContext';
 
 export default function SelectorIdioma() {
-  const [idiomaActual, setIdiomaActual] = useState('es');
+  const { idioma, setIdioma, t } = useIdioma();
   const [mostrandoMenu, setMostrandoMenu] = useState(false);
-
-  useEffect(() => {
-    // Detectar cambio de idioma de Google Translate
-    const interval = setInterval(() => {
-      const frame = document.querySelector('iframe.goog-te-banner-frame');
-      if (frame) {
-        try {
-          const innerDoc = frame.contentDocument || frame.contentWindow.document;
-          const select = innerDoc.querySelector('.goog-te-combo');
-          if (select && select.value !== idiomaActual) {
-            setIdiomaActual(select.value || 'es');
-          }
-        } catch (e) {
-          // Ignorar errores de cross-origin
-        }
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [idiomaActual]);
-
-  const cambiarIdioma = (nuevoIdioma) => {
-    // Buscar el iframe de Google Translate
-    const frames = document.getElementsByTagName('iframe');
-    
-    for (let i = 0; i < frames.length; i++) {
-      if (frames[i].className === 'goog-te-banner-frame') {
-        try {
-          const innerDoc = frames[i].contentDocument || frames[i].contentWindow.document;
-          const selectElement = innerDoc.querySelector('.goog-te-combo');
-          
-          if (selectElement) {
-            selectElement.value = nuevoIdioma;
-            selectElement.dispatchEvent(new Event('change'));
-            setIdiomaActual(nuevoIdioma);
-            setMostrandoMenu(false);
-            return;
-          }
-        } catch (e) {
-          console.error('Error al cambiar idioma:', e);
-        }
-      }
-    }
-
-    // Fallback: intentar con el elemento visible
-    const visibleSelect = document.querySelector('.goog-te-combo');
-    if (visibleSelect) {
-      visibleSelect.value = nuevoIdioma;
-      visibleSelect.dispatchEvent(new Event('change'));
-      setIdiomaActual(nuevoIdioma);
-      setMostrandoMenu(false);
-    }
-  };
 
   const idiomas = [
     { codigo: 'es', nombre: 'Español', bandera: '🇪🇸' },
     { codigo: 'en', nombre: 'English', bandera: '🇬🇧' }
   ];
 
-  const idiomaSeleccionado = idiomas.find(i => i.codigo === idiomaActual) || idiomas[0];
+  const idiomaSeleccionado = idiomas.find(i => i.codigo === idioma) || idiomas[0];
+
+  const cambiarIdioma = (nuevoIdioma) => {
+    setIdioma(nuevoIdioma);
+    setMostrandoMenu(false);
+    toast.success(nuevoIdioma === 'es' ? '🇪🇸 Español' : '🇬🇧 English');
+  };
 
   return (
     <div style={{ position: 'relative' }}>
       <button
         onClick={() => setMostrandoMenu(!mostrandoMenu)}
+        title={t('idioma')}
         style={{
           background: "rgba(255,255,255,0.15)",
           backdropFilter: "blur(10px)",
@@ -125,15 +81,15 @@ export default function SelectorIdioma() {
               minWidth: '180px'
             }}
           >
-            {idiomas.map((idioma) => (
+            {idiomas.map((opcion) => (
               <button
-                key={idioma.codigo}
-                onClick={() => cambiarIdioma(idioma.codigo)}
+                key={opcion.codigo}
+                onClick={() => cambiarIdioma(opcion.codigo)}
                 style={{
                   width: '100%',
                   padding: '12px 16px',
                   border: 'none',
-                  background: idiomaActual === idioma.codigo ? colors.backgroundGray : 'white',
+                  background: idioma === opcion.codigo ? colors.backgroundGray : 'white',
                   cursor: 'pointer',
                   textAlign: 'left',
                   fontSize: '14px',
@@ -145,18 +101,18 @@ export default function SelectorIdioma() {
                   gap: '10px'
                 }}
                 onMouseOver={(e) => {
-                  if (idiomaActual !== idioma.codigo) {
+                  if (idioma !== opcion.codigo) {
                     e.currentTarget.style.background = colors.backgroundGray;
                   }
                 }}
                 onMouseOut={(e) => {
-                  if (idiomaActual !== idioma.codigo) {
+                  if (idioma !== opcion.codigo) {
                     e.currentTarget.style.background = 'white';
                   }
                 }}
               >
-                <span style={{ fontSize: '20px' }}>{idioma.bandera}</span>
-                {idioma.nombre}
+                <span style={{ fontSize: '20px' }}>{opcion.bandera}</span>
+                {opcion.nombre}
               </button>
             ))}
           </div>

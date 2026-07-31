@@ -12,64 +12,66 @@ import {
   FaHammer
 } from 'react-icons/fa';
 import colors from '../utils/colors';
+import { useIdioma } from '../context/IdiomaContext';
 
 export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
   const navigate = useNavigate();
+const { t, idioma } = useIdioma();
 
   const modulos = [
-    { 
-      titulo: "Members",
-      desc: "Records, follow-up & visits.",
+    {
+      titulo: t('miembros'),
+      desc: t('miembrosDesc'),
       ruta: "/miembros",
       icon: <FaUsers size={20} />,
       permiso: "miembros"
     },
-    { 
-      titulo: "Bible Studies",
-      desc: "Weekly control & tracking.",
+    {
+      titulo: t('estudiosBiblicos'),
+      desc: t('estudiosBiblicosDesc'),
       ruta: "/estudios-biblicos",
       icon: <FaBook size={20} />,
       permiso: "estudios_biblicos"
     },
-    { 
-      titulo: "Reports",
-      desc: "Results & goals achieved.",
+    {
+      titulo: t('reportes'),
+      desc: t('reportesDesc'),
       ruta: "/reportes",
       icon: <FaChartBar size={20} />,
       permiso: "reportes"
     },
-    { 
-      titulo: "Contacts",
-      desc: "New & follow-up contacts.",
+    {
+      titulo: t('contactos'),
+      desc: t('contactosDesc'),
       ruta: "/contactos",
       icon: <FaAddressBook size={20} />,
       permiso: "contactos"
     },
-    { 
-      titulo: "Administration",
-      desc: "Budget & financial control.",
+    {
+      titulo: t('administracion'),
+      desc: t('administracionDesc'),
       ruta: "/administracion",
       icon: <FaMoneyBillWave size={20} />,
       permiso: "administracion"
     },
-    { 
-      titulo: "Statistics",
-      desc: "Charts & reports by country.",
+    {
+      titulo: t('estadisticas'),
+      desc: t('estadisticasDesc'),
       ruta: "/estadisticas",
       icon: <FaChartLine size={20} />,
       permiso: "reportes"
     },
-    { 
-      titulo: "Studies",
-      desc: "🚧 Under construction - Coming soon",
+    {
+      titulo: t('estudios'),
+      desc: t('enConstruccion'),
       ruta: null,
       icon: <FaHammer size={20} />,
       permiso: "estudios_biblicos",
       enConstruccion: true
     },
-    { 
-      titulo: "Settings",
-      desc: "Users, roles & permissions.",
+    {
+      titulo: t('configuracion'),
+      desc: t('configuracionDesc'),
       ruta: "/configuracion",
       icon: <FaCog size={20} />,
       permiso: "configuracion"
@@ -147,7 +149,7 @@ export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
           }}
         >
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
-            Menú
+            {t('menu')}
           </h2>
           <button
             onClick={onClose}
@@ -255,7 +257,7 @@ export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
             textAlign: 'center'
           }}
         >
-          © {new Date().getFullYear()} Emanuel Church
+          © {new Date().getFullYear()} {idioma === 'en' ? 'Emanuel Church' : 'Iglesia Emanuel'}
         </div>
       </div>
     </>

@@ -2,9 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft } from 'react-icons/fa';
 import colors from '../utils/colors';
+import { useIdioma } from '../context/IdiomaContext';
 
-export default function BotonVolver({ ruta = "/home", texto = "Volver" }) {
+export default function BotonVolver({ ruta = "/home", texto }) {
   const navigate = useNavigate();
+  const { t } = useIdioma();
+  const etiqueta = texto || t('volver');
 
   return (
     <button
@@ -32,7 +35,7 @@ export default function BotonVolver({ ruta = "/home", texto = "Volver" }) {
         e.currentTarget.style.transform = 'translateX(0)';
       }}
     >
-      <FaArrowLeft /> {texto}
+      <FaArrowLeft /> {etiqueta}
     </button>
   );
 }
