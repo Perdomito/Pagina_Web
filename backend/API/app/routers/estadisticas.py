@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, extract
 from app.database import get_db
-from app.models import Usuario, Miembro, Contacto, Reporte, EstadisticaPais, Pais, Ciudad, CiudadMision
+from app.models import Usuario, Miembro, Contacto, Reporte, EstadisticaPais, Pais, Ciudad, Iglesia
 from app.schemas import (
     EstadisticasOut, ComparacionEstudios, SerieData,
     RendimientoProfesores, ProfesorRendimiento,
@@ -245,11 +245,16 @@ async def _build_resumen_pais(db: AsyncSession, pais_id: int | None) -> ResumenP
         )
     ).scalar() or 0
 
+    # Iglesias activas del pais. Se aceptan las que quedaron sin pais_id
+    # resolviendo por la ciudad, para no perder filas cargadas a medias.
     cantidad_iglesias = (
         await db.execute(
-            select(func.count(CiudadMision.id))
-            .join(Ciudad, CiudadMision.ciudad_id == Ciudad.id)
-            .where(Ciudad.pais_iso2 == pais.iso)
+            select(func.count(Iglesia.id))
+            .outerjoin(Ciudad, Iglesia.ciudad_id == Ciudad.id)
+            .where(
+                Iglesia.activa.is_(True),
+                (Iglesia.pais_id == pais_id) | (Ciudad.pais_iso2 == pais.iso),
+            )
         )
     ).scalar() or 0
 
