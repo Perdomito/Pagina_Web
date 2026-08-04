@@ -53,6 +53,7 @@ const [, setCargandoDatos] = useState(false);
   const [evangelismoData, setEvangelismoData] = useState({});
   const [studentsQueDigeronSi, setEstudiantesQueDigeronSi] = useState({});
   const [nuevosContactos, setNuevosContactos] = useState({});
+  const [potenciales, setPotenciales] = useState({});
   
   const [alertaModal, setAlertaModal] = useState({ visible: false, titulo: '', mensaje: '' });
   const [nuevoEstudiante, setNuevoEstudiante] = useState({
@@ -152,7 +153,7 @@ try {
         // Separar array plano en categorías
         const resumen = {
           evangelismo: resumenRaw.filter(r => r.tipo !== null && r.contacto_id === null),
-          nuevosEstudiantes: resumenRaw.filter(r => r.tipo === null && r.contacto_id === null && (r.dijeron_si > 0 || r.nuevos_contactos > 0)),
+          nuevosEstudiantes: resumenRaw.filter(r => r.tipo === null && r.contacto_id === null && (r.dijeron_si > 0 || r.nuevos_contactos > 0 || r.potenciales > 0)),
           estudios: resumenRaw.filter(r => r.contacto_id !== null)
         };
         
@@ -182,24 +183,32 @@ try {
         if (resumen.nuevosEstudiantes && resumen.nuevosEstudiantes.length > 0) {
           const dijeronSiData = {};
           const contactosData = {};
-          
+          const potencialesData = {};
+
           resumen.nuevosEstudiantes.forEach(ne => {
             if (!dijeronSiData[ne.miembro_id]) {
               dijeronSiData[ne.miembro_id] = {};
               contactosData[ne.miembro_id] = {};
+              potencialesData[ne.miembro_id] = {};
             }
             dijeronSiData[ne.miembro_id][ne.dia] = ne.dijeron_si;
             contactosData[ne.miembro_id][ne.dia] = ne.nuevos_contactos;
+            potencialesData[ne.miembro_id][ne.dia] = ne.potenciales;
           });
-          
+
           setEstudiantesQueDigeronSi(prev => ({
             ...prev,
             [clave]: dijeronSiData
           }));
-          
+
           setNuevosContactos(prev => ({
             ...prev,
             [clave]: contactosData
+          }));
+
+          setPotenciales(prev => ({
+            ...prev,
+            [clave]: potencialesData
           }));
         }
         
@@ -334,7 +343,14 @@ try {
     const data = nuevosContactos[clave] || {};
     return misioneroId ? (data[misioneroId] || {}) : data;
   };
-  
+
+  const obtenerPotencialesActual = (misioneroId = null) => {
+    if (!continenteSeleccionado || !paisSeleccionado || !mesSeleccionado) return {};
+    const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+    const data = potenciales[clave] || {};
+    return misioneroId ? (data[misioneroId] || {}) : data;
+  };
+
   const calcularTotalStudiesMissionary = (misioneroId) => {
     const studentsLista = obtenerEstudiantesActuales(misioneroId);
     const diasDelMes = mesSeleccionado ? obtenerDiasDelMes(mesSeleccionado, añoActual) : [];
@@ -463,7 +479,8 @@ const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
   
   // Autoguardar en BD
   const contactosCantidad = nuevosContactos[clave]?.[misioneroId]?.[dia] || 0;
-  
+  const potencialesCantidad = potenciales[clave]?.[misioneroId]?.[dia] || 0;
+
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
@@ -471,7 +488,8 @@ const actualizarDigeronSi = (misioneroId, dia, cantidad) => {
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(cantidad || 0),
-    nuevos_contactos: parseInt(contactosCantidad || 0)
+    nuevos_contactos: parseInt(contactosCantidad || 0),
+    potenciales: parseInt(potencialesCantidad || 0)
   }).catch(err => console.error('Error autoguardando:', err));
 };
   
@@ -491,7 +509,8 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
   
   // Autoguardar en BD
   const dijeronSiCantidad = studentsQueDigeronSi[clave]?.[misioneroId]?.[dia] || 0;
-  
+  const potencialesCantidad = potenciales[clave]?.[misioneroId]?.[dia] || 0;
+
   estudiosService.guardarNuevosEstudiantes({
     miembro_id: misioneroId,
     pais_id: paisSeleccionado,
@@ -499,10 +518,41 @@ const actualizarContactos = (misioneroId, dia, cantidad) => {
     anio: añoActual,
     dia: parseInt(dia),
     dijeron_si: parseInt(dijeronSiCantidad || 0),
-    nuevos_contactos: parseInt(cantidad || 0)
+    nuevos_contactos: parseInt(cantidad || 0),
+    potenciales: parseInt(potencialesCantidad || 0)
   }).catch(err => console.error('Error autoguardando:', err));
 };
-  
+
+const actualizarPotenciales = (misioneroId, dia, cantidad) => {
+  const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
+
+  setPotenciales(prev => ({
+    ...prev,
+    [clave]: {
+      ...prev[clave],
+      [misioneroId]: {
+        ...prev[clave]?.[misioneroId],
+        [dia]: parseInt(cantidad) || 0
+      }
+    }
+  }));
+
+  // Autoguardar en BD
+  const dijeronSiCantidad = studentsQueDigeronSi[clave]?.[misioneroId]?.[dia] || 0;
+  const contactosCantidad = nuevosContactos[clave]?.[misioneroId]?.[dia] || 0;
+
+  estudiosService.guardarNuevosEstudiantes({
+    miembro_id: misioneroId,
+    pais_id: paisSeleccionado,
+    mes: toMesNum(mesSeleccionado),
+    anio: añoActual,
+    dia: parseInt(dia),
+    dijeron_si: parseInt(dijeronSiCantidad || 0),
+    nuevos_contactos: parseInt(contactosCantidad || 0),
+    potenciales: parseInt(cantidad || 0)
+  }).catch(err => console.error('Error autoguardando:', err));
+};
+
   const agregarEstudiante = async () => {
     if (!nuevoEstudiante.nombre || !misioneroSeleccionado) {
       toast.error(t('eb_completeNombre'));
@@ -1517,15 +1567,18 @@ const eliminarPais = async (continenteId, paisId) => {
                     <th style={{ minWidth: "150px" }}>{tx('NOMBRE', 'NAME')}</th>
                     <th>{tx('DIJERON SÍ', 'SAID YES')}</th>
                     <th>{tx('CONTACTOS', 'CONTACTS')}</th>
+                    <th>{tx('POTENCIALES', 'POTENTIALS')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
                     const dataSi = obtenerDigeronSiActual(misionero.id);
                     const dataContactos = obtenerContactosActual(misionero.id);
+                    const dataPotenciales = obtenerPotencialesActual(misionero.id);
                     const totalSi = Object.values(dataSi).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
                     const totalContactos = Object.values(dataContactos).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-                    
+                    const totalPotenciales = Object.values(dataPotenciales).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+
                     return (
                       <tr key={misionero.id}>
                         <td style={{ textAlign: "left", fontWeight: "700", fontSize: "14px" }}>
@@ -1533,6 +1586,7 @@ const eliminarPais = async (continenteId, paisId) => {
                         </td>
                         <td style={{ fontSize: "15px" }}>{totalSi}</td>
                         <td style={{ fontSize: "15px" }}>{totalContactos}</td>
+                        <td style={{ fontSize: "15px" }}>{totalPotenciales}</td>
                       </tr>
                     );
                   })}
@@ -1547,6 +1601,12 @@ const eliminarPais = async (continenteId, paisId) => {
                     <td>
                       {misioneros.reduce((sum, m) => {
                         const data = obtenerContactosActual(m.id);
+                        return sum + Object.values(data).reduce((s, val) => s + (parseInt(val) || 0), 0);
+                      }, 0)}
+                    </td>
+                    <td>
+                      {misioneros.reduce((sum, m) => {
+                        const data = obtenerPotencialesActual(m.id);
                         return sum + Object.values(data).reduce((s, val) => s + (parseInt(val) || 0), 0);
                       }, 0)}
                     </td>
@@ -1762,6 +1822,72 @@ const eliminarPais = async (continenteId, paisId) => {
                         <td key={dia} style={{ fontSize: "16px" }}>
                           {misioneros.reduce((sum, m) => {
                             const data = obtenerContactosActual(m.id);
+                            return sum + (parseInt(data[dia]) || 0);
+                          }, 0)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* POTENCIALES */}
+              <h3 style={{ margin: "40px 0 20px 0", color: "#4CAF50", fontSize: "22px" }}>
+                {tx('Potenciales', 'Potentials')}
+              </h3>
+              <div className="scroll-container">
+                <table className="tabla-estudios">
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: "150px", background: "#4CAF50 !important" }}>{tx('NOMBRE', 'NAME')}</th>
+                      <th style={{ background: "#4CAF50 !important" }}>TOTAL</th>
+                      {diasDelMes.map(dia => (
+                        <th key={dia} style={{ minWidth: "90px", background: "#4CAF50 !important" }}>
+                          {obtenerDiaSemana(dia, mesSeleccionado, añoActual)}<br/>{dia}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {misioneros.filter(m => m.pais_id === paisSeleccionado).map(misionero => {
+                      const data = obtenerPotencialesActual(misionero.id);
+                      const total = Object.values(data).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+
+                      return (
+                        <tr key={misionero.id}>
+                          <td style={{ textAlign: "left", fontWeight: "700", fontSize: "14px" }}>
+                            {misionero.nombre}
+                          </td>
+                          <td style={{ fontWeight: "700", background: "#C8E6C9", fontSize: "16px" }}>
+                            {total}
+                          </td>
+                          {diasDelMes.map(dia => (
+                            <td key={dia}>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={data[dia] || ""}
+                                onChange={(e) => actualizarPotenciales(misionero.id, dia, e.target.value)}
+                                style={{ width: "70px", fontSize: "15px" }}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                    <tr style={{ background: "#4CAF50", color: "white", fontWeight: "700" }}>
+                      <td>TOTAL</td>
+                      <td style={{ fontSize: "17px" }}>
+                        {misioneros.reduce((sum, m) => {
+                          const data = obtenerPotencialesActual(m.id);
+                          return sum + Object.values(data).reduce((s, val) => s + (parseInt(val) || 0), 0);
+                        }, 0)}
+                      </td>
+                      {diasDelMes.map(dia => (
+                        <td key={dia} style={{ fontSize: "16px" }}>
+                          {misioneros.reduce((sum, m) => {
+                            const data = obtenerPotencialesActual(m.id);
                             return sum + (parseInt(data[dia]) || 0);
                           }, 0)}
                         </td>

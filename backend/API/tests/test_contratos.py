@@ -34,6 +34,10 @@ PAYLOADS_FRONTEND = [
     (schemas.UsuarioPermisoUpdate,
      {"tiene_acceso": False},
      "ConfiguracionService.js -> actualizarPermisoUsuario"),
+    (schemas.EstudioDiarioCreate,
+     {"miembro_id": "M001", "pais_id": 1, "mes": 7, "anio": 2026, "dia": 15,
+      "dijeron_si": 2, "nuevos_contactos": 3, "potenciales": 4},
+     "EstudiosBiblicos.jsx -> guardarNuevosEstudiantes"),
 ]
 
 

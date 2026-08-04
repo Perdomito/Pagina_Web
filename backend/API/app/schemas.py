@@ -543,6 +543,75 @@ class ConfiguracionOut(ConfiguracionBase):
 
 # ── Ciudades Mision ────────────────────────────────────────────────────────
 
+class IglesiaBase(BaseModel):
+    ciudad_id: int
+    pais_id: Optional[int] = None
+    nombre: str
+    direccion: Optional[str] = None
+    pastor_encargado_id: Optional[str] = None
+    pastor_encargado_nombre: Optional[str] = None
+    fecha_apertura: Optional[date] = None
+    cantidad_miembros: int = 0
+    activa: bool = True
+    notas: Optional[str] = None
+
+    @field_validator("pais_id", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
+
+    # El formulario manda "" en los campos que el usuario deja en blanco.
+    @field_validator("pastor_encargado_id", "pastor_encargado_nombre",
+                     "direccion", "notas", "fecha_apertura", mode="before")
+    @classmethod
+    def texto_vacio_a_none(cls, v):
+        return None if v == "" else v
+
+    @field_validator("cantidad_miembros", mode="before")
+    @classmethod
+    def cantidad_vacia_es_cero(cls, v):
+        return 0 if v in ("", None) else v
+
+class IglesiaCreate(IglesiaBase):
+    pass
+
+class IglesiaUpdate(BaseModel):
+    ciudad_id: Optional[int] = None
+    pais_id: Optional[int] = None
+    nombre: Optional[str] = None
+    direccion: Optional[str] = None
+    pastor_encargado_id: Optional[str] = None
+    pastor_encargado_nombre: Optional[str] = None
+    fecha_apertura: Optional[date] = None
+    cantidad_miembros: Optional[int] = None
+    activa: Optional[bool] = None
+    notas: Optional[str] = None
+
+    @field_validator("pais_id", "ciudad_id", mode="before")
+    @classmethod
+    def blank_to_none_fields(cls, v):
+        return blank_to_none(v)
+
+    @field_validator("pastor_encargado_id", "pastor_encargado_nombre",
+                     "direccion", "notas", "fecha_apertura", mode="before")
+    @classmethod
+    def texto_vacio_a_none(cls, v):
+        return None if v == "" else v
+
+    @field_validator("cantidad_miembros", mode="before")
+    @classmethod
+    def cantidad_vacia_es_cero(cls, v):
+        return 0 if v == "" else v
+
+class IglesiaOut(IglesiaBase):
+    id: int
+    ciudad_nombre: Optional[str] = None
+    pais_nombre: Optional[str] = None
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    model_config = {"from_attributes": True}
+
+
 class CiudadMisionBase(BaseModel):
     ciudad_id: int
     region: Optional[str] = None
@@ -725,6 +794,7 @@ class EstudioDiarioBase(BaseModel):
     donde: Optional[str] = None
     dijeron_si: int = 0
     nuevos_contactos: int = 0
+    potenciales: int = 0
 
     @field_validator("mes")
     @classmethod
@@ -756,6 +826,7 @@ class EstudioDiarioUpdate(BaseModel):
     donde: Optional[str] = None
     dijeron_si: Optional[int] = None
     nuevos_contactos: Optional[int] = None
+    potenciales: Optional[int] = None
 
 class EstudioDiarioOut(EstudioDiarioBase):
     id: int

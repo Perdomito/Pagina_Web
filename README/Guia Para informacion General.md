@@ -1,172 +1,136 @@
-# 🚀 INICIO RÁPIDO - Sistema Iglesia Emanuel
+# 🚀 INICIO RÁPIDO - Sistema Iglesia Emanuel (GNIT)
 
 ## ¿Qué es este proyecto?
 
-Es un sistema web completo para gestionar:
+Un sistema web para gestionar:
+
 - ✅ Miembros de la iglesia
-- ✅ Contactos y evangelización  
-- ✅ Estudios bíblicos
+- ✅ Contactos y evangelización
+- ✅ Estudios bíblicos (registro día a día por misionero)
+- ✅ Iglesias por ciudad y país
 - ✅ Reportes de actividades
 - ✅ Administración y presupuestos
 
-**IMPORTANTE**: El proyecto funciona SIN necesidad de base de datos. Usa datos de prueba (mock data) para que todos puedan trabajar sin configuraciones complicadas.
+**IMPORTANTE**: el sistema trabaja con **datos reales en una base Neon PostgreSQL**.
+Lo que hagas en la app (crear un miembro, borrar un contacto) se guarda de verdad y lo
+ven los demás. No hay datos de prueba.
 
-## 📥 Instalación (3 pasos)
+## 📥 Instalación (2 pasos)
 
-### Paso 1: Descomprimir
-Descomprime el archivo `iglesia-emanuel-proyecto.zip` en tu computadora.
-
-### Paso 2: Instalar dependencias
-Abre una terminal en la carpeta del proyecto y ejecuta:
+### Paso 1: Instalar dependencias
 
 ```bash
 cd frontend
 npm install
 ```
 
-⏱️ Esto tomará unos minutos la primera vez.
+⏱️ Tomará unos minutos la primera vez.
 
-### Paso 3: Iniciar la aplicación
+### Paso 2: Iniciar la aplicación
 
 ```bash
 npm start
 ```
 
-✅ La aplicación se abrirá automáticamente en tu navegador en `http://localhost:3000`
+✅ Se abre en `http://localhost:3000`.
+
+**No hace falta instalar Python, ni base de datos, ni levantar el backend**: la app se
+conecta sola a la API ya desplegada en HuggingFace. Solo necesitas Node.js.
 
 ## 🔐 Acceder al Sistema
 
-En la pantalla de login, usa estas credenciales:
+Con tu usuario y contraseña reales. Las credenciales se validan contra la tabla
+`usuarios` de la base de datos — no hay usuarios de ejemplo.
 
-**Opción 1 - Administrador:**
-- Email: `admin@sistema.com`
-- Contraseña: `1234`
-
-**Opción 2 - Pastor:**
-- Email: `pastor@iglesia.com`
-- Contraseña: `pastor123`
-
-**Opción 3 - Miembro:**
-- Email: `maria@miembros.com`
-- Contraseña: `123456`
+Si no tienes acceso, pídeselo a quien administre el sistema: te creará el usuario y te
+asignará el rol, que es lo que decide qué módulos ves.
 
 ## 🎨 ¿Qué puedes hacer?
 
-Una vez dentro, verás el panel principal con 5 módulos:
+El panel principal tiene 7 módulos, y **verás solo aquellos que tu rol permita**:
 
-1. **Miembros** - Ver, buscar y gestionar miembros de la iglesia
-2. **Estudios Bíblicos** - Seguimiento de estudios
-3. **Reportes** - Reportes de evangelización
-4. **Contactos** - Gestión de contactos nuevos
-5. **Administración** - Control de presupuestos
-
-Todos los módulos tienen datos de ejemplo que puedes ver y modificar.
+1. **Miembros** — Ver, buscar y gestionar miembros
+2. **Estudios Bíblicos** — Seguimiento diario: estudios por contacto, horas de
+   evangelismo y contadores del día (dijeron sí, nuevos contactos, potenciales)
+3. **Reportes** — Reportes semanales/mensuales, exportables a PDF
+4. **Contactos** — Gestión de contactos nuevos
+5. **Estadísticas** — Gráficas por país, proyecciones e iglesias por país
+6. **Administración** — Presupuestos, ingresos, gastos y saldos
+7. **Configuración** — Usuarios, roles y permisos
 
 ## 💾 Sobre los Datos
 
-Los datos son de **PRUEBA** y están en el archivo:
-```
-frontend/src/data/mockData.js
-```
+Todo vive en Neon PostgreSQL (proyecto `sweet-salad-38836045`, base **"GNIT DB"**).
 
-Puedes:
-- ✅ Agregar más datos de prueba editando ese archivo
-- ✅ Modificar los datos existentes
-- ✅ Ver toda la información sin necesidad de base de datos
-
-**NOTA**: Los cambios que hagas en la aplicación (como eliminar un miembro) se perderán al recargar la página, porque los datos están en memoria.
+⚠️ **Los cambios son permanentes y afectan a todos.** Si vas a probar algo que borre o
+modifique datos, hazlo primero contra una rama de Neon, nunca contra la base principal.
 
 ## 🔧 Comandos Útiles
 
-### Iniciar la aplicación
 ```bash
 cd frontend
-npm start
-```
+npm start                 # Iniciar (Ctrl + C para detener)
 
-### Detener la aplicación
-Presiona `Ctrl + C` en la terminal
-
-### Reinstalar dependencias (si hay problemas)
-```bash
-cd frontend
-rm -rf node_modules
+rm -rf node_modules       # Si algo se rompe:
 npm install
 ```
+
+Para trabajar en la API (solo si vas a tocar el backend), mira `backend/API/README.md`.
 
 ## 📁 Estructura del Proyecto
 
 ```
-proyecto-iglesia-emanuel/
+Pagina_Web/
 │
-├── frontend/              ← Aquí trabajarás principalmente
-│   ├── src/
-│   │   ├── pages/        ← Todas las páginas (Login, Home, Miembros, etc.)
-│   │   ├── data/         ← mockData.js (datos de prueba)
-│   │   └── context/      ← AuthContext.js (maneja el login)
-│   └── package.json
+├── frontend/                 ← Aquí trabajarás casi siempre
+│   └── src/
+│       ├── pages/           ← Una página por módulo (Login, Miembros, ...)
+│       ├── services/        ← Llamadas a la API, una por dominio
+│       ├── context/         ← AuthContext (login) e IdiomaContext (ES/EN)
+│       ├── utils/translations/  ← Textos de la interfaz
+│       └── api/axios.js     ← A qué API apunta la app
 │
-├── backend/              ← Preparado para el futuro (opcional)
-│   ├── controllers/     ← Archivos con comentarios y ejemplos
-│   ├── routes/          ← Rutas de la API
-│   └── database/        ← Script SQL listo para usar
+├── backend/API/              ← La API real (FastAPI). Su README documenta
+│   │                           todas las tablas y endpoints
+│   └── backend/*.js          ← Express heredado, ya no se usa
 │
-├── README.md            ← Documentación completa
-└── GUIA_DESARROLLADORES.md  ← Guía detallada
+└── README.md                 ← Documentación general
 ```
 
 ## ❓ Preguntas Frecuentes
 
-### ¿Necesito instalar MySQL o alguna base de datos?
-**No**. El proyecto funciona sin base de datos usando datos de prueba.
+### ¿Necesito instalar PostgreSQL o alguna base de datos?
+
+No. La base está en la nube y la API también.
 
 ### ¿Los cambios se guardan?
-Solo mientras la página esté abierta. Al recargar, vuelven a los datos originales.
+
+Sí, permanentemente y para todos los usuarios. Ten cuidado al borrar.
 
 ### ¿Puedo modificar el diseño?
-Sí, los archivos están en `frontend/src/pages/`. Cada página es un archivo `.jsx`.
 
-### ¿Cómo agrego más datos de prueba?
-Edita el archivo `frontend/src/data/mockData.js` y agrega objetos a los arrays.
+Sí, en `frontend/src/pages/`. Cada página es un `.jsx` con estilos inline.
 
-### ¿Cuándo se usa el backend?
-Cuando estén listos para conectar a una base de datos real. Todos los archivos están preparados con instrucciones.
+### ¿Cómo agrego un texto nuevo a la interfaz?
 
-## 🆘 Problemas Comunes
+En `frontend/src/utils/translations/<módulo>.js`, añadiendo la clave en **`es` y en
+`en`**; luego úsala con `t('miClave')`.
 
-### "npm: command not found"
-**Solución**: Necesitas instalar Node.js. Descárgalo de [nodejs.org](https://nodejs.org/)
+### ¿Por qué no veo un módulo del menú?
 
-### "Port 3000 is already in use"
-**Solución**: Cierra cualquier otra aplicación que use el puerto 3000, o usa otro puerto:
-```bash
-PORT=3001 npm start
-```
+Porque tu rol no tiene ese permiso. Se gestiona en Configuración → Roles y permisos.
 
-### La página no carga después de cambios
-**Solución**: 
-1. Guarda todos los archivos
-2. Recarga la página (F5 o Ctrl+R)
-3. Si persiste, detén el servidor (Ctrl+C) y vuelve a iniciarlo
+### ¿Cuándo levanto el backend?
+
+Solo si vas a modificar la API. Para trabajar en la interfaz no hace falta.
 
 ## 📚 Siguientes Pasos
 
-1. **Explora la aplicación**: Navega por todos los módulos
-2. **Lee README.md**: Para entender mejor el proyecto
-3. **Lee GUIA_DESARROLLADORES.md**: Para aprender a modificar y extender
-4. **Haz tus primeros cambios**: Prueba modificar los datos mock
-
-## 🎯 Objetivo del Proyecto
-
-Crear un sistema completo que permita a la iglesia:
-- Gestionar sus miembros y contactos
-- Llevar control de estudios bíblicos
-- Generar reportes de evangelización
-- Administrar presupuestos
-- Todo desde un solo lugar, de forma sencilla y moderna
+1. **Explora la aplicación**: navega por los módulos a los que tengas acceso
+2. **Lee `README.md`** en la raíz: arquitectura y flujo de despliegue
+3. **Lee `backend/API/README.md`**: esquema de la base de datos y endpoints
+4. **Lee `CLAUDE.md`**: convenciones de código y flujo de trabajo
 
 ---
 
-**¿Todo listo?** ¡Ejecuta `npm start` y comienza a explorar! 🎉
-
-Si tienes dudas, revisa los archivos README.md y GUIA_DESARROLLADORES.md para más información.
+**¿Todo listo?** `npm start` y a explorar 🎉

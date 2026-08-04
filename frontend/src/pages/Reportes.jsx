@@ -180,7 +180,7 @@ export default function Reportes() {
 
       const estudios = todasEntradas.filter(r => r && r.contacto_id != null);
       const evangelismo = todasEntradas.filter(r => r && r.contacto_id == null && r.tipo != null);
-      const nuevosEst = todasEntradas.filter(r => r && r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0));
+      const nuevosEst = todasEntradas.filter(r => r && r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0 || r.potenciales > 0));
 
       const contactosUnicos = [...new Set(estudios.map(e => e.contacto_id).filter(Boolean))];
 
@@ -204,6 +204,7 @@ export default function Reportes() {
       const totalHorasEstudios = estudios.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
       const totalNuevosContactos = nuevosEst.reduce((s, e) => s + parseInt(e.nuevos_contactos || 0), 0);
       const totalDijeronSi = nuevosEst.reduce((s, e) => s + parseInt(e.dijeron_si || 0), 0);
+      const totalPotenciales = nuevosEst.reduce((s, e) => s + parseInt(e.potenciales || 0), 0);
 
       return {
         estudiantesActuales: contactosUnicos.length,
@@ -216,7 +217,7 @@ export default function Reportes() {
         terminadoRomanos8: hastaCap8,
         terminado4Leyes: masDe8,
         probabilidadMiembro: totalDijeronSi,
-        ovejasPotenciales: totalDijeronSi
+        ovejasPotenciales: totalPotenciales
       };
     } catch (error) {
       console.error('Error al calcular reporte:', error);
@@ -377,6 +378,7 @@ export default function Reportes() {
         [tipoReporte === "semanal" ? t('rp_estudiosEnLaSemana') : t('rp_estudiosEnElMes'), reporteActual.numeroEstudios.toString()],
         [tipoReporte === "semanal" ? t('rp_nuevosContactosEstaSemana') : t('rp_nuevosContactosEsteMes'), reporteActual.nuevosContactos.toString()],
         [tx('Contactos que Aceptaron', 'Contacts who Accepted'), (reporteActual.probabilidadMiembro || 0).toString()],
+        [t('rp_ovejasPotenciales'), (reporteActual.ovejasPotenciales || 0).toString()],
         ["Students up to Chapter 4", (reporteActual.hastRomanos4 || 0).toString()],
         ["Students up to Chapter 8", (reporteActual.terminadoRomanos8 || 0).toString()],
         ["Students past Chapter 8", (reporteActual.terminado4Leyes || 0).toString()]
@@ -503,6 +505,7 @@ export default function Reportes() {
               <MetricaCard icono={<FaBookOpen />} titulo={tipoReporte === "semanal" ? t('rp_estudiosEnLaSemana') : t('rp_estudiosEnElMes')} valor={reporteActual.numeroEstudios} anterior={reporteAnterior?.numeroEstudios} color="#4CAF50" />
               <MetricaCard icono={<FaUserPlus />} titulo={tipoReporte === "semanal" ? t('rp_nuevosContactosEstaSemana') : t('rp_nuevosContactosEsteMes')} valor={reporteActual.nuevosContactos} anterior={reporteAnterior?.nuevosContactos} color="#00BCD4" />
               <MetricaCard icono={<FaCheckCircle />} titulo={tx('Contactos que Aceptaron', 'Contacts who Accepted')} valor={reporteActual.probabilidadMiembro} anterior={reporteAnterior?.probabilidadMiembro} color="#8BC34A" />
+              <MetricaCard icono={<FaUserPlus />} titulo={t('rp_ovejasPotenciales')} valor={reporteActual.ovejasPotenciales} anterior={reporteAnterior?.ovejasPotenciales} color="#E91E63" />
             </div>
             
             <div style={{ marginBottom: "24px" }} className="no-print">

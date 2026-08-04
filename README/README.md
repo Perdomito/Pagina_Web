@@ -8,7 +8,7 @@ Sistema full-stack para la gestión de miembros, contactos, estudios bíblicos, 
 
 - **Frontend**: React 18 con estilos inline, Context API para i18n y autenticación
 - **Backend**: FastAPI con autenticación JWT, roles y permisos
-- **Base de datos**: Neon PostgreSQL (proyecto "sweet-salad-38836045", tabla "GNIT DB")
+- **Base de datos**: Neon PostgreSQL (proyecto `sweet-salad-38836045`, base **"GNIT DB"** — no `neondb`)
 - **i18n**: Sistema de idiomas (ES/EN) manejado completamente en frontend con localStorage
 
 ## 🚀 Características
@@ -21,6 +21,7 @@ Sistema full-stack para la gestión de miembros, contactos, estudios bíblicos, 
 - ✅ Datos persistentes en Neon PostgreSQL
 - ✅ Diseño responsive
 - ✅ Roles y permisos por usuario
+- ✅ Registro de iglesias por ciudad y conteo por país
 
 ## 🔐 Credenciales de Acceso
 
@@ -41,7 +42,9 @@ npm install
 npm start
 ```
 
-Abre `http://localhost:3000`. La app intenta conectar con el backend en `http://localhost:8000` por defecto.
+Abre `http://localhost:3000`. **No necesitas levantar el backend**: el frontend apunta a la
+API ya desplegada (`https://laevateinn707-gnit-api.hf.space`, fijado en
+`frontend/src/api/axios.js`). Para trabajar contra una API local, cambia ese `baseURL`.
 
 ### Backend (FastAPI)
 
@@ -52,16 +55,18 @@ python -m venv venv
 source venv/bin/activate  # macOS/Linux
 
 pip install -r requirements.txt
-python app/main.py
+uvicorn app.main:app --reload --port 7860
 ```
 
-Backend corre en `http://localhost:8000`
+Backend corre en `http://localhost:7860` (`/docs` para Swagger).
 
 **Variables de entorno**: Copia `.env.example` a `.env` y configura:
 ```env
-DATABASE_URL=postgresql://...  # Neon DB
+DATABASE_URL=postgresql+asyncpg://usuario:password@host/GNIT%20DB
 SECRET_KEY=tu-clave-secreta
 ```
+
+**Tests**: `python -m pytest -q` — corren sobre SQLite en memoria, no tocan Neon.
 
 ## 🗂️ Estructura del Proyecto
 
@@ -76,21 +81,26 @@ Pagina_Web/
 │       ├── context/
 │       │   ├── AuthContext.js       # Autenticación JWT + usuario
 │       │   └── IdiomaContext.js     # Sistema de idiomas (ES/EN)
-│       ├── utils/
-│       │   └── translations.js      # Traducciones de UI
+│       ├── api/axios.js            # Cliente HTTP único (baseURL de la API)
+│       ├── services/               # Un servicio por dominio (Miembros, Iglesias, ...)
+│       ├── utils/translations/     # Traducciones de UI, un archivo por módulo
 │       └── App.js
 │
-├── backend/API/                       # FastAPI + SQLAlchemy
+├── backend/API/                       # FastAPI + SQLAlchemy (la API viva)
 │   ├── app/
-│   │   ├── main.py                  # Punto de entrada
+│   │   ├── main.py                  # Punto de entrada + migraciones idempotentes
 │   │   ├── models.py                # Modelos SQLAlchemy
 │   │   ├── schemas.py               # Pydantic schemas (validación)
 │   │   ├── database.py              # Conexión Neon
-│   │   ├── middleware.py            # Auth JWT
-│   │   └── routers/                 # Endpoints (usuarios, roles, etc)
+│   │   ├── auth_middleware.py       # Auth JWT
+│   │   ├── migrations/schema.sql    # Esquema de referencia
+│   │   └── routers/                 # Endpoints (usuarios, roles, iglesias, etc)
 │   ├── requirements.txt
 │   ├── pytest.ini
-│   └── tests/                        # Tests unitarios
+│   ├── tests/                        # Tests (SQLite en memoria)
+│   └── README.md                     # Esquema de BD y endpoints, en detalle
+│
+├── backend/{server.js,routes,controllers}  # Express heredado: el frontend NO lo usa
 │
 └── GNITDB2.sql                       # Dump de BD (referencia)
 ```
@@ -102,7 +112,9 @@ El sistema maneja traducciones de la interfaz completamente en **frontend** sin 
 ### Cómo funciona
 
 1. **Traducciones definidas en código**  
-   `frontend/src/utils/translations.js` contiene dos objetos: `es` e `en` con pares clave-valor.
+   `frontend/src/utils/translations/` tiene un archivo por módulo (`miembros.js`,
+   `estudiosBiblicos.js`, `reportes.js`, …), cada uno con dos objetos `es` e `en`
+   de pares clave-valor.
 
    ```javascript
    const translations = {
@@ -147,13 +159,14 @@ El sistema maneja traducciones de la interfaz completamente en **frontend** sin 
 ### Cambios en frontend
 1. Crear rama: `git checkout -b feature/mi-feature`
 2. Modificar componentes, añadir rutas si es necesario
-3. Verificar i18n: nuevas claves van en `translations.js`
+3. Verificar i18n: nuevas claves van en `utils/translations/<módulo>.js`, en `es` y en `en`
 4. Test en navegador
 5. PR → merge a `main`
 
 ### Despliegue
 - **Frontend**: builds automáticos en production
-- **Backend**: push a `main` en rama separada `gnit-api` (deploy en HuggingFace)
+- **Backend**: no sale de este repo. Se copian los archivos de `backend/API/app` al repo
+  aparte `C:\gnit-api` y se publica en el Space `Laevateinn707/gnit-api`, que reconstruye solo
 
 ## 🛠️ Tecnologías Utilizadas
 
@@ -175,7 +188,8 @@ El sistema maneja traducciones de la interfaz completamente en **frontend** sin 
 
 ### Base de datos
 - **Neon PostgreSQL** — BD en la nube
-- **20+ tablas** — Geografía, personas, finanzas, operaciones
+- **24 tablas** — Geografía, personas, misiones e iglesias, finanzas, operaciones
+- Esquema y endpoints documentados en `backend/API/README.md`
 
 ## 👥 Colaboración
 
