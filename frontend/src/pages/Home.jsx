@@ -361,7 +361,7 @@ export default function Home() {
           />
 
           <div>
-            <h1 className="home-title">Emanuel Church</h1>
+<h1 className="home-title">LATIN MISSION DATA</h1>
             <p className="home-subtitle">{t('panelControl')}</p>
           </div>
         </div>
@@ -618,7 +618,9 @@ export default function Home() {
       </div>
 
       {/* ── FOOTER ── */}
-      <p className="footer-ps">© {new Date().getFullYear()} Emanuel Church · OA Mundial</p>
+<p className="footer-ps">
+  © {new Date().getFullYear()} LATIN MISSION DATA · OA Mundial
+</p>
     </div>
   );
 }

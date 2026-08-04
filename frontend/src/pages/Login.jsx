@@ -385,7 +385,7 @@ export default function Login() {
               />
             </div>
 
-            <h1 className="church-name">Emanuel Church</h1>
+            <h1 className="church-name">LATIN MISSION DATA</h1>
             <p className="church-subtitle">{t('sistemaGestion')}</p>
             <div className="divider-left" />
             <p className="verse">
@@ -480,8 +480,9 @@ export default function Login() {
           </div>
 
           {/* ── PERDOMOSOFT ── */}
-          <p className="footer-brand">© 2025 Emanuel Church · OA Mundial</p>
-        </div>
+<p className="footer-brand">
+  © 2025 LATIN MISSION DATA · OA Mundial
+</p>        </div>
 
       </div>
     </>

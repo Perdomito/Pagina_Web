@@ -394,6 +394,19 @@ try {
     
     return total;
   };
+
+  // Solo las horas de Evangelismo (virtual + presencial), SIN mezclar con las horas
+  // de estudio bíblico — para que "Total de Horas" coincida con la tabla de Evangelismo
+  const calcularHorasEvangelismoSolo = (misioneroId) => {
+    const diasDelMes = mesSeleccionado ? obtenerDiasDelMes(mesSeleccionado, añoActual) : [];
+    const evang = obtenerEvangelismoActual(misioneroId);
+    let total = 0;
+    diasDelMes.forEach(dia => {
+      total += parseInt(evang.virtual?.[dia]?.horas || 0);
+      total += parseInt(evang.presencial?.[dia]?.horas || 0);
+    });
+    return total;
+  };
   
 const actualizarEvangelismo = (misioneroId, tipo, dia, campo, valor) => {
     const clave = obtenerClave(continenteSeleccionado, paisSeleccionado, mesSeleccionado);
@@ -2381,7 +2394,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
               const misionerosDelPais = misioneros.filter(m => m.pais_id === paisSeleccionado);
               const filas = misionerosDelPais.map(m => {
                 const estudios = calcularTotalStudiesMissionary(m.id);
-                const horas = calcularTotalHoursMissionary(m.id);
+                const horas = calcularHorasEvangelismoSolo(m.id);
                 const estudiantes = obtenerEstudiantesActuales(m.id).length;
                 return { nombre: m.nombre, estudios, horas, estudiantes };
               });
@@ -2398,7 +2411,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                       <div style={{ fontSize: "38px", fontWeight: "700", color: "#1a5490" }}>{totalEstudios}</div>
                     </div>
                     <div style={{ background: "#E8F5E9", padding: "24px", borderRadius: "14px" }}>
-                      <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>{tx('Total de Horas', 'Total Hours')}</div>
+                      <div style={{ fontSize: "15px", color: "#666", marginBottom: "8px" }}>{tx('Horas de Evangelismo', 'Evangelism Hours')}</div>
                       <div style={{ fontSize: "38px", fontWeight: "700", color: "#4CAF50" }}>{totalHoras}</div>
                     </div>
                     <div style={{ background: "#FFF3E0", padding: "24px", borderRadius: "14px" }}>

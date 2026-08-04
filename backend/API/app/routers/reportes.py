@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import date
 from app.database import get_db
 from app.models import Reporte
 from app.schemas import ReporteCreate, ReporteUpdate, ReporteOut
@@ -21,7 +22,7 @@ async def listar(
     if pais_id:
         q = q.where(Reporte.pais_id == pais_id)
     if anio:
-        q = q.where(Reporte.fecha >= f"{anio}-01-01").where(Reporte.fecha <= f"{anio}-12-31")
+        q = q.where(Reporte.fecha >= date(anio, 1, 1)).where(Reporte.fecha <= date(anio, 12, 31))
     result = await db.execute(q)
     return result.scalars().all()
 

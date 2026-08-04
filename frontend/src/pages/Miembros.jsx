@@ -199,7 +199,9 @@ export default function Miembros() {
         toast.success(t('mi_miembroEliminado'));
         cargarDatos();
       } catch (error) {
-        toast.error(t('mi_errorEliminarMiembro'));
+        const detalle = error.response?.data?.detail;
+        toast.error(detalle ? String(detalle).slice(0, 160) : t('mi_errorEliminarMiembro'));
+        console.error('Error al eliminar miembro:', error.response?.data || error);
       }
     }
   };
