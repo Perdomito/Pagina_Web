@@ -17,6 +17,7 @@ import Contactos from './pages/Contactos';
 import Administracion from './pages/Administracion';
 import Configuracion from './pages/Configuracion';
 import InformeRegional from './pages/InformeRegional';
+import SeguimientoLeyes from './pages/SeguimientoLeyes';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -57,6 +58,7 @@ function AppRoutes() {
         <Route path="/contactos" element={<PrivateRoute><Contactos /></PrivateRoute>} />
         <Route path="/administracion" element={<PrivateRoute><Administracion /></PrivateRoute>} />
         <Route path="/configuracion" element={<PrivateRoute><Configuracion /></PrivateRoute>} />
+        <Route path="/seguimiento-leyes" element={<PrivateRoute><SeguimientoLeyes /></PrivateRoute>} />
         <Route path="/informe-regional" element={<InformeRegional />} />
       </Routes>
     </BrowserRouter>

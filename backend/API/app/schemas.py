@@ -282,6 +282,75 @@ class ContactoOut(ContactoBase):
     model_config = {"from_attributes": True}
 
 
+class SeguimientoLeyBase(BaseModel):
+    contacto_id: int
+    pais_id: Optional[int] = None
+    miembro_contacto_id: Optional[str] = None
+    miembro_estudios_id: Optional[str] = None
+    tipo_miembro_destino: str = "Registrado"
+    notas_generales: Optional[str] = None
+
+    @field_validator("pais_id", mode="before")
+    @classmethod
+    def blank_to_none_pais(cls, v):
+        return blank_to_none(v)
+
+
+class SeguimientoLeyCreate(SeguimientoLeyBase):
+    pass
+
+
+class SeguimientoLeyUpdate(BaseModel):
+    miembro_contacto_id: Optional[str] = None
+    miembro_estudios_id: Optional[str] = None
+    tipo_miembro_destino: Optional[str] = None
+    notas_generales: Optional[str] = None
+    activo: Optional[bool] = None
+
+
+class SeguimientoLeyAvance(BaseModel):
+    etapa: str
+    notas: Optional[str] = None
+
+
+class SeguimientoLeyHistorialOut(BaseModel):
+    id: int
+    etapa: str
+    etapa_orden: int
+    notas: Optional[str] = None
+    fecha_evento: datetime
+    model_config = {"from_attributes": True}
+
+
+class SeguimientoLeyOut(BaseModel):
+    id: int
+    contacto_id: int
+    pais_id: Optional[int] = None
+    miembro_contacto_id: Optional[str] = None
+    miembro_estudios_id: Optional[str] = None
+    estado_actual: str
+    etapa_actual_orden: int
+    abandono_alerta: bool
+    fecha_inicio: datetime
+    fecha_ultimo_avance: datetime
+    fecha_abandono: Optional[datetime] = None
+    fecha_conversion_miembro: Optional[datetime] = None
+    miembro_convertido_id: Optional[str] = None
+    tipo_miembro_destino: str
+    notas_generales: Optional[str] = None
+    activo: bool
+    contacto_nombre: Optional[str] = None
+    contacto_telefono: Optional[str] = None
+    pais_nombre: Optional[str] = None
+    miembro_contacto_nombre: Optional[str] = None
+    miembro_estudios_nombre: Optional[str] = None
+    miembro_convertido_nombre: Optional[str] = None
+    dias_inactivo: int = 0
+    historial: list[SeguimientoLeyHistorialOut] = []
+
+    model_config = {"from_attributes": True}
+
+
 # ── Reportes ───────────────────────────────────────────────────────────────
 
 class ReporteBase(BaseModel):

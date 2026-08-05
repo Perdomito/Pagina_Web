@@ -8,7 +8,7 @@ from app.routers import (
     estadisticas_paises, roles, configuracion, usuarios,
     ciudades_mision, ingresos, miembros_info_adicional,
     saldos_caja_banco, traslados, auth, continentes,
-    estudios_diarios, estadisticas, archivos, iglesias,
+    estudios_diarios, estadisticas, archivos, iglesias, seguimiento_leyes,
 )
 
 app = FastAPI(
@@ -199,6 +199,46 @@ async def startup():
             await conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_iglesias_ciudad ON public.iglesias (ciudad_id)
             """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.seguimiento_leyes (
+                    id                      SERIAL PRIMARY KEY,
+                    contacto_id             INTEGER NOT NULL REFERENCES public.contactos(id) ON DELETE RESTRICT,
+                    pais_id                 INTEGER REFERENCES public.paises(id) ON DELETE SET NULL,
+                    miembro_contacto_id     VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    miembro_estudios_id     VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    estado_actual           VARCHAR(50) NOT NULL DEFAULT 'Contacto',
+                    etapa_actual_orden      INTEGER NOT NULL DEFAULT 0,
+                    abandono_alerta         BOOLEAN NOT NULL DEFAULT FALSE,
+                    fecha_inicio            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    fecha_ultimo_avance     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    fecha_abandono          TIMESTAMP,
+                    fecha_conversion_miembro TIMESTAMP,
+                    miembro_convertido_id   VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    tipo_miembro_destino    VARCHAR(50) NOT NULL DEFAULT 'Registrado',
+                    notas_generales         TEXT,
+                    activo                  BOOLEAN NOT NULL DEFAULT TRUE
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_contacto ON public.seguimiento_leyes (contacto_id)
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_pais ON public.seguimiento_leyes (pais_id)
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.seguimiento_leyes_historial (
+                    id              SERIAL PRIMARY KEY,
+                    seguimiento_id  INTEGER NOT NULL REFERENCES public.seguimiento_leyes(id) ON DELETE CASCADE,
+                    etapa           VARCHAR(50) NOT NULL,
+                    etapa_orden     INTEGER NOT NULL DEFAULT 0,
+                    notas           TEXT,
+                    fecha_evento    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_historial_seguimiento
+                ON public.seguimiento_leyes_historial (seguimiento_id, fecha_evento)
+            """))
 
             # Tabla de archivos adjuntos (ingresos/gastos)
             await conn.execute(text("""
@@ -311,6 +351,7 @@ app.include_router(estudios_diarios.router)
 app.include_router(estadisticas.router)
 app.include_router(archivos.router)
 app.include_router(iglesias.router)
+app.include_router(seguimiento_leyes.router)
 
 
 @app.get("/", tags=["Estado"])

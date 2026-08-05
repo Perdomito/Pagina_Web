@@ -9,7 +9,8 @@ import {
   FaMoneyBillWave, 
   FaCog, 
   FaChartLine, 
-  FaHammer
+  FaHammer,
+  FaRoute
 } from 'react-icons/fa';
 import colors from '../utils/colors';
 import { useIdioma } from '../context/IdiomaContext';
@@ -31,6 +32,13 @@ const { t, idioma } = useIdioma();
       desc: t('estudiosBiblicosDesc'),
       ruta: "/estudios-biblicos",
       icon: <FaBook size={20} />,
+      permiso: "estudios_biblicos"
+    },
+    {
+      titulo: t('sl_modulo'),
+      desc: t('sl_moduloDesc'),
+      ruta: "/seguimiento-leyes",
+      icon: <FaRoute size={20} />,
       permiso: "estudios_biblicos"
     },
     {
