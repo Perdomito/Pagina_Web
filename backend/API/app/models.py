@@ -195,6 +195,7 @@ class Miembro(Base):
     cargo_funcion = Column(Text, nullable=True)
     ministerio_of = Column(Text, nullable=True)
     avance_audio = Column(Text, nullable=True)
+    iglesia_id = Column(Integer, ForeignKey("iglesias.id", ondelete="SET NULL"), nullable=True)
 
     pais_rel = relationship("Pais", back_populates="miembros")
     ciudad_rel = relationship("Ciudad", back_populates="miembros")
@@ -280,6 +281,7 @@ class Presupuesto(Base):
     mes = Column(Integer)
     anio = Column(Integer, nullable=False)
     tipo_gasto = Column(String(100), nullable=False)
+    categoria = Column(String(50), nullable=True)
     concepto = Column(Text)
     monto = Column(Numeric(15, 2), nullable=False)
     moneda = Column(String(10), nullable=False)

@@ -134,6 +134,16 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE miembros ADD COLUMN IF NOT EXISTS avance_audio TEXT
             """))
+            # Iglesia a la que pertenece el miembro (punto 13 del análisis: cantidad_miembros
+            # de iglesias pasa de ser un número manual a poder calcularse desde miembros reales)
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS iglesia_id INTEGER REFERENCES iglesias(id) ON DELETE SET NULL
+            """))
+            # Categoría real del gasto en Administración (Iglesia/Casa/Misión/Misioneros/General),
+            # separada de tipo_gasto que ya tiene su propia lista fija de valores validados
+            await conn.execute(text("""
+                ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS categoria VARCHAR(50)
+            """))
             # Contactos potenciales registrados dia a dia (se acumulan en reportes)
             await conn.execute(text("""
                 ALTER TABLE estudios_diarios ADD COLUMN IF NOT EXISTS potenciales INTEGER NOT NULL DEFAULT 0
