@@ -19,6 +19,7 @@ import iglesiasService from '../services/IglesiasService';
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext";
 import configuracionService from "../services/ConfiguracionService";
+import { useIdioma } from "../context/IdiomaContext";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
@@ -107,30 +108,31 @@ const calcularVariacion = (actual, anterior) => {
 const obtenerLecturaPronostico = (variacion) => {
   if (variacion >= 10) {
     return {
-      etiqueta: "Alto",
+      etiquetaKey: "st_pronosticoAlto",
       color: "#2E7D32",
-      descripcion: "Projected closing is above the previous year."
+      descripcionKey: "st_descripcionAlto"
     };
   }
 
   if (variacion <= -10) {
     return {
-      etiqueta: "Bajo",
+      etiquetaKey: "st_pronosticoBajo",
       color: "#C62828",
-      descripcion: "Projected closing is below the previous year."
+      descripcionKey: "st_descripcionBajo"
     };
   }
 
   return {
-    etiqueta: "Estable",
+    etiquetaKey: "st_pronosticoEstable",
     color: "#B26A00",
-    descripcion: "Projected closing is near the previous year."
+    descripcionKey: "st_descripcionEstable"
   };
 };
 
 export default function Estadisticas() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useIdioma();
   const anioActualPorDefecto = new Date().getFullYear();
   const mesActualPorDefecto = new Date().toLocaleString('es-ES', { month: 'long' }).toUpperCase();
   const [stats, setStats] = useState(null);
@@ -166,6 +168,17 @@ export default function Estadisticas() {
     ciudad_id: "", nombre: "", direccion: "", pastor_encargado_nombre: "",
     fecha_apertura: "", cantidad_miembros: ""
   });
+  const tf = (clave, valores = {}) =>
+    Object.entries(valores).reduce(
+      (texto, [llave, valor]) => texto.replaceAll(`{${llave}}`, String(valor ?? "")),
+      t(clave)
+    );
+  const mesesTraducidos = Array.from({ length: 12 }, (_, index) => t(`st_mes${index}`));
+  const traducirMes = (valor) => {
+    if (!valor) return "";
+    const indice = MESES_EVANGELISMO.indexOf(String(valor).toUpperCase());
+    return indice >= 0 ? mesesTraducidos[indice] : formatearMes(String(valor));
+  };
   useEffect(() => {
     const cargarContinentes = async () => {
       try {
@@ -247,11 +260,11 @@ export default function Estadisticas() {
 
   const crearIglesia = async () => {
     if (!paisSeleccionado) {
-      toast.error("Selecciona un país primero");
+      toast.error(t('st_errorSeleccionaPais'));
       return;
     }
     if (!nuevaIglesia.ciudad_id || !nuevaIglesia.nombre.trim()) {
-      toast.error("La ciudad y el nombre de la iglesia son obligatorios");
+      toast.error(t('st_errorIglesiaCampos'));
       return;
     }
 
@@ -263,10 +276,10 @@ export default function Estadisticas() {
         fecha_apertura: "", cantidad_miembros: ""
       });
       setRefrescoIglesias(v => v + 1);
-      toast.success("Iglesia registrada");
+      toast.success(t('st_iglesiaRegistrada'));
     } catch (error) {
       console.error('Error creating church:', error);
-      toast.error(error?.response?.data?.detail || "No se pudo registrar la iglesia");
+      toast.error(error?.response?.data?.detail || t('st_errorRegistrarIglesia'));
     } finally {
       setGuardandoIglesia(false);
     }
@@ -276,10 +289,10 @@ export default function Estadisticas() {
     try {
       await iglesiasService.eliminar(iglesia.id);
       setRefrescoIglesias(v => v + 1);
-      toast.success("Iglesia eliminada");
+      toast.success(t('st_iglesiaEliminada'));
     } catch (error) {
       console.error('Error deleting church:', error);
-      toast.error("No se pudo eliminar la iglesia");
+      toast.error(t('st_errorEliminarIglesia'));
     }
   };
 
@@ -304,14 +317,14 @@ export default function Estadisticas() {
         setStatsProyeccion(dataProyeccion);
       } catch (error) {
         console.error('Error:', error);
-        toast.error('Error loading statistics');
+        toast.error(t('st_errorCargarEstadisticas'));
       } finally {
         setLoading(false);
       }
     };
 
     cargarEstadisticas();
-  }, [anioSeleccionadoFiltro, paisSeleccionado, paisUsuarioResuelto]);
+  }, [anioSeleccionadoFiltro, paisSeleccionado, paisUsuarioResuelto, t]);
 
   useEffect(() => {
     const cargarCrecimientoMiembros = async () => {
@@ -454,8 +467,8 @@ export default function Estadisticas() {
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)", padding: "28px", fontFamily: "'Lato', sans-serif", display: "flex", justifyContent: "center", alignItems: "center" }}>
-        <div style={{ background: "white", padding: "40px", borderRadius: "12px", textAlign: "center" }}>
-          Loading statistics...
+          <div style={{ background: "white", padding: "40px", borderRadius: "12px", textAlign: "center" }}>
+          {t('cargando')}
         </div>
       </div>
     );
@@ -467,7 +480,7 @@ export default function Estadisticas() {
   const evangelismoMissionaryes = stats?.evangelismo_missionaries?.missionaries || [];
   const evangelismoMissionaryesComparacion = stats?.evangelismo_missionaries?.missionaries_comparacion || [];
   const modoEvangelismo = stats?.evangelismo_missionaries?.modo || modoEvangelismoSelectdo;
-  const mesEvangelismo = formatearMes(stats?.evangelismo_missionaries?.mes || "");
+  const mesEvangelismo = traducirMes(stats?.evangelismo_missionaries?.mes || "");
   const anioEvangelismo = stats?.evangelismo_missionaries?.anio || new Date().getFullYear();
   const anioComparacionEvangelismo = stats?.evangelismo_missionaries?.anio_comparacion || anioComparacionEvangelismoSelectdo;
   const aniosEvangelismoDisponibles = stats?.evangelismo_missionaries?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
@@ -544,7 +557,7 @@ export default function Estadisticas() {
   const resumenesPronostico = [
     {
       id: "evangelismo",
-      titulo: "Evangelism",
+      titulo: t('st_tabEvangelismo'),
       color: "#134069",
       actual: totalEvangelismoActualProyeccion,
       anteriorMismoPeriodo: null,
@@ -552,11 +565,11 @@ export default function Estadisticas() {
       cierreAnterior: totalEvangelismoAnteriorProyeccion,
       variacion: variacionProyeccionEvangelismo,
       lectura: lecturaEvangelismo,
-      unidad: "horas"
+      unidad: t('st_unidadHoras')
     },
     {
       id: "miembros",
-      titulo: "Members",
+      titulo: t('st_miembros'),
       color: "#8E24AA",
       actual: acumuladoMiembrosActual,
       anteriorMismoPeriodo: acumuladoMiembrosAnteriorMismoPeriodo,
@@ -564,11 +577,11 @@ export default function Estadisticas() {
       cierreAnterior: totalMiembrosAnterior,
       variacion: variacionProyeccionMiembros,
       lectura: lecturaMiembros,
-      unidad: "registros"
+      unidad: t('st_unidadRegistros')
     },
     {
       id: "estudios",
-      titulo: "Studies",
+      titulo: t('st_tabEstudios'),
       color: "#2E7D32",
       actual: acumuladoEstudiosActual,
       anteriorMismoPeriodo: acumuladoEstudiosAnteriorMismoPeriodo,
@@ -576,14 +589,14 @@ export default function Estadisticas() {
       cierreAnterior: totalEstudiosAnterior,
       variacion: variacionProyeccionEstudios,
       lectura: lecturaEstudios,
-      unidad: "estudios"
+      unidad: t('st_unidadEstudios')
     }
   ];
   const graficoComparacion = {
-    labels: comparacion.labels || ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
+    labels: comparacion.labels || mesesTraducidos,
     datasets: [
       {
-        label: comparacion?.serie_anterior?.etiqueta || "Previous Year",
+        label: comparacion?.serie_anterior?.etiqueta || tf('st_cierreAnio', { anio: anioSelectdo - 1 }),
         data: comparacion?.serie_anterior?.data || Array(12).fill(0),
         borderColor: "#B8C4CC",
         backgroundColor: "rgba(184, 196, 204, 0.10)",
@@ -594,7 +607,7 @@ export default function Estadisticas() {
         fill: false
       },
       {
-        label: comparacion?.serie_actual?.etiqueta || "Current Year",
+        label: comparacion?.serie_actual?.etiqueta || tf('st_acumuladoAnio', { anio: anioSelectdo }),
         data: comparacion?.serie_actual?.data || Array(12).fill(0),
         borderColor: "#134069",
         backgroundColor: "rgba(19, 64, 105, 0.12)",
@@ -649,10 +662,10 @@ export default function Estadisticas() {
   };
 
   const graficoRendimientoMissionary = {
-    labels: ["Annual Performance", "Monthly Average", "Daily Average"],
+    labels: [t('st_desempenoAnual'), t('st_promedioMensual'), t('st_promedioDiario')],
     datasets: [
       {
-        label: profesorActivo?.nombre || "Missionary",
+        label: profesorActivo?.nombre || t('st_missionaryFallback'),
         data: profesorActivo
           ? [
               profesorActivo.total_estudios || 0,
@@ -722,7 +735,7 @@ export default function Estadisticas() {
     datasets: modoEvangelismo === "annual"
       ? [
           {
-            label: `Horas ${anioComparacionEvangelismo}`,
+            label: tf('st_horasDeAnio', { anio: anioComparacionEvangelismo }),
             data: Array.from(new Set([
               ...evangelismoMissionaryes.map((profesor) => profesor.nombre),
               ...evangelismoMissionaryesComparacion.map((profesor) => profesor.nombre)
@@ -732,7 +745,7 @@ export default function Estadisticas() {
             borderSkipped: false
           },
           {
-            label: `Horas ${anioEvangelismo}`,
+            label: tf('st_horasDeAnio', { anio: anioEvangelismo }),
             data: Array.from(new Set([
               ...evangelismoMissionaryes.map((profesor) => profesor.nombre),
               ...evangelismoMissionaryesComparacion.map((profesor) => profesor.nombre)
@@ -744,7 +757,7 @@ export default function Estadisticas() {
         ]
       : [
           {
-            label: `Evangelism hours · ${mesEvangelismo || "current month"}`,
+            label: tf('st_horasEvangelismoMes', { mes: mesEvangelismo || t('st_mesActual') }),
             data: evangelismoMissionaryes.map((profesor) => profesor.total_horas || 0),
             backgroundColor: [
               "#134069",
@@ -771,7 +784,7 @@ export default function Estadisticas() {
         backgroundColor: "#1f2937",
         padding: 12,
         callbacks: {
-          label: (context) => `${context.parsed.y} horas`
+          label: (context) => `${context.parsed.y} ${t('st_horasSufijo')}`
         }
       }
     },
@@ -799,10 +812,10 @@ export default function Estadisticas() {
   };
 
   const graficoCrecimientoEstudiantes = {
-    labels: crecimientoEstudiantes.labels || ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
+    labels: crecimientoEstudiantes.labels || mesesTraducidos,
     datasets: [
       {
-        label: `Unique students per month · ${crecimientoEstudiantes.anio || new Date().getFullYear()}`,
+        label: `${t('st_totalEstudiantesPorMes')} · ${crecimientoEstudiantes.anio || new Date().getFullYear()}`,
         data: crecimientoEstudiantes.serie || Array(12).fill(0),
         borderColor: "#2E7D32",
         backgroundColor: "rgba(46, 125, 50, 0.14)",
@@ -819,7 +832,7 @@ export default function Estadisticas() {
   };
 
   const graficoCrecimientoMiembros = {
-    labels: crecimientoMiembros.labels || ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
+    labels: crecimientoMiembros.labels || mesesTraducidos,
     datasets: [
       {
         label: `${tipoMiembroSelectdo} ${anioComparacionMiembros}`,
@@ -853,21 +866,21 @@ export default function Estadisticas() {
     labels: resumenesPronostico.map((item) => item.titulo),
     datasets: [
       {
-        label: `Accumulated ${anioSelectdo}`,
+        label: tf('st_acumuladoAnio', { anio: anioSelectdo }),
         data: resumenesPronostico.map((item) => Number(formatearDecimal(item.actual, 1))),
         backgroundColor: ["#8FD3D7", "#D2A8E6", "#A5D6A7"],
         borderRadius: 10,
         borderSkipped: false
       },
       {
-        label: `Year-end projection ${anioSelectdo}`,
+        label: tf('st_proyeccionCierreAnio', { anio: anioSelectdo }),
         data: resumenesPronostico.map((item) => item.proyectado),
         backgroundColor: ["#134069", "#8E24AA", "#2E7D32"],
         borderRadius: 10,
         borderSkipped: false
       },
       {
-        label: `Year-end ${anioSelectdo - 1}`,
+        label: tf('st_cierreAnio', { anio: anioSelectdo - 1 }),
         data: resumenesPronostico.map((item) => Number(item.cierreAnterior || 0)),
         backgroundColor: ["#B8C4CC", "#C9B6D9", "#C8E6C9"],
         borderRadius: 10,
@@ -877,13 +890,13 @@ export default function Estadisticas() {
   };
 
   const tabs = [
-    { id: "pais", label: "Country" },
-    { id: "evangelismo", label: "Evangelism" },
-    { id: "estudios", label: "Bible Studies" },
-    { id: "missionaries", label: "Missionaries" },
-    { id: "crecimiento", label: "Growth" },
-    { id: "proyeccion", label: "Projection" },
-    { id: "iglesias", label: "Churches by Country" }
+    { id: "pais", label: t('st_tabPais') },
+    { id: "evangelismo", label: t('st_tabEvangelismo') },
+    { id: "estudios", label: t('st_tabEstudios') },
+    { id: "missionaries", label: t('st_tabMissionaries') },
+    { id: "crecimiento", label: t('st_tabCrecimiento') },
+    { id: "proyeccion", label: t('st_tabProyeccion') },
+    { id: "iglesias", label: t('st_tabIglesias') }
   ];
 
   return (
@@ -892,11 +905,11 @@ export default function Estadisticas() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "28px" }}>
           <button onClick={() => navigate("/home")} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px", padding: "8px 14px", color: "white", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "700", fontFamily: "'Lato',sans-serif" }}>
-            <FaArrowLeft /> Back
+            <FaArrowLeft /> {t('volver')}
           </button>
           <div>
-            <h1 style={{ fontSize: "20px", color: "white", margin: 0, fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>General Statistics</h1>
-            <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>System overview · {new Date().getFullYear()}</p>
+            <h1 style={{ fontSize: "20px", color: "white", margin: 0, fontFamily: "'Cinzel',serif", fontWeight: "600", letterSpacing: "1px" }}>{t('st_titulo')}</h1>
+            <p style={{ margin: "2px 0 0", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontFamily: "'Lato',sans-serif" }}>{t('st_subtitulo')} · {new Date().getFullYear()}</p>
           </div>
         </div>
 
@@ -904,7 +917,7 @@ export default function Estadisticas() {
         <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
           <select value={continenteSeleccionado || ""} onChange={e => { setContinenteSeleccionado(Number(e.target.value)); setPaisSeleccionado(null); }}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600", minWidth: "200px" }}>
-            <option value="">Select Region</option>
+            <option value="">{t('st_seleccionarRegion')}</option>
             {continentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
           <select value={anioSeleccionadoFiltro} onChange={e => setAnioSeleccionadoFiltro(Number(e.target.value))}
@@ -917,13 +930,13 @@ export default function Estadisticas() {
         {datosRealesEstudios && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             {[
-              { label: "Active Students", value: datosRealesEstudios.estudiantesActivos, color: "#134069", icon: "📖" },
-              { label: "Study Hours", value: datosRealesEstudios.horasTotales, color: "#4CAF50", icon: "⏱" },
-              { label: "Online Evang.", value: datosRealesEstudios.horasOnline, color: "#2196F3", icon: "💻" },
-              { label: "In-Person Evang.", value: datosRealesEstudios.horasPresencial, color: "#FF9800", icon: "🚶" },
-              { label: "New Contacts", value: datosRealesEstudios.nuevosContactos, color: "#9C27B0", icon: "👥" },
-              { label: "Said Yes", value: datosRealesEstudios.dijeronSi, color: "#E91E63", icon: "✋" },
-              { label: "Potentials", value: datosRealesEstudios.potenciales, color: "#00897B", icon: "🌱" },
+              { label: t('st_activeStudents'), value: datosRealesEstudios.estudiantesActivos, color: "#134069", icon: "📖" },
+              { label: t('st_studyHours'), value: datosRealesEstudios.horasTotales, color: "#4CAF50", icon: "⏱" },
+              { label: t('st_onlineEvang'), value: datosRealesEstudios.horasOnline, color: "#2196F3", icon: "💻" },
+              { label: t('st_inPersonEvang'), value: datosRealesEstudios.horasPresencial, color: "#FF9800", icon: "🚶" },
+              { label: t('st_newContacts'), value: datosRealesEstudios.nuevosContactos, color: "#9C27B0", icon: "👥" },
+              { label: t('st_saidYes'), value: datosRealesEstudios.dijeronSi, color: "#E91E63", icon: "✋" },
+              { label: t('st_potentials'), value: datosRealesEstudios.potenciales, color: "#00897B", icon: "🌱" },
             ].map((item, i) => (
               <div key={i} style={{ background: "white", borderRadius: "10px", padding: "14px 16px", border: "1px solid #e8edf5", boxShadow: "0 2px 6px rgba(19,64,105,0.06)" }}>
                 <div style={{ fontSize: "18px", marginBottom: "4px" }}>{item.icon}</div>
@@ -939,7 +952,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Users</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_totalUsuarios')}</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#2196F3" }}>
                   {stats?.total_usuarios || 0}
                 </div>
@@ -951,7 +964,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Members</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_totalMiembros')}</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#4CAF50" }}>
                   {stats?.total_miembros || 0}
                 </div>
@@ -963,7 +976,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Contacts</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_totalContactos')}</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#FF9800" }}>
                   {stats?.total_contactos || 0}
                 </div>
@@ -975,7 +988,7 @@ export default function Estadisticas() {
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Studies</div>
+                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_totalEstudios')}</div>
                 <div style={{ fontSize: "32px", fontWeight: "700", color: "#9C27B0" }}>
                   {stats?.total_estudios || 0}
                 </div>
@@ -987,22 +1000,22 @@ export default function Estadisticas() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "30px" }}>
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Annual Variation</div>
+            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_variacionAnual')}</div>
             <div style={{ fontSize: "30px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.crecimiento || 0) }}>
               {formatearVariacion(comparacion.crecimiento || 0)}
             </div>
             <div style={{ marginTop: "10px", color: "#777", fontSize: "13px" }}>
-              vs previous period
+              {t('st_vsPeriodoAnterior')}
             </div>
           </div>
 
           <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>Total Difference</div>
+            <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_diferenciaTotal')}</div>
             <div style={{ fontSize: "30px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.diferencia || 0) }}>
               {comparacion.diferencia > 0 ? `+${comparacion.diferencia}` : comparacion.diferencia || 0}
             </div>
             <div style={{ marginTop: "10px", color: "#777", fontSize: "13px" }}>
-              Study difference
+              {t('st_diferenciaEstudios')}
             </div>
           </div>
         </div>
@@ -1034,28 +1047,28 @@ export default function Estadisticas() {
           {tabActiva === "pais" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Country Summary</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_resumenPaisTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Datos consolidados del país asignado al usuario actual.
+                  {t('st_resumenPaisDesc')}
                 </p>
 
                 {resumenPais ? (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
                       <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Country</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_tabPais')}</div>
                         <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>
                           {resumenPais.nombre_pais}
                         </div>
                       </div>
                       <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cantidad de iglesias</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_cantidadIglesias')}</div>
                         <div style={{ fontSize: "28px", fontWeight: "700", color: "#2E7D32" }}>
                           {resumenPais.cantidad_iglesias || 0}
                         </div>
                       </div>
                       <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cantidad de miembros</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_cantidadMiembros')}</div>
                         <div style={{ fontSize: "28px", fontWeight: "700", color: "#8E24AA" }}>
                           {resumenPais.cantidad_miembros || 0}
                         </div>
@@ -1063,12 +1076,16 @@ export default function Estadisticas() {
                     </div>
 
                     <div style={{ background: "white", borderRadius: "14px", padding: "18px", border: "1px solid #e5e7eb", color: "#4b5563", lineHeight: "1.6" }}>
-                      {`${resumenPais.nombre_pais} tiene ${resumenPais.cantidad_iglesias || 0} iglesias registradas y ${resumenPais.cantidad_miembros || 0} miembros asociados a ese país.`}
+                      {tf('st_narrativaPais', {
+                        pais: resumenPais.nombre_pais,
+                        iglesias: resumenPais.cantidad_iglesias || 0,
+                        miembros: resumenPais.cantidad_miembros || 0
+                      })}
                     </div>
                   </>
                 ) : (
                   <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
-                    No country assigned to user or no data available for this country.
+                    {t('st_sinPaisAsignado')}
                   </div>
                 )}
               </div>
@@ -1078,17 +1095,17 @@ export default function Estadisticas() {
           {tabActiva === "evangelismo" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Evangelism Hours by Missionary</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_evangelismoTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
                   {modoEvangelismo === "annual"
-                    ? `Total hours recorded by missionary during ${anioEvangelismo}, vs ${anioComparacionEvangelismo}.`
-                    : `Total hours recorded by missionary in ${mesEvangelismo || "current month"} de ${anioEvangelismo}.`}
+                    ? tf('st_evangelismoDescAnual', { anio: anioEvangelismo, anioComp: anioComparacionEvangelismo })
+                    : tf('st_evangelismoDescMensual', { mes: mesEvangelismo || t('st_mesActual'), anio: anioEvangelismo })}
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                      Vista
+                      {t('st_vista')}
                     </label>
                     <select
                       value={modoEvangelismoSelectdo}
@@ -1103,13 +1120,13 @@ export default function Estadisticas() {
                         fontSize: "14px"
                       }}
                     >
-                      <option value="monthly">Specific month</option>
-                      <option value="annual">Todo el ano</option>
+                      <option value="monthly">{t('st_vistaMensual')}</option>
+                      <option value="annual">{t('st_vistaAnual')}</option>
                     </select>
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                      Año
+                      {t('st_anio')}
                     </label>
                     <select
                       value={anioEvangelismoSelectdo}
@@ -1134,7 +1151,7 @@ export default function Estadisticas() {
                   {modoEvangelismoSelectdo === "monthly" && (
                     <div>
                       <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                        Mes
+                        {t('st_mesLabel')}
                       </label>
                       <select
                         value={mesEvangelismoSelectdo}
@@ -1151,7 +1168,7 @@ export default function Estadisticas() {
                       >
                         {MESES_EVANGELISMO.map((mes) => (
                           <option key={mes} value={mes}>
-                            {formatearMes(mes)}
+                            {traducirMes(mes)}
                           </option>
                         ))}
                       </select>
@@ -1160,7 +1177,7 @@ export default function Estadisticas() {
                   {modoEvangelismoSelectdo === "annual" && (
                     <div>
                       <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                        Comparar contra
+                        {t('st_compararContra')}
                       </label>
                       <select
                         value={anioComparacionEvangelismoSelectdo}
@@ -1189,14 +1206,14 @@ export default function Estadisticas() {
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Missionaryes con registro</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_missionariesConRegistro')}</div>
                         <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>
                           {evangelismoMissionaryes.filter((profesor) => Number(profesor.total_horas) > 0).length}
                         </div>
                       </div>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
                         <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>
-                          {modoEvangelismo === "annual" ? `Total hours ${anioEvangelismo}` : "Total hours del mes"}
+                          {modoEvangelismo === "annual" ? tf('st_totalHorasAnio', { anio: anioEvangelismo }) : t('st_totalHorasMes')}
                         </div>
                         <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                           {formatearDecimal(totalEvangelismoActual, 1)}
@@ -1206,14 +1223,14 @@ export default function Estadisticas() {
                         <>
                           <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
                             <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>
-                              {`Total hours ${anioComparacionEvangelismo}`}
+                              {tf('st_totalHorasAnio', { anio: anioComparacionEvangelismo })}
                             </div>
                             <div style={{ fontSize: "24px", fontWeight: "700", color: "#475467" }}>
                               {formatearDecimal(totalEvangelismoComparacion, 1)}
                             </div>
                           </div>
                           <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                            <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Annual Variation</div>
+                            <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_variacionAnual')}</div>
                             <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(variacionEvangelismoAnnual) }}>
                               {formatearVariacion(variacionEvangelismoAnnual)}
                             </div>
@@ -1241,7 +1258,7 @@ export default function Estadisticas() {
                         >
                           <div style={{ color: "#1f2937", fontWeight: "700" }}>{profesor.nombre}</div>
                           <div style={{ textAlign: "right", color: "#134069", fontWeight: "700" }}>
-                            {formatearDecimal(profesor.total_horas, 1)} h
+                            {formatearDecimal(profesor.total_horas, 1)} {t('st_horasSufijo')}
                           </div>
                         </div>
                       ))}
@@ -1249,7 +1266,7 @@ export default function Estadisticas() {
                   </>
                 ) : (
                   <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
-                    No evangelism hours recorded yet.
+                    {t('st_sinHorasEvangelismo')}
                   </div>
                 )}
               </div>
@@ -1260,13 +1277,13 @@ export default function Estadisticas() {
             <div style={{ padding: "10px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                 <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Annual Variation</div>
+                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_variacionAnual')}</div>
                   <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.crecimiento || 0) }}>
                     {formatearVariacion(comparacion.crecimiento || 0)}
                   </div>
                 </div>
                 <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Total Difference</div>
+                  <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_diferenciaTotal')}</div>
                   <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(comparacion.diferencia || 0) }}>
                     {comparacion.diferencia > 0 ? `+${comparacion.diferencia}` : comparacion.diferencia || 0}
                   </div>
@@ -1274,9 +1291,9 @@ export default function Estadisticas() {
               </div>
 
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", minWidth: 0 }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Studies Comparison</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_comparacionEstudiosTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Total studies per month comparing current year vs previous year.
+                  {t('st_comparacionEstudiosDesc')}
                 </p>
 
                 <div style={{ height: "340px" }}>
@@ -1289,29 +1306,29 @@ export default function Estadisticas() {
           {tabActiva === "missionaries" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", minWidth: 0 }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Performance by Missionary</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_rendimientoTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Estudios del año {anioRendimiento}, con promedio mensual y promedio diario por profesor.
+                  {tf('st_rendimientoDesc', { anio: anioRendimiento })}
                 </p>
 
                 {rendimientoMissionaryes.length > 0 ? (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Missionaryes con datos</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_missionariesConDatos')}</div>
                         <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>{rendimientoMissionaryes.length}</div>
                       </div>
                       <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Missionary seleccionado</div>
+                        <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_missionarySeleccionado')}</div>
                         <div style={{ fontSize: "16px", fontWeight: "700", color: "#1f2937" }}>
-                          {profesorActivo?.nombre || "No data"}
+                          {profesorActivo?.nombre || t('st_sinDatosLabel')}
                         </div>
                       </div>
                     </div>
 
                     <div style={{ marginBottom: "20px" }}>
                       <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                        Selectr profesor
+                        {t('st_seleccionarProfesor')}
                       </label>
                       <select
                         value={profesorSelectdo}
@@ -1353,19 +1370,19 @@ export default function Estadisticas() {
                         >
                           <div>
                             <div style={{ color: "#1f2937", fontWeight: "700" }}>{profesor.nombre}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Missionary</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>{t('st_missionaryFallback')}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ color: "#134069", fontWeight: "700" }}>{profesor.total_estudios || 0}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Annual</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>{t('st_anual')}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ color: "#1f2937", fontWeight: "600" }}>{formatearDecimal(profesor.promedio_mensual, 1)}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Monthly</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>{t('st_mensual')}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ color: "#1f2937", fontWeight: "600" }}>{formatearDecimal(profesor.promedio_diario, 2)}</div>
-                            <div style={{ color: "#667085", fontSize: "12px" }}>Diario</div>
+                            <div style={{ color: "#667085", fontSize: "12px" }}>{t('st_diario')}</div>
                           </div>
                         </div>
                       ))}
@@ -1373,7 +1390,7 @@ export default function Estadisticas() {
                   </>
                 ) : (
                   <div style={{ padding: "18px", borderRadius: "12px", background: "white", color: "#667085", border: "1px solid #e5e7eb" }}>
-                    No missionary performance data available yet.
+                    {t('st_sinRendimiento')}
                   </div>
                 )}
               </div>
@@ -1383,15 +1400,15 @@ export default function Estadisticas() {
           {tabActiva === "crecimiento" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Member Growth by Month</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_crecimientoMiembrosTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Monthly member additions by type, comparing main year vs another year.
+                  {t('st_crecimientoMiembrosDesc')}
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                      País
+                      {t('st_pais')}
                     </label>
                     <select
                       value={paisCrecimientoSeleccionado || paisUsuarioResuelto || ""}
@@ -1415,7 +1432,7 @@ export default function Estadisticas() {
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                      Tipo de miembro
+                      {t('st_tipoMiembro')}
                     </label>
                     <select
                       value={tipoMiembroSelectdo}
@@ -1432,14 +1449,14 @@ export default function Estadisticas() {
                     >
                       {tiposMiembroDisponibles.map((tipo) => (
                         <option key={tipo} value={tipo}>
-                          {tipo}
+                          {tipo === "Todos" ? t('st_todos') : tipo}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "13px", color: "#46535a", marginBottom: "8px", fontWeight: "600" }}>
-                      Comparar contra
+                      {t('st_compararContra')}
                     </label>
                     <select
                       value={anioComparacionMiembros}
@@ -1465,31 +1482,31 @@ export default function Estadisticas() {
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Country</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_tabPais')}</div>
                     <div style={{ fontSize: "20px", fontWeight: "700", color: "#134069" }}>
-                      {paisCrecimientoActivo?.nombre || "N/A"}
+                      {paisCrecimientoActivo?.nombre || t('st_sinDatosLabel')}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Main Year</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_anioPrincipal')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#8E24AA" }}>
                       {anioSelectdo}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Miembros nuevos en {anioSelectdo}</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{tf('st_miembrosNuevosEnAnio', { anio: anioSelectdo })}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                       {totalCrecimientoMiembrosActual}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Miembros nuevos en {anioComparacionMiembros}</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{tf('st_miembrosNuevosEnAnio', { anio: anioComparacionMiembros })}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#475467" }}>
                       {totalCrecimientoMiembrosComparacion}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Annual Variation</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_variacionAnual')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(variacionCrecimientoMiembros) }}>
                       {formatearVariacion(variacionCrecimientoMiembros)}
                     </div>
@@ -1502,20 +1519,20 @@ export default function Estadisticas() {
               </div>
 
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Unique Students with Bible Study per Month</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_estudiantesUnicosTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Muestra cuantos estudiantes diferentes tuvieron al menos un estudio biblico en cada mes de {crecimientoEstudiantes.anio || new Date().getFullYear()}, sin repetir al mismo estudiante dentro del mismo mes.
+                  {tf('st_estudiantesUnicosDesc', { anio: crecimientoEstudiantes.anio || new Date().getFullYear() })}
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Year analyzed</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_anioAnalizado')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#2E7D32" }}>
                       {crecimientoEstudiantes.anio || new Date().getFullYear()}
                     </div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Total students per month</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_totalEstudiantesPorMes')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                       {crecimientoEstudiantes.total || 0}
                     </div>
@@ -1532,26 +1549,30 @@ export default function Estadisticas() {
           {tabActiva === "proyeccion" && (
             <div style={{ padding: "10px" }}>
               <div style={{ background: "#f8fafb", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
-                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>Annual Closing Projection</h2>
+                <h2 style={{ fontSize: "20px", marginBottom: "8px", color: "#1a1a1a" }}>{t('st_proyeccionTitulo')}</h2>
                 <p style={{ margin: "0 0 20px", color: "#666", fontSize: "14px" }}>
-                  Estimates how the year {anioSelectdo} may close if the average pace from January to {formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} is maintained through December, compared to the previous year closing.
+                  {tf('st_proyeccionDesc', {
+                    anio: anioSelectdo,
+                    mesInicio: t('st_mes0'),
+                    mesFin: traducirMes(MESES_EVANGELISMO[mesCorteProyeccion])
+                  })}
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Projected year</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_anioProyectado')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#134069" }}>{anioSelectdo}</div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Meses analizados</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_mesesAnalizados')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>{mesesTranscurridosProyeccion}</div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Criterio</div>
-                    <div style={{ fontSize: "16px", fontWeight: "700", color: "#1f2937" }}>Ritmo promedio mensual</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_criterio')}</div>
+                    <div style={{ fontSize: "16px", fontWeight: "700", color: "#1f2937" }}>{t('st_ritmoPromedioMensual')}</div>
                   </div>
                   <div style={{ background: "white", borderRadius: "12px", padding: "14px 16px", border: "1px solid #e5e7eb" }}>
-                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Estudiantes proyectados</div>
+                    <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_estudiantesProyectados')}</div>
                     <div style={{ fontSize: "24px", fontWeight: "700", color: "#2E7D32" }}>{formatearDecimal(proyeccionEstudiantes, 1)}</div>
                   </div>
                 </div>
@@ -1566,31 +1587,31 @@ export default function Estadisticas() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", gap: "12px" }}>
                         <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a1a" }}>{item.titulo}</div>
                         <div style={{ background: `${item.lectura.color}18`, color: item.lectura.color, borderRadius: "999px", padding: "6px 10px", fontSize: "12px", fontWeight: "700" }}>
-                          {item.lectura.etiqueta}
+                          {t(item.lectura.etiquetaKey)}
                         </div>
                       </div>
 
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", marginBottom: "14px" }}>
                         <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Acumulado actual</div>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_acumuladoActual')}</div>
                           <div style={{ fontSize: "24px", fontWeight: "700", color: item.color }}>
                             {formatearDecimal(item.actual, 1)}
                           </div>
                         </div>
                         <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Cierre proyectado</div>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_cierreProyectado')}</div>
                           <div style={{ fontSize: "24px", fontWeight: "700", color: "#1f2937" }}>
                             {formatearDecimal(item.proyectado, 1)}
                           </div>
                         </div>
                         <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Previous year closing</div>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_cierreAnioAnterior')}</div>
                           <div style={{ fontSize: "24px", fontWeight: "700", color: "#475467" }}>
                             {formatearDecimal(item.cierreAnterior, 1)}
                           </div>
                         </div>
                         <div style={{ background: "#f8fafb", borderRadius: "12px", padding: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>Projected variation</div>
+                          <div style={{ fontSize: "12px", color: "#667085", marginBottom: "6px" }}>{t('st_variacionProyectada')}</div>
                           <div style={{ fontSize: "24px", fontWeight: "700", color: obtenerColorCrecimiento(item.variacion) }}>
                             {formatearVariacion(item.variacion)}
                           </div>
@@ -1598,9 +1619,20 @@ export default function Estadisticas() {
                       </div>
 
                       <div style={{ color: "#4b5563", fontSize: "14px", lineHeight: "1.6" }}>
-                        {item.titulo === "Evangelismo"
-                          ? `At current pace, ${item.titulo.toLowerCase()} could close at ${formatearDecimal(item.proyectado, 1)} ${item.unidad}, vs ${formatearDecimal(item.cierreAnterior, 1)} ${item.unidad} of the previous year. ${item.lectura.descripcion}`
-                          : `Through ${formatearMes(MESES_EVANGELISMO[mesCorteProyeccion])} you have ${formatearDecimal(item.actual, 1)} ${item.unidad}. At the same point last year: ${formatearDecimal(item.anteriorMismoPeriodo, 1)} ${item.unidad}. ${item.lectura.descripcion}`}
+                        {item.id === "evangelismo"
+                          ? tf('st_narrativaEvangelismo', {
+                              proyectado: formatearDecimal(item.proyectado, 1),
+                              unidad: item.unidad,
+                              cierreAnterior: formatearDecimal(item.cierreAnterior, 1),
+                              descripcion: t(item.lectura.descripcionKey)
+                            })
+                          : tf('st_narrativaGeneral', {
+                              mes: traducirMes(MESES_EVANGELISMO[mesCorteProyeccion]),
+                              actual: formatearDecimal(item.actual, 1),
+                              unidad: item.unidad,
+                              anteriorMismoPeriodo: formatearDecimal(item.anteriorMismoPeriodo, 1),
+                              descripcion: t(item.lectura.descripcionKey)
+                            })}
                       </div>
                     </div>
                   ))}
@@ -1615,15 +1647,15 @@ export default function Estadisticas() {
           <div style={{ background: "white", borderRadius: "12px", border: "1px solid #e8edf5", overflow: "hidden" }}>
             <div style={{ padding: "20px 24px", borderBottom: "1px solid #e8edf5" }}>
               <h2 style={{ margin: 0, color: "#134069", fontFamily: "'Cinzel',serif", fontSize: "17px" }}>
-                Churches & Presence by Country
+                {t('st_iglesiasTitulo')}
               </h2>
               <p style={{ margin: "4px 0 0", color: "#8a97b0", fontSize: "12px" }}>
-                {continenteSeleccionado ? continentes.find(c => c.id === continenteSeleccionado)?.nombre : "All regions"} — {anioSeleccionadoFiltro}
+                {continenteSeleccionado ? continentes.find(c => c.id === continenteSeleccionado)?.nombre : t('st_todasLasRegiones')} — {anioSeleccionadoFiltro}
               </p>
             </div>
             <div style={{ padding: "20px 24px" }}>
               {paisesDelContinente.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#b0bcd0", padding: "40px" }}>Select a region to view countries</div>
+                <div style={{ textAlign: "center", color: "#b0bcd0", padding: "40px" }}>{t('st_seleccionaRegionParaVer')}</div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
                   {paisesDelContinente.map((pais, i) => {
@@ -1638,10 +1670,10 @@ export default function Estadisticas() {
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                           {[
-                            { label: "Members", value: stats?.total_miembros || "—", icon: "👥" },
-                            { label: "Contacts", value: stats?.total_contactos || "—", icon: "📞" },
-                            { label: "Churches", value: conteoIglesias[pais.id] || 0, icon: "⛪" },
-                            { label: "Studies", value: datosRealesEstudios?.estudiantesActivos || 0, icon: "📖" },
+                            { label: t('st_miembros'), value: stats?.total_miembros || "—", icon: "👥" },
+                            { label: t('st_contactos'), value: stats?.total_contactos || "—", icon: "📞" },
+                            { label: t('st_iglesias'), value: conteoIglesias[pais.id] || 0, icon: "⛪" },
+                            { label: t('st_estudiosLabel'), value: datosRealesEstudios?.estudiantesActivos || 0, icon: "📖" },
                           ].map((item, j) => (
                             <div key={j} style={{ background: "white", borderRadius: "8px", padding: "10px", textAlign: "center", border: "1px solid #e8edf5" }}>
                               <div style={{ fontSize: "16px" }}>{item.icon}</div>
@@ -1660,10 +1692,10 @@ export default function Estadisticas() {
               {paisSeleccionado && (
                 <div style={{ marginTop: "24px", borderTop: "1px solid #e8edf5", paddingTop: "20px" }}>
                   <h3 style={{ margin: "0 0 4px", color: "#134069", fontFamily: "'Cinzel',serif", fontSize: "15px" }}>
-                    Iglesias de {paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre || ""}
+                    {tf('st_iglesiasDePais', { pais: paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre || "" })}
                   </h3>
                   <p style={{ margin: "0 0 16px", color: "#8a97b0", fontSize: "12px" }}>
-                    Registra una iglesia por cada ciudad. El total alimenta el contador del país.
+                    {t('st_iglesiasPaisDesc')}
                   </p>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "12px" }}>
@@ -1672,28 +1704,28 @@ export default function Estadisticas() {
                       onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, ciudad_id: e.target.value })}
                       style={estiloCampoIglesia}
                     >
-                      <option value="">Ciudad…</option>
+                      <option value="">{t('st_ciudadPlaceholder')}</option>
                       {ciudadesDelPais.map(c => (
                         <option key={c.id} value={c.id}>{c.nombre}</option>
                       ))}
                     </select>
                     <input
                       type="text"
-                      placeholder="Nombre de la iglesia"
+                      placeholder={t('st_nombreIglesiaPlaceholder')}
                       value={nuevaIglesia.nombre}
                       onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, nombre: e.target.value })}
                       style={estiloCampoIglesia}
                     />
                     <input
                       type="text"
-                      placeholder="Pastor encargado"
+                      placeholder={t('st_pastorEncargadoPlaceholder')}
                       value={nuevaIglesia.pastor_encargado_nombre}
                       onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, pastor_encargado_nombre: e.target.value })}
                       style={estiloCampoIglesia}
                     />
                     <input
                       type="text"
-                      placeholder="Dirección"
+                      placeholder={t('st_direccionPlaceholder')}
                       value={nuevaIglesia.direccion}
                       onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, direccion: e.target.value })}
                       style={estiloCampoIglesia}
@@ -1707,7 +1739,7 @@ export default function Estadisticas() {
                     <input
                       type="number"
                       min="0"
-                      placeholder="Miembros"
+                      placeholder={t('st_miembrosPlaceholder')}
                       value={nuevaIglesia.cantidad_miembros}
                       onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, cantidad_miembros: e.target.value })}
                       style={estiloCampoIglesia}
@@ -1718,25 +1750,25 @@ export default function Estadisticas() {
                     disabled={guardandoIglesia}
                     style={{ background: "#134069", color: "white", border: "none", borderRadius: "8px", padding: "10px 20px", fontSize: "13px", fontWeight: "700", cursor: guardandoIglesia ? "default" : "pointer", opacity: guardandoIglesia ? 0.6 : 1, marginBottom: "18px" }}
                   >
-                    {guardandoIglesia ? "Guardando…" : "Agregar iglesia"}
+                    {guardandoIglesia ? t('st_guardando') : t('st_agregarIglesia')}
                   </button>
 
                   {cargandoIglesias ? (
-                    <div style={{ color: "#b0bcd0", fontSize: "13px" }}>Cargando…</div>
+                    <div style={{ color: "#b0bcd0", fontSize: "13px" }}>{t('st_cargandoIglesias')}</div>
                   ) : iglesiasDelPais.length === 0 ? (
                     <div style={{ color: "#b0bcd0", fontSize: "13px" }}>
-                      Todavía no hay iglesias registradas en este país.
+                      {t('st_sinIglesiasPais')}
                     </div>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                           <tr style={{ background: "#f4f6fb", color: "#8a97b0", textAlign: "left" }}>
-                            <th style={estiloCeldaIglesia}>Ciudad</th>
-                            <th style={estiloCeldaIglesia}>Iglesia</th>
-                            <th style={estiloCeldaIglesia}>Pastor</th>
-                            <th style={estiloCeldaIglesia}>Apertura</th>
-                            <th style={estiloCeldaIglesia}>Miembros</th>
+                            <th style={estiloCeldaIglesia}>{t('st_colCiudad')}</th>
+                            <th style={estiloCeldaIglesia}>{t('st_colIglesia')}</th>
+                            <th style={estiloCeldaIglesia}>{t('st_colPastor')}</th>
+                            <th style={estiloCeldaIglesia}>{t('st_colApertura')}</th>
+                            <th style={estiloCeldaIglesia}>{t('st_colMiembros')}</th>
                             <th style={estiloCeldaIglesia}></th>
                           </tr>
                         </thead>
@@ -1753,7 +1785,7 @@ export default function Estadisticas() {
                                   onClick={() => eliminarIglesia(ig)}
                                   style={{ background: "transparent", border: "none", color: "#c0392b", cursor: "pointer", fontWeight: "700" }}
                                 >
-                                  Eliminar
+                                  {t('eliminar')}
                                 </button>
                               </td>
                             </tr>

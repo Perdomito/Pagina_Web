@@ -224,6 +224,53 @@ class Contacto(Base):
     pais_rel = relationship("Pais", back_populates="contactos")
     ciudad_rel = relationship("Ciudad", back_populates="contactos")
     miembro_rel = relationship("Miembro", back_populates="contactos")
+    seguimientos_leyes = relationship("SeguimientoLey", back_populates="contacto_rel")
+
+
+class SeguimientoLey(Base):
+    __tablename__ = "seguimiento_leyes"
+
+    id = Column(Integer, primary_key=True)
+    contacto_id = Column(Integer, ForeignKey("contactos.id", ondelete="RESTRICT"), nullable=False)
+    pais_id = Column(Integer, ForeignKey("paises.id", ondelete="SET NULL"))
+    miembro_contacto_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    miembro_estudios_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    estado_actual = Column(String(50), nullable=False, default="Contacto")
+    etapa_actual_orden = Column(Integer, nullable=False, default=0)
+    abandono_alerta = Column(Boolean, default=False, nullable=False)
+    fecha_inicio = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_ultimo_avance = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_abandono = Column(DateTime)
+    fecha_conversion_miembro = Column(DateTime)
+    miembro_convertido_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    tipo_miembro_destino = Column(String(50), default="Registrado", nullable=False)
+    notas_generales = Column(Text)
+    activo = Column(Boolean, default=True, nullable=False)
+
+    contacto_rel = relationship("Contacto", back_populates="seguimientos_leyes")
+    pais_rel = relationship("Pais")
+    miembro_contacto_rel = relationship("Miembro", foreign_keys=[miembro_contacto_id])
+    miembro_estudios_rel = relationship("Miembro", foreign_keys=[miembro_estudios_id])
+    miembro_convertido_rel = relationship("Miembro", foreign_keys=[miembro_convertido_id])
+    historial = relationship(
+        "SeguimientoLeyHistorial",
+        back_populates="seguimiento_rel",
+        cascade="all, delete-orphan",
+        order_by="SeguimientoLeyHistorial.fecha_evento",
+    )
+
+
+class SeguimientoLeyHistorial(Base):
+    __tablename__ = "seguimiento_leyes_historial"
+
+    id = Column(Integer, primary_key=True)
+    seguimiento_id = Column(Integer, ForeignKey("seguimiento_leyes.id", ondelete="CASCADE"), nullable=False)
+    etapa = Column(String(50), nullable=False)
+    etapa_orden = Column(Integer, nullable=False, default=0)
+    notas = Column(Text)
+    fecha_evento = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    seguimiento_rel = relationship("SeguimientoLey", back_populates="historial")
 
 
 class Reporte(Base):

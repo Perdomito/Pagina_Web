@@ -15,10 +15,11 @@ import reportes from './translations/reportes';
 import estadisticas from './translations/estadisticas';
 import estudiosBiblicos from './translations/estudiosBiblicos';
 import configuracion from './translations/configuracion';
+import seguimientoLeyes from './translations/seguimientoLeyes';
 
 const modulos = [
   core, miembros, contactos, auth, administracion,
-  informeRegional, reportes, estadisticas, estudiosBiblicos, configuracion,
+  informeRegional, reportes, estadisticas, estudiosBiblicos, configuracion, seguimientoLeyes,
 ];
 
 export const translations = {

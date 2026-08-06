@@ -14,7 +14,8 @@ import {
   FaHammer,
   //FaBook, 
   FaBars,
-  FaBell
+  FaBell,
+  FaRoute
 } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import axios from '../api/axios';
@@ -106,6 +107,15 @@ export default function Home() {
       color: "#f67195",
       permiso: "estudios_biblicos",
       animacion: "flip"
+    },
+    {
+      titulo: t('sl_modulo'),
+      desc: t('sl_moduloDesc'),
+      ruta: "/seguimiento-leyes",
+      icon: <FaRoute size={32} />,
+      color: "#ffb703",
+      permiso: "estudios_biblicos",
+      animacion: "pulse"
     },
     {
       titulo: t('reportes'),
