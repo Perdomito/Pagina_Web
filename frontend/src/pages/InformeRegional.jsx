@@ -7,21 +7,41 @@ import {
 } from "react-icons/fa";
 import { useAuth } from '../context/AuthContext';
 import administracionService from '../services/AdministracionService';
+import { useIdioma } from '../context/IdiomaContext';
 import toast from 'react-hot-toast';
 
 const P  = "#1a5490";
 const PL = "#2a72b8";
 
+const MESES_ES = {
+  ENERO:"Enero", FEBRERO:"Febrero", MARZO:"Marzo", ABRIL:"Abril",
+  MAYO:"Mayo", JUNIO:"Junio", JULIO:"Julio", AGOSTO:"Agosto",
+  SEPTIEMBRE:"Septiembre", OCTUBRE:"Octubre", NOVIEMBRE:"Noviembre", DICIEMBRE:"Diciembre"
+};
+const MESES_ES_ABR = {
+  ENERO:"Ene", FEBRERO:"Feb", MARZO:"Mar", ABRIL:"Abr",
+  MAYO:"May", JUNIO:"Jun", JULIO:"Jul", AGOSTO:"Ago",
+  SEPTIEMBRE:"Sep", OCTUBRE:"Oct", NOVIEMBRE:"Nov", DICIEMBRE:"Dic"
+};
 const MESES_EN = {
   ENERO:"January", FEBRERO:"February", MARZO:"March", ABRIL:"April",
   MAYO:"May", JUNIO:"June", JULIO:"July", AGOSTO:"August",
   SEPTIEMBRE:"September", OCTUBRE:"October", NOVIEMBRE:"November", DICIEMBRE:"December"
+};
+const MESES_EN_ABR = {
+  ENERO:"Jan", FEBRERO:"Feb", MARZO:"Mar", ABRIL:"Apr",
+  MAYO:"May", JUNIO:"Jun", JULIO:"Jul", AGOSTO:"Aug",
+  SEPTIEMBRE:"Sep", OCTUBRE:"Oct", NOVIEMBRE:"Nov", DICIEMBRE:"Dec"
 };
 const MESES = Object.keys(MESES_EN);
 
 export default function InformeRegional() {
   const navigate   = useNavigate();
   const { user }   = useAuth();
+  const { idioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es);
+  const mesNombre = (m) => tx(MESES_ES[m], MESES_EN[m]);
+  const mesAbr = (m) => tx(MESES_ES_ABR[m], MESES_EN_ABR[m]);
 
   const [año, setAño]               = useState(new Date().getFullYear());
   const [mes, setMes]               = useState(MESES[new Date().getMonth()]);
@@ -47,7 +67,7 @@ export default function InformeRegional() {
         setRegion(data[0].nombre);
         setPaises(data[0].paises || []);
       }
-    } catch { toast.error("Error loading regions"); }
+    } catch { toast.error(tx('Error al cargar las regiones', 'Error loading regions')); }
   };
 
   const handleContinenteChange = (id) => {
@@ -107,7 +127,7 @@ export default function InformeRegional() {
 
       setDatos(resultados);
       setGenerado(true);
-    } catch { toast.error("Error generating report"); }
+    } catch { toast.error(tx('Error al generar el informe', 'Error generating report')); }
     finally { setCargando(false); }
   };
 
@@ -213,24 +233,24 @@ export default function InformeRegional() {
       <div className="ir-topbar no-print">
         <div className="ir-topbar-left">
           <button className="ir-back" onClick={() => navigate("/administracion")}>
-            <FaArrowLeft /> Back
+            <FaArrowLeft /> {tx('Volver', 'Back')}
           </button>
-          <span className="ir-title">Regional Financial Report</span>
+          <span className="ir-title">{tx('Informe Financiero Regional', 'Regional Financial Report')}</span>
           <span className="ir-region-tag">{region}</span>
         </div>
         <div className="ir-topbar-right">
           {generado && (
             <>
               <button className="ir-btn ir-btn-print" onClick={handlePrint}>
-                <FaPrint /> Print
+                <FaPrint /> {tx('Imprimir', 'Print')}
               </button>
               <button className="ir-btn ir-btn-outline">
-                <FaDownload /> Export
+                <FaDownload /> {tx('Exportar', 'Export')}
               </button>
             </>
           )}
           <button className="ir-btn ir-btn-primary" onClick={generarInforme} disabled={cargando}>
-            <FaFileAlt /> {cargando ? "Generating..." : "Generate Report"}
+            <FaFileAlt /> {cargando ? tx('Generando...', 'Generating...') : tx('Generar Informe', 'Generate Report')}
           </button>
         </div>
       </div>
@@ -238,17 +258,17 @@ export default function InformeRegional() {
       {/* ── FILTROS ── */}
       <div className="ir-filters no-print">
         <FaFilter style={{ color: "#b0bcd0", fontSize: "13px" }} />
-        <span className="ir-filter-label">Region:</span>
+        <span className="ir-filter-label">{tx('Región:', 'Region:')}</span>
         <select className="ir-select" value={continenteId || ""} onChange={e => handleContinenteChange(e.target.value)}>
           {continentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <span className="ir-filter-label" style={{ marginLeft:8 }}>Period:</span>
-        <button className={`ir-mode-btn ${filtroModo === "mensual" ? "active" : ""}`} onClick={() => setFiltroModo("mensual")}>Monthly</button>
-        <button className={`ir-mode-btn ${filtroModo === "anual"   ? "active" : ""}`} onClick={() => setFiltroModo("anual")}>Annual</button>
+        <span className="ir-filter-label" style={{ marginLeft:8 }}>{tx('Periodo:', 'Period:')}</span>
+        <button className={`ir-mode-btn ${filtroModo === "mensual" ? "active" : ""}`} onClick={() => setFiltroModo("mensual")}>{tx('Mensual', 'Monthly')}</button>
+        <button className={`ir-mode-btn ${filtroModo === "anual"   ? "active" : ""}`} onClick={() => setFiltroModo("anual")}>{tx('Anual', 'Annual')}</button>
 
         {filtroModo === "mensual" && (
           <select className="ir-select" value={mes} onChange={e => setMes(e.target.value)}>
-            {MESES.map(m => <option key={m} value={m}>{MESES_EN[m]}</option>)}
+            {MESES.map(m => <option key={m} value={m}>{mesNombre(m)}</option>)}
           </select>
         )}
 
@@ -259,7 +279,7 @@ export default function InformeRegional() {
         {generado && (
           <div className="ir-search">
             <FaSearch className="ir-search-icon" />
-            <input type="text" placeholder="Search country..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+            <input type="text" placeholder={tx('Buscar país...', 'Search country...')} value={busqueda} onChange={e => setBusqueda(e.target.value)} />
           </div>
         )}
       </div>
@@ -270,19 +290,19 @@ export default function InformeRegional() {
         {/* Print Header */}
         <div className="ir-print-header">
           <h2 style={{ fontFamily: "'Cinzel', serif", color: "#1a2d5a", margin: "0 0 4px" }}>
-            Emanuel Church — Regional Financial Report
+            {tx('Iglesia Emanuel — Informe Financiero Regional', 'Emanuel Church — Regional Financial Report')}
           </h2>
           <p style={{ color: "#8a97b0", margin: 0, fontSize: "13px" }}>
-            {region} · {filtroModo === "anual" ? `Year ${año}` : `${MESES_EN[mes]} ${año}`} · Generated: {new Date().toLocaleDateString('en-US')}
+            {region} · {filtroModo === "anual" ? `${tx('Año', 'Year')} ${año}` : `${mesNombre(mes)} ${año}`} · {tx('Generado', 'Generated')}: {new Date().toLocaleDateString(idioma === 'en' ? 'en-US' : 'es-DO')}
           </p>
         </div>
 
         {!generado && !cargando && (
           <div className="ir-empty">
             <div className="ir-empty-icon"><FaGlobe /></div>
-            <div style={{ fontWeight: "700", fontSize: "16px", marginBottom: "8px" }}>Configure and generate the report</div>
+            <div style={{ fontWeight: "700", fontSize: "16px", marginBottom: "8px" }}>{tx('Configura y genera el informe', 'Configure and generate the report')}</div>
             <p style={{ fontSize: "13px", maxWidth: "320px", margin: "0 auto" }}>
-              Select the period and click <strong>Generate Report</strong> to see the consolidated data for all {paises.length} countries in {region}.
+              {tx('Selecciona el periodo y haz clic en', 'Select the period and click')} <strong>{tx('Generar Informe', 'Generate Report')}</strong> {tx('para ver los datos consolidados de los', 'to see the consolidated data for all')} {paises.length} {tx('países en', 'countries in')} {region}.
             </p>
           </div>
         )}
@@ -290,7 +310,7 @@ export default function InformeRegional() {
         {cargando && (
           <div className="ir-loading">
             <div className="ir-spinner" />
-            <div style={{ color: "#8a97b0", fontSize: "14px" }}>Loading data from {paises.length} countries...</div>
+            <div style={{ color: "#8a97b0", fontSize: "14px" }}>{tx('Cargando datos de', 'Loading data from')} {paises.length} {tx('países...', 'countries...')}</div>
           </div>
         )}
 
@@ -299,24 +319,24 @@ export default function InformeRegional() {
             {/* Summary cards */}
             <div className="ir-summary">
               <div className="ir-sum-card">
-                <div className="ir-sum-label">Countries in Region</div>
+                <div className="ir-sum-label">{tx('Países en la Región', 'Countries in Region')}</div>
                 <div className="ir-sum-value" style={{ color: P }}>{paises.length}</div>
-                <div className="ir-sum-sub">{paisesConData} with records</div>
+                <div className="ir-sum-sub">{paisesConData} {tx('con registros', 'with records')}</div>
               </div>
               <div className="ir-sum-card">
-                <div className="ir-sum-label">Total Distributed (USD)</div>
+                <div className="ir-sum-label">{tx('Total Distribuido (USD)', 'Total Distributed (USD)')}</div>
                 <div className="ir-sum-value" style={{ color: P }}>${totalRegionRecibido.toLocaleString()}</div>
-                <div className="ir-sum-sub">From headquarters</div>
+                <div className="ir-sum-sub">{tx('Desde la sede', 'From headquarters')}</div>
               </div>
               <div className="ir-sum-card">
-                <div className="ir-sum-label">Total Spent (DOP)</div>
+                <div className="ir-sum-label">{tx('Total Gastado (USD)', 'Total Spent (USD)')}</div>
                 <div className="ir-sum-value" style={{ color: "#f44336" }}>${totalRegionGastado.toLocaleString()}</div>
-                <div className="ir-sum-sub">All countries combined</div>
+                <div className="ir-sum-sub">{tx('Todos los países combinados', 'All countries combined')}</div>
               </div>
               <div className="ir-sum-card">
-                <div className="ir-sum-label">Countries No Data</div>
+                <div className="ir-sum-label">{tx('Países Sin Datos', 'Countries No Data')}</div>
                 <div className="ir-sum-value" style={{ color: "#FF9800" }}>{paisessinData}</div>
-                <div className="ir-sum-sub">Pending reports</div>
+                <div className="ir-sum-sub">{tx('Informes pendientes', 'Pending reports')}</div>
               </div>
             </div>
 
@@ -324,22 +344,22 @@ export default function InformeRegional() {
             <div className="ir-card">
               <div className="ir-card-header">
                 <h3 className="ir-card-title">
-                  Expense Detail by Country — {filtroModo === "anual" ? `Year ${año}` : `${MESES_EN[mes]} ${año}`}
+                  {tx('Detalle de Gastos por País', 'Expense Detail by Country')} — {filtroModo === "anual" ? `${tx('Año', 'Year')} ${año}` : `${mesNombre(mes)} ${año}`}
                 </h3>
-                <span style={{ fontSize: "12px", color: "#8a97b0" }}>{region} · {datosFiltrados.length} countries</span>
+                <span style={{ fontSize: "12px", color: "#8a97b0" }}>{region} · {datosFiltrados.length} {tx('países', 'countries')}</span>
               </div>
 
               <table className="ir-table">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Country</th>
+                    <th>{tx('País', 'Country')}</th>
                     <th>ISO</th>
-                    <th style={{ textAlign: "right" }}>Received (USD)</th>
-                    <th style={{ textAlign: "right" }}>Spent (DOP)</th>
-                    <th style={{ textAlign: "right" }}>Remaining</th>
-                    <th style={{ textAlign: "center" }}>Records</th>
-                    <th style={{ textAlign: "center" }}>Status</th>
+                    <th style={{ textAlign: "right" }}>{tx('Recibido (USD)', 'Received (USD)')}</th>
+                    <th style={{ textAlign: "right" }}>{tx('Gastado (USD)', 'Spent (USD)')}</th>
+                    <th style={{ textAlign: "right" }}>{tx('Restante', 'Remaining')}</th>
+                    <th style={{ textAlign: "center" }}>{tx('Registros', 'Records')}</th>
+                    <th style={{ textAlign: "center" }}>{tx('Estado', 'Status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,10 +382,10 @@ export default function InformeRegional() {
                       </td>
                       <td style={{ textAlign: "center" }}>
                         {!d.tieneData
-                          ? <span className="ir-badge ir-badge-no-data">No data</span>
+                          ? <span className="ir-badge ir-badge-no-data">{tx('Sin datos', 'No data')}</span>
                           : d.restante < 0
-                          ? <span className="ir-badge ir-badge-over">Over budget</span>
-                          : <span className="ir-badge ir-badge-ok"><FaCheckCircle /> Reported</span>
+                          ? <span className="ir-badge ir-badge-over">{tx('Sobre presupuesto', 'Over budget')}</span>
+                          : <span className="ir-badge ir-badge-ok"><FaCheckCircle /> {tx('Reportado', 'Reported')}</span>
                         }
                       </td>
                     </tr>
@@ -374,7 +394,7 @@ export default function InformeRegional() {
                   {/* Total row */}
                   <tr className="total-row">
                     <td colSpan="3" style={{ color: "#5a6a85", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                      Regional Total — {region}
+                      {tx('Total Regional', 'Regional Total')} — {region}
                     </td>
                     <td style={{ textAlign: "right", color: P }}>${totalRegionRecibido.toLocaleString()}</td>
                     <td style={{ textAlign: "right", color: "#f44336" }}>${totalRegionGastado.toLocaleString()}</td>
@@ -382,7 +402,7 @@ export default function InformeRegional() {
                       ${Math.abs(totalRegionRecibido - totalRegionGastado).toLocaleString()}
                     </td>
                     <td colSpan="2" style={{ textAlign: "center", color: "#8a97b0" }}>
-                      {paisesConData} / {paises.length} countries
+                      {paisesConData} / {paises.length} {tx('países', 'countries')}
                     </td>
                   </tr>
                 </tbody>
@@ -393,14 +413,14 @@ export default function InformeRegional() {
             {filtroModo === "anual" && datosFiltrados.some(d => d.movimientos.length > 0) && (
               <div className="ir-card" style={{ marginTop: "20px" }}>
                 <div className="ir-card-header">
-                  <h3 className="ir-card-title">Monthly Breakdown by Country</h3>
+                  <h3 className="ir-card-title">{tx('Desglose Mensual por País', 'Monthly Breakdown by Country')}</h3>
                 </div>
                 <table className="ir-table">
                   <thead>
                     <tr>
-                      <th>Country</th>
-                      {MESES.map(m => <th key={m} style={{ textAlign: "right" }}>{MESES_EN[m].slice(0,3)}</th>)}
-                      <th style={{ textAlign: "right" }}>Total</th>
+                      <th>{tx('País', 'Country')}</th>
+                      {MESES.map(m => <th key={m} style={{ textAlign: "right" }}>{mesAbr(m)}</th>)}
+                      <th style={{ textAlign: "right" }}>{tx('Total', 'Total')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -427,10 +447,10 @@ export default function InformeRegional() {
             <div style={{ marginTop: "20px", padding: "16px 20px", background: "#eef2fb", borderRadius: "12px", border: `1px solid ${P}20`, display: "flex", alignItems: "center", gap: "12px" }}>
               <FaGlobe style={{ color: P, fontSize: "18px", flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: "700", color: P, fontSize: "13px", marginBottom: "2px" }}>Report ready to send to headquarters</div>
+                <div style={{ fontWeight: "700", color: P, fontSize: "13px", marginBottom: "2px" }}>{tx('Informe listo para enviar a la sede', 'Report ready to send to headquarters')}</div>
                 <div style={{ fontSize: "12px", color: "#8a97b0" }}>
-                  This report consolidates the expenses of {paisesConData} countries in the {region} region for {filtroModo === "anual" ? `the year ${año}` : `${MESES_EN[mes]} ${año}`}.
-                  {paisessinData > 0 && ` ${paisessinData} countries have not yet submitted their expense report.`}
+                  {tx('Este informe consolida los gastos de', 'This report consolidates the expenses of')} {paisesConData} {tx('países en la región', 'countries in the')} {region} {tx('para', 'region for')} {filtroModo === "anual" ? `${tx('el año', 'the year')} ${año}` : `${mesNombre(mes)} ${año}`}.
+                  {paisessinData > 0 && ` ${paisessinData} ${tx('países aún no han enviado su reporte de gastos.', 'countries have not yet submitted their expense report.')}`}
                 </div>
               </div>
             </div>

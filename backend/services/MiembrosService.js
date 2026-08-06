@@ -51,7 +51,8 @@ class MiembrosService {
       comentarios: datos.comentarios || null,
       tipo_miembro: datos.tipo_miembro || 'Registrado',
       pais_id: datos.pais_id,
-      ciudad_id: datos.ciudad_id || null
+      ciudad_id: datos.ciudad_id || null,
+      iglesia_id: datos.iglesia_id || null
     };
 
     if (datos.id) {
@@ -78,6 +79,7 @@ class MiembrosService {
     if (datos.tipo_miembro !== undefined) payload.tipo_miembro = datos.tipo_miembro;
     if (datos.pais_id !== undefined) payload.pais_id = datos.pais_id;
     if (datos.ciudad_id !== undefined) payload.ciudad_id = datos.ciudad_id;
+    if (datos.iglesia_id !== undefined) payload.iglesia_id = datos.iglesia_id;
 
     const response = await pythonApi.patch(`/miembros/${id}`, payload);
     return response.data;

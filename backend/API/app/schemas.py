@@ -203,8 +203,9 @@ class MiembroBase(BaseModel):
     cargo_funcion: Optional[str] = None
     ministerio_of: Optional[str] = None
     avance_audio: Optional[str] = None
+    iglesia_id: Optional[int] = None
 
-    @field_validator("pais_id", "ciudad_id", "edad", mode="before")
+    @field_validator("pais_id", "ciudad_id", "edad", "iglesia_id", mode="before")
     @classmethod
     def blank_to_none_fields(cls, v):
         return blank_to_none(v)
@@ -228,8 +229,9 @@ class MiembroUpdate(BaseModel):
     cargo_funcion: Optional[str] = None
     ministerio_of: Optional[str] = None
     avance_audio: Optional[str] = None
+    iglesia_id: Optional[int] = None
 
-    @field_validator("pais_id", "ciudad_id", "edad", mode="before")
+    @field_validator("pais_id", "ciudad_id", "edad", "iglesia_id", mode="before")
     @classmethod
     def blank_to_none_fields(cls, v):
         return blank_to_none(v)
@@ -381,6 +383,7 @@ class PresupuestoBase(BaseModel):
     mes: Optional[int] = None
     anio: int
     tipo_gasto: str
+    categoria: Optional[str] = None
     concepto: Optional[str] = None
     monto: Decimal
     moneda: str
@@ -410,6 +413,7 @@ class PresupuestoUpdate(BaseModel):
     mes: Optional[int] = None
     anio: Optional[int] = None
     tipo_gasto: Optional[str] = None
+    categoria: Optional[str] = None
     concepto: Optional[str] = None
     monto: Optional[Decimal] = None
     moneda: Optional[str] = None

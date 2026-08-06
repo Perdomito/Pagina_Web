@@ -44,6 +44,13 @@ export default function Miembros() {
   const [miembroEditando, setMiembroEditando] = useState(null);
   const [pestanaActiva, setPestanaActiva] = useState('basic');
 
+  // Iglesia (punto 13): iglesias del país seleccionado en el form + alta rápida "Iglesia Emanuel De {Ciudad}"
+  const [iglesiasPais, setIglesiasPais] = useState([]);
+  const [ciudadesPais, setCiudadesPais] = useState([]);
+  const [mostrarNuevaIglesia, setMostrarNuevaIglesia] = useState(false);
+  const [ciudadNuevaIglesia, setCiudadNuevaIglesia] = useState('');
+  const [creandoIglesia, setCreandoIglesia] = useState(false);
+
   const [mostrarModalInfo, setMostrarModalInfo] = useState(false);
   const [miembroParaInfo, setMiembroParaInfo] = useState(null);
   const [infoAdicional, setInfoAdicional] = useState(null);
@@ -82,6 +89,7 @@ export default function Miembros() {
     cargo_funcion: '',
     avance_audio: '',
     ministerio_of: '',
+    iglesia_id: '',
     // Extra (Jasen)
     nombre_padre: '',
     telefono_padre: '',
@@ -111,6 +119,58 @@ export default function Miembros() {
       toast.error(t('mi_errorCargarDatos'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Cuando cambia el país seleccionado en el form, carga sus iglesias y ciudades
+  useEffect(() => {
+    if (!formData.pais_id) {
+      setIglesiasPais([]);
+      setCiudadesPais([]);
+      return;
+    }
+    const paisSel = paises.find(p => String(p.id) === String(formData.pais_id));
+    let cancelado = false;
+    (async () => {
+      try {
+        const iglesias = await administracionService.getIglesias(formData.pais_id);
+        if (!cancelado) setIglesiasPais(iglesias || []);
+      } catch { if (!cancelado) setIglesiasPais([]); }
+      try {
+        const iso = paisSel?.iso || paisSel?.codigo_iso;
+        if (iso) {
+          const ciudades = await administracionService.getCiudadesPorPaisIso2(iso);
+          if (!cancelado) setCiudadesPais(ciudades || []);
+        } else if (!cancelado) {
+          setCiudadesPais([]);
+        }
+      } catch { if (!cancelado) setCiudadesPais([]); }
+    })();
+    return () => { cancelado = true; };
+  }, [formData.pais_id, paises]);
+
+  const crearNuevaIglesia = async () => {
+    if (!ciudadNuevaIglesia) { toast.error('Select a city first'); return; }
+    const ciudad = ciudadesPais.find(c => String(c.id) === String(ciudadNuevaIglesia));
+    if (!ciudad) return;
+    try {
+      setCreandoIglesia(true);
+      const nueva = await administracionService.crearIglesia({
+        nombre: `Iglesia Emanuel De ${ciudad.nombre}`,
+        pais_id: Number(formData.pais_id),
+        ciudad_id: ciudad.id,
+        activa: true,
+        cantidad_miembros: 0
+      });
+      setIglesiasPais(prev => [...prev, nueva]);
+      setFormData(prev => ({ ...prev, iglesia_id: nueva.id }));
+      setMostrarNuevaIglesia(false);
+      setCiudadNuevaIglesia('');
+      toast.success('Church created');
+    } catch (error) {
+      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'Error creating the church');
+    } finally {
+      setCreandoIglesia(false);
     }
   };
 
@@ -152,6 +212,7 @@ export default function Miembros() {
       tipo_miembro: data.tipo_miembro,
       pais_id: data.pais_id === '' || data.pais_id === null ? null : Number(data.pais_id),
       ciudad_id: null,
+      iglesia_id: data.iglesia_id === '' || data.iglesia_id === null ? null : Number(data.iglesia_id),
       cargo_funcion: data.cargo_funcion || null,
       ministerio_of: data.ministerio_of || null,
       avance_audio: data.avance_audio || null
@@ -224,6 +285,7 @@ export default function Miembros() {
         cargo_funcion: miembro.cargo_funcion || '',
         avance_audio: miembro.avance_audio || '',
         ministerio_of: miembro.ministerio_of || '',
+        iglesia_id: miembro.iglesia_id || '',
         nombre_padre: miembro.nombre_padre || '',
         telefono_padre: miembro.telefono_padre || '',
         nombre_madre: miembro.nombre_madre || '',
@@ -527,6 +589,67 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                         <label style={labelStyle}>{t('mi_ciudad')}</label>
                         <input className="mbr-input" type="text" value={formData.ciudad} onChange={set('ciudad')} style={inputStyle} placeholder={t('mi_ciudadPlaceholder')} />
                       </div>
+                    </div>
+
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={labelStyle}>Church</label>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <select
+                          className="mbr-input"
+                          value={formData.iglesia_id}
+                          onChange={set('iglesia_id')}
+                          disabled={!formData.pais_id}
+                          style={{ ...inputStyle, flex: 1 }}
+                        >
+                          <option value="">
+                            {!formData.pais_id ? 'Select a country first' : 'Select a church...'}
+                          </option>
+                          {iglesiasPais.map(ig => (
+                            <option key={ig.id} value={ig.id}>{ig.nombre}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setMostrarNuevaIglesia(v => !v)}
+                          disabled={!formData.pais_id}
+                          title="Add a new church"
+                          style={{ padding: "0 16px", background: !formData.pais_id ? "#e8edf5" : PRIMARY, color: !formData.pais_id ? "#b0bcd0" : "white", border: "none", borderRadius: "8px", cursor: !formData.pais_id ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 18 }}
+                        >
+                          <FaPlus />
+                        </button>
+                      </div>
+
+                      {mostrarNuevaIglesia && (
+                        <div style={{ marginTop: "10px", padding: "12px", background: "#f0f4fa", borderRadius: "8px", display: "flex", gap: "8px", alignItems: "flex-end" }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ ...labelStyle, marginBottom: 4, fontSize: 12 }}>City for the new church</label>
+                            <select
+                              className="mbr-input"
+                              value={ciudadNuevaIglesia}
+                              onChange={(e) => setCiudadNuevaIglesia(e.target.value)}
+                              style={inputStyle}
+                            >
+                              <option value="">Select a city...</option>
+                              {ciudadesPais.map(c => (
+                                <option key={c.id} value={c.id}>{c.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={crearNuevaIglesia}
+                            disabled={creandoIglesia || !ciudadNuevaIglesia}
+                            style={{ padding: "10px 16px", background: "#4CAF50", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: creandoIglesia ? "not-allowed" : "pointer" }}
+                          >
+                            {creandoIglesia ? '...' : 'Add'}
+                          </button>
+                        </div>
+                      )}
+                      {formData.pais_id && ciudadesPais.length === 0 && (
+                        <div style={{ fontSize: 12, color: "#8a97b0", marginTop: 4 }}>
+                          No cities found for this country yet.
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>

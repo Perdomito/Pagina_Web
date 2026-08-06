@@ -318,6 +318,17 @@ const administracionService = {
   crearSaldos: async (datos) => {
     const response = await axios.post('/saldos-caja-banco', datos);
     return response.data;
+  },
+
+  // Iglesias
+  getIglesias: async (pais_id) => {
+    const response = await axios.get('/iglesias', { params: pais_id ? { pais_id } : {} });
+    return response.data;
+  },
+
+  crearIglesia: async (datos) => {
+    const response = await axios.post('/iglesias', datos);
+    return response.data;
   }
 
 };
