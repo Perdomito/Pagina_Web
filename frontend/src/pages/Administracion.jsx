@@ -161,6 +161,7 @@ export default function Administracion() {
         origen: x.origen || "World Olivet Assembly",
         dondeIngresa: x.donde_ingresa || "banco",
         valorRecibido: parseFloat(x.valor || x.monto || 0),
+        comision: x.comision != null ? parseFloat(x.comision) : "",
         observaciones: x.observaciones || "",
         fecha: x.fecha?.split('T')[0] || new Date().toISOString().split('T')[0],
         numero: x.numero || `RC-${String(x.id).padStart(3,'0')}`
@@ -250,9 +251,7 @@ export default function Administracion() {
         origen: nuevoIngreso.origen,
         donde_ingresa: nuevoIngreso.dondeIngresa,
         valor: val,
-        // TODO: cuando Jasen agregue la columna "comision" a la tabla ingresos,
-        // descomentar esta línea para que se guarde de verdad:
-        // comision: nuevoIngreso.comision ? parseFloat(nuevoIngreso.comision) : null,
+        comision: nuevoIngreso.comision ? parseFloat(nuevoIngreso.comision) : null,
         observaciones: nuevoIngreso.observaciones || null,
         fecha: nuevoIngreso.fecha
       });

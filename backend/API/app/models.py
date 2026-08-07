@@ -112,7 +112,9 @@ class Iglesia(Base):
 
     ciudad_rel = relationship("Ciudad", back_populates="iglesias")
     pais_rel = relationship("Pais", back_populates="iglesias")
-    pastor_rel = relationship("Miembro")
+    # miembros.iglesia_id crea un segundo camino de FK entre las dos tablas:
+    # sin foreign_keys explicito el mapper no puede resolver el join.
+    pastor_rel = relationship("Miembro", foreign_keys=[pastor_encargado_id])
 
 
 class Rol(Base):
@@ -258,6 +260,14 @@ class SeguimientoLey(Base):
         cascade="all, delete-orphan",
         order_by="SeguimientoLeyHistorial.fecha_evento",
     )
+    examen = relationship(
+        "ExamenRomanos", back_populates="seguimiento_rel",
+        cascade="all, delete-orphan", uselist=False,
+    )
+    entrevista = relationship(
+        "Entrevista", back_populates="seguimiento_rel",
+        cascade="all, delete-orphan", uselist=False,
+    )
 
 
 class SeguimientoLeyHistorial(Base):
@@ -271,6 +281,56 @@ class SeguimientoLeyHistorial(Base):
     fecha_evento = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     seguimiento_rel = relationship("SeguimientoLey", back_populates="historial")
+
+
+# Las etapas Potencial, Ley 1-4 y Camino al Discipulo no tienen tabla propia: son
+# etapas de seguimiento_leyes_historial, que ya guarda etapa, fecha y notas. Solo
+# el examen y la entrevista necesitan campos estructurados (nota, veredicto), y
+# van 1:1 contra el seguimiento para no duplicar la espina del flujo.
+
+class ExamenRomanos(Base):
+    __tablename__ = "examenes_romanos"
+
+    id = Column(Integer, primary_key=True)
+    seguimiento_id = Column(
+        Integer, ForeignKey("seguimiento_leyes.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
+    )
+    fecha = Column(Date)
+    nota = Column(Numeric(5, 2))
+    nota_maxima = Column(Numeric(5, 2), default=100)
+    aprobado = Column(Boolean)
+    evaluador_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    observaciones = Column(Text)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    seguimiento_rel = relationship("SeguimientoLey", back_populates="examen")
+    evaluador_rel = relationship("Miembro", foreign_keys=[evaluador_id])
+
+
+class Entrevista(Base):
+    __tablename__ = "entrevistas"
+
+    id = Column(Integer, primary_key=True)
+    seguimiento_id = Column(
+        Integer, ForeignKey("seguimiento_leyes.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
+    )
+    fecha = Column(Date)
+    entrevistador_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    # El entrevistador puede ser alguien que no esta dado de alta como miembro.
+    entrevistador_nombre = Column(Text)
+    resultado = Column(String(30), default="Pendiente")
+    # Con que tipo entra a miembros si el resultado es Aprobado. Alimenta el
+    # tipo_miembro_destino del seguimiento, que es quien crea el miembro.
+    tipo_miembro_resultante = Column(String(50))
+    observaciones = Column(Text)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    seguimiento_rel = relationship("SeguimientoLey", back_populates="entrevista")
+    entrevistador_rel = relationship("Miembro", foreign_keys=[entrevistador_id])
 
 
 class Reporte(Base):
@@ -434,6 +494,9 @@ class Ingreso(Base):
     origen = Column(Text)
     donde_ingresa = Column(String(10), nullable=False)
     valor = Column(Numeric(15, 2), nullable=False)
+    # Comision descontada del deposito. Opcional: los ingresos historicos y los
+    # que no pasan por banco no la tienen, y el neto se calcula en el frontend.
+    comision = Column(Numeric(15, 2))
     observaciones = Column(Text)
     fecha = Column(Date, nullable=False)
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
