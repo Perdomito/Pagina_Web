@@ -6,9 +6,68 @@ import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
 import { useAuth } from '../context/AuthContext';
 import { useIdioma } from '../context/IdiomaContext';
+import DIVISIONES_POR_PAIS from '../data/divisionesAdministrativas';
 
 const PRIMARY = "#1a5490";
 const PRIMARY_LIGHT = "#2a72b8";
+
+const normalizarTexto = (s) =>
+  (s || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+// Las 32 provincias oficiales de RD, mapeadas a mano a su ciudad capital real
+// (verificado con datos reales de la API — se deja fijo porque ya se confirmó
+// que está 100% correcto, a diferencia del resto de los países más abajo).
+const PROVINCIAS_RD = [
+  { provincia: "Azua", capital: "Azua" },
+  { provincia: "Bahoruco", capital: "Neiba" },
+  { provincia: "Barahona", capital: "Barahona" },
+  { provincia: "Dajabón", capital: "Dajabón" },
+  { provincia: "Distrito Nacional", capital: "Santo Domingo" },
+  { provincia: "Duarte", capital: "San Francisco de Macorís" },
+  { provincia: "Elías Piña", capital: "Comendador" },
+  { provincia: "El Seibo", capital: "El Seibo" },
+  { provincia: "Espaillat", capital: "Moca" },
+  { provincia: "Hato Mayor", capital: "Hato Mayor" },
+  { provincia: "Hermanas Mirabal", capital: "Salcedo" },
+  { provincia: "Independencia", capital: "Jimaní" },
+  { provincia: "La Altagracia", capital: "Higüey" },
+  { provincia: "La Romana", capital: "La Romana" },
+  { provincia: "La Vega", capital: "La Vega" },
+  { provincia: "María Trinidad Sánchez", capital: "Nagua" },
+  { provincia: "Monseñor Nouel", capital: "Bonao" },
+  { provincia: "Monte Cristi", capital: "Monte Cristi" },
+  { provincia: "Monte Plata", capital: "Monte Plata" },
+  { provincia: "Pedernales", capital: "Pedernales" },
+  { provincia: "Peravia", capital: "Baní" },
+  { provincia: "Puerto Plata", capital: "Puerto Plata" },
+  { provincia: "Samaná", capital: "Samaná" },
+  { provincia: "San Cristóbal", capital: "San Cristóbal" },
+  { provincia: "San José de Ocoa", capital: "San José de Ocoa" },
+  { provincia: "San Juan", capital: "San Juan de la Maguana" },
+  { provincia: "San Pedro de Macorís", capital: "San Pedro de Macorís" },
+  { provincia: "Sánchez Ramírez", capital: "Cotuí" },
+  { provincia: "Santiago", capital: "Santiago" },
+  { provincia: "Santiago Rodríguez", capital: "Sabaneta" },
+  { provincia: "Santo Domingo", capital: "Santo Domingo Este" },
+  { provincia: "Valverde", capital: "Mao" },
+];
+
+// Busca, entre las ciudades reales de un país, cuál corresponde a una división
+// oficial (provincia/estado/departamento) por nombre. Si no encuentra nada
+// parecido, esa división simplemente no aparece en la lista.
+const emparejarDivisionConCiudad = (nombreDivision, ciudades) => {
+  const nd = normalizarTexto(nombreDivision);
+  let match = ciudades.find(c => normalizarTexto(c.nombre) === nd);
+  if (match) return match;
+  match = ciudades.find(c => normalizarTexto(c.admin_name) === nd);
+  if (match) return match;
+  match = ciudades.find(c => {
+    const cn = normalizarTexto(c.nombre);
+    return cn.length >= 4 && (nd.includes(cn) || cn.includes(nd));
+  });
+  return match || null;
+};
+
 
 const inputStyle = {
   width: "100%",
@@ -48,7 +107,8 @@ export default function Miembros() {
   const [iglesiasPais, setIglesiasPais] = useState([]);
   const [ciudadesPais, setCiudadesPais] = useState([]);
   const [mostrarNuevaIglesia, setMostrarNuevaIglesia] = useState(false);
-  const [ciudadNuevaIglesia, setCiudadNuevaIglesia] = useState('');
+  const [nombreLugarNuevaIglesia, setNombreLugarNuevaIglesia] = useState('');
+  const [ciudadNuevaIglesiaId, setCiudadNuevaIglesiaId] = useState('');
   const [creandoIglesia, setCreandoIglesia] = useState(false);
 
   const [mostrarModalInfo, setMostrarModalInfo] = useState(false);
@@ -149,14 +209,97 @@ export default function Miembros() {
     return () => { cancelado = true; };
   }, [formData.pais_id, paises]);
 
-  const crearNuevaIglesia = async () => {
-    if (!ciudadNuevaIglesia) { toast.error('Select a city first'); return; }
-    const ciudad = ciudadesPais.find(c => String(c.id) === String(ciudadNuevaIglesia));
-    if (!ciudad) return;
+  const paisSeleccionado = useMemo(
+    () => paises.find(p => String(p.id) === String(formData.pais_id)),
+    [paises, formData.pais_id]
+  );
+  const isoPaisSeleccionado = (paisSeleccionado?.iso || paisSeleccionado?.codigo_iso || '').toUpperCase();
+  const esRD = isoPaisSeleccionado === 'DO' ||
+    (paisSeleccionado && normalizarTexto(paisSeleccionado.nombre) === 'republica dominicana');
+
+  // Desplegable de Iglesia = iglesias reales ya creadas + "plantillas" listas para
+  // usar de las provincias/divisiones principales del país (RD: las 32 verificadas;
+  // otros países: DIVISIONES_POR_PAIS). Elegir una plantilla crea la iglesia al vuelo.
+  const opcionesIglesia = useMemo(() => {
+    const reales = iglesiasPais.map(ig => ({ value: `real:${ig.id}`, label: ig.nombre }));
+
+    const divisiones = esRD
+      ? PROVINCIAS_RD.map(({ provincia, capital }) => ({ nombre: provincia, buscar: capital }))
+      : (DIVISIONES_POR_PAIS[isoPaisSeleccionado] || []).map(d => ({ nombre: d, buscar: d }));
+
+    const plantillas = divisiones
+      .map(({ nombre, buscar }) => {
+        const ciudad = esRD
+          ? ciudadesPais.find(c => normalizarTexto(c.nombre) === normalizarTexto(buscar))
+          : emparejarDivisionConCiudad(buscar, ciudadesPais);
+        if (!ciudad) return null;
+        // si ya hay una iglesia real en esa misma ciudad, no repetirla como plantilla
+        if (iglesiasPais.some(ig => ig.ciudad_id === ciudad.id)) return null;
+        const nombreCompleto = `Iglesia Emanuel - ${nombre}`;
+        return { value: `plantilla:${ciudad.id}:${nombreCompleto}`, label: nombreCompleto };
+      })
+      .filter(Boolean);
+
+    return [...reales, ...plantillas];
+  }, [iglesiasPais, ciudadesPais, esRD, isoPaisSeleccionado]);
+
+  const manejarSeleccionIglesia = async (e) => {
+    const val = e.target.value;
+    if (!val) { setFormData(prev => ({ ...prev, iglesia_id: '' })); return; }
+    if (val.startsWith('real:')) {
+      setFormData(prev => ({ ...prev, iglesia_id: val.slice(5) }));
+      return;
+    }
+    // "plantilla:<ciudad_id>:<nombre completo>" — se crea la iglesia en este momento.
+    const resto = val.slice('plantilla:'.length);
+    const separador = resto.indexOf(':');
+    const ciudadId = resto.slice(0, separador);
+    const nombreCompleto = resto.slice(separador + 1);
     try {
       setCreandoIglesia(true);
       const nueva = await administracionService.crearIglesia({
-        nombre: `Iglesia Emanuel De ${ciudad.nombre}`,
+        nombre: nombreCompleto,
+        pais_id: Number(formData.pais_id),
+        ciudad_id: Number(ciudadId),
+        activa: true,
+        cantidad_miembros: 0
+      });
+      setIglesiasPais(prev => [...prev, nueva]);
+      setFormData(prev => ({ ...prev, iglesia_id: nueva.id }));
+      toast.success('Iglesia creada');
+    } catch (error) {
+      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'Error al crear la iglesia');
+    } finally {
+      setCreandoIglesia(false);
+    }
+  };
+
+  const crearNuevaIglesia = async () => {
+    try {
+      setCreandoIglesia(true);
+      let ciudad = null;
+      let nombreLugar = '';
+
+      if (ciudadNuevaIglesiaId) {
+        // Eligieron una ciudad de la lista existente.
+        ciudad = ciudadesPais.find(c => String(c.id) === String(ciudadNuevaIglesiaId));
+        nombreLugar = ciudad?.nombre || '';
+      } else {
+        // No estaba en la lista: la escribieron a mano.
+        nombreLugar = nombreLugarNuevaIglesia.trim();
+        if (!nombreLugar) { toast.error('Selecciona una ciudad de la lista, o escribe el nombre de una nueva'); setCreandoIglesia(false); return; }
+        ciudad = ciudadesPais.find(c => normalizarTexto(c.nombre) === normalizarTexto(nombreLugar));
+        if (!ciudad) {
+          ciudad = await administracionService.crearCiudad({
+            nombre: nombreLugar,
+            pais_iso2: isoPaisSeleccionado || undefined,
+          });
+          setCiudadesPais(prev => [...prev, ciudad]);
+        }
+      }
+
+      const nueva = await administracionService.crearIglesia({
+        nombre: `Iglesia Emanuel - ${nombreLugar}`,
         pais_id: Number(formData.pais_id),
         ciudad_id: ciudad.id,
         activa: true,
@@ -165,10 +308,11 @@ export default function Miembros() {
       setIglesiasPais(prev => [...prev, nueva]);
       setFormData(prev => ({ ...prev, iglesia_id: nueva.id }));
       setMostrarNuevaIglesia(false);
-      setCiudadNuevaIglesia('');
-      toast.success('Church created');
+      setNombreLugarNuevaIglesia('');
+      setCiudadNuevaIglesiaId('');
+      toast.success('Iglesia creada');
     } catch (error) {
-      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'Error creating the church');
+      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'Error al crear la iglesia');
     } finally {
       setCreandoIglesia(false);
     }
@@ -592,62 +736,81 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                     </div>
 
                     <div style={{ marginBottom: "16px" }}>
-                      <label style={labelStyle}>Church</label>
+                      <label style={labelStyle}>Iglesia *</label>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <select
                           className="mbr-input"
-                          value={formData.iglesia_id}
-                          onChange={set('iglesia_id')}
-                          disabled={!formData.pais_id}
+                          required
+                          value={formData.iglesia_id ? `real:${formData.iglesia_id}` : ''}
+                          onChange={manejarSeleccionIglesia}
+                          disabled={!formData.pais_id || creandoIglesia}
                           style={{ ...inputStyle, flex: 1 }}
                         >
                           <option value="">
-                            {!formData.pais_id ? 'Select a country first' : 'Select a church...'}
+                            {!formData.pais_id ? 'Selecciona primero un país' : (creandoIglesia ? 'Creando...' : 'Selecciona una iglesia...')}
                           </option>
-                          {iglesiasPais.map(ig => (
-                            <option key={ig.id} value={ig.id}>{ig.nombre}</option>
+                          {opcionesIglesia.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
                           ))}
                         </select>
                         <button
                           type="button"
                           onClick={() => setMostrarNuevaIglesia(v => !v)}
                           disabled={!formData.pais_id}
-                          title="Add a new church"
+                          title="Agregar una iglesia que no está en la lista"
                           style={{ padding: "0 16px", background: !formData.pais_id ? "#e8edf5" : PRIMARY, color: !formData.pais_id ? "#b0bcd0" : "white", border: "none", borderRadius: "8px", cursor: !formData.pais_id ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 18 }}
                         >
                           <FaPlus />
                         </button>
                       </div>
+                      <div style={{ fontSize: 12, color: "#8a97b0", marginTop: 4 }}>
+                        ¿No está la ciudad que buscas en la lista? Usa el botón + para agregarla.
+                      </div>
 
                       {mostrarNuevaIglesia && (
-                        <div style={{ marginTop: "10px", padding: "12px", background: "#f0f4fa", borderRadius: "8px", display: "flex", gap: "8px", alignItems: "flex-end" }}>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ ...labelStyle, marginBottom: 4, fontSize: 12 }}>City for the new church</label>
+                        <div style={{ marginTop: "10px", padding: "12px", background: "#f0f4fa", borderRadius: "8px" }}>
+                          <div style={{ marginBottom: "10px" }}>
+                            <label style={{ ...labelStyle, marginBottom: 4, fontSize: 12 }}>Ciudad de la nueva iglesia</label>
                             <select
                               className="mbr-input"
-                              value={ciudadNuevaIglesia}
-                              onChange={(e) => setCiudadNuevaIglesia(e.target.value)}
+                              value={ciudadNuevaIglesiaId}
+                              onChange={(e) => { setCiudadNuevaIglesiaId(e.target.value); setNombreLugarNuevaIglesia(''); }}
                               style={inputStyle}
                             >
-                              <option value="">Select a city...</option>
+                              <option value="">
+                                {ciudadesPais.length === 0 ? 'No hay ciudades cargadas para este país todavía' : 'Selecciona una ciudad...'}
+                              </option>
                               {ciudadesPais.map(c => (
                                 <option key={c.id} value={c.id}>{c.nombre}</option>
                               ))}
                             </select>
                           </div>
-                          <button
-                            type="button"
-                            onClick={crearNuevaIglesia}
-                            disabled={creandoIglesia || !ciudadNuevaIglesia}
-                            style={{ padding: "10px 16px", background: "#4CAF50", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: creandoIglesia ? "not-allowed" : "pointer" }}
-                          >
-                            {creandoIglesia ? '...' : 'Add'}
-                          </button>
-                        </div>
-                      )}
-                      {formData.pais_id && ciudadesPais.length === 0 && (
-                        <div style={{ fontSize: 12, color: "#8a97b0", marginTop: 4 }}>
-                          No cities found for this country yet.
+
+                          <div style={{ fontSize: 12, color: "#8a97b0", textAlign: "center", margin: "6px 0" }}>
+                            — {ciudadesPais.length === 0 ? 'escribe el nombre de la ciudad abajo' : '¿no está en la lista? escríbela abajo'} —
+                          </div>
+
+                          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ ...labelStyle, marginBottom: 4, fontSize: 12 }}>Nombre de la ciudad nueva</label>
+                              <input
+                                className="mbr-input"
+                                type="text"
+                                value={nombreLugarNuevaIglesia}
+                                onChange={(e) => { setNombreLugarNuevaIglesia(e.target.value); setCiudadNuevaIglesiaId(''); }}
+                                placeholder="Ej. Santiago"
+                                style={inputStyle}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={crearNuevaIglesia}
+                              disabled={creandoIglesia || (!ciudadNuevaIglesiaId && !nombreLugarNuevaIglesia.trim())}
+                              style={{ padding: "10px 16px", background: "#4CAF50", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: creandoIglesia ? "not-allowed" : "pointer" }}
+                            >
+                              {creandoIglesia ? '...' : 'Añadir'}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

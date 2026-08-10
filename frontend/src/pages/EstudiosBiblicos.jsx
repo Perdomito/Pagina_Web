@@ -242,9 +242,15 @@ try {
               studentsPorMissionary[misioneroId].push(estudiante);
             }
             
+            // Si ya hay una sesión guardada ese mismo día (varias sesiones el
+            // mismo día con el mismo contacto), sumar en vez de sobrescribir —
+            // antes se perdían todas menos la última (causaba conteos de menos,
+            // ej. Francisca Mayo Nicaragua: 87 en vez de 108)
+            const previo = estudiante.estudios[est.dia];
             estudiante.estudios[est.dia] = {
               capitulo: est.capitulo,
-              horas: est.horas
+              horas: (parseFloat(previo?.horas) || 0) + (parseFloat(est.horas) || 0),
+              cantidad: (previo?.cantidad || 0) + 1,
             };
           });
           
@@ -359,7 +365,7 @@ try {
     studentsLista.forEach(est => {
       diasDelMes.forEach(dia => {
         if (est.estudios?.[dia]?.capitulo && est.estudios?.[dia]?.capitulo.trim() !== "") {
-          totalStudies++;
+          totalStudies += (est.estudios[dia].cantidad || 1);
         }
       });
     });
@@ -376,7 +382,7 @@ try {
         // sumar horas daba 0 para datos que no tienen ese campo cargado
         const capitulo = est.estudios?.[dia]?.capitulo;
         if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
-          total += 1;
+          total += (est.estudios[dia].cantidad || 1);
         }
       });
     });
@@ -1414,7 +1420,7 @@ const eliminarPais = async (continenteId, paisId) => {
                               studentsLista.forEach(est => {
                                 const capitulo = est.estudios?.[dia]?.capitulo;
                                 if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
-                                  totalStudies += 1;
+                                  totalStudies += (est.estudios[dia].cantidad || 1);
                                 }
                               });
                             });
@@ -1429,7 +1435,7 @@ const eliminarPais = async (continenteId, paisId) => {
                           studentsLista.forEach(est => {
                             const capitulo = est.estudios?.[dia]?.capitulo;
                             if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
-                              studiesDiaMissionary += 1;
+                              studiesDiaMissionary += (est.estudios[dia].cantidad || 1);
                             }
                           });
 
@@ -1459,7 +1465,7 @@ const eliminarPais = async (continenteId, paisId) => {
                             studentsLista.forEach(est => {
                               const capitulo = est.estudios?.[dia]?.capitulo;
                               if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
-                                totalStudies += 1;
+                                totalStudies += (est.estudios[dia].cantidad || 1);
                               }
                             });
                           });
@@ -1631,7 +1637,7 @@ const eliminarPais = async (continenteId, paisId) => {
                     studentsLista.forEach(est => {
                       const capitulo = est.estudios?.[dia]?.capitulo;
                       if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
-                        cantidadStudies++;
+                        cantidadStudies += (est.estudios[dia].cantidad || 1);
                       }
                     });
                   });
@@ -2211,7 +2217,7 @@ const numeroTelefono = numeroInput?.value?.trim() || '';
                     studentsLista.forEach(est => {
                       const capitulo = est.estudios?.[dia]?.capitulo;
                       if (capitulo !== undefined && capitulo !== null && capitulo !== "") {
-                        studiesDia += 1;
+                        studiesDia += (est.estudios[dia].cantidad || 1);
                       }
                     });
 

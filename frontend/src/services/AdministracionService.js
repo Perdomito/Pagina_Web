@@ -82,6 +82,11 @@ const administracionService = {
     return ciudades;
   },
 
+  crearCiudad: async (datos) => {
+    const response = await axios.post('/ciudades', datos);
+    return response.data;
+  },
+
   getCiudadesMision: async () => {
     const response = await axios.get('/ciudades-mision');
     return response.data;

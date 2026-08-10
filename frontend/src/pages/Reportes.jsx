@@ -68,6 +68,10 @@ export default function Reportes() {
   const { t, idioma } = useIdioma();
   const tx = (es, en) => (idioma === 'en' ? en : es);
 
+  // Punto 1.2 del PDF: por debajo de este número de estudios en el periodo, se
+  // marca "bajo rendimiento" (amarillo). Ajustable si el umbral real es otro.
+  const UMBRAL_BAJO_RENDIMIENTO = 3;
+
   const [continenteSeleccionado, setContinenteSeleccionado] = useState("");
   const [paisSeleccionado, setPaisSeleccionado] = useState("");
   // Pre-seleccionar el país del usuario
@@ -80,6 +84,7 @@ export default function Reportes() {
   
   const [mostrandoDetalle, setMostrandoDetalle] = useState(false);
   const [misioneros, setMisioneros] = useState([]);
+  const [busquedaMisionero, setBusquedaMisionero] = useState("");
   const [misioneroSeleccionado, setMisioneroSeleccionado] = useState(null);
   const [estudiantesMisionero, setEstudiantesMisionero] = useState([]);
   const [continentes, setContinentes] = useState([]);
@@ -266,17 +271,41 @@ export default function Reportes() {
       }
       
       const resumenRaw = await estudiosService.getResumenCompleto(parseInt(paisSeleccionado), mes, parseInt(año));
-      const resumenEstudios = Array.isArray(resumenRaw) ? resumenRaw.filter(r => r.contacto_id !== null) : (resumenRaw?.estudios || []);
-      
+      const raw = resumenRaw || [];
+      const todasEntradas = Array.isArray(raw) ? raw :
+                            Array.isArray(raw.data) ? raw.data :
+                            Object.values(raw).find(v => Array.isArray(v)) || [];
+
+      // Mismas 3 categorías que calcularReporte, pero acá las filtramos por cada miembro
+      const esDeMisionero = (r, id) => r.miembro_id === id || r.miembro_responsable_id === id;
+
       const misionerosConDatos = misionerosPais.map(misionero => {
-        const estudiantesMisionero = resumenEstudios.filter(e => e.miembro_id === misionero.id || e.miembro_responsable_id === misionero.id);
-        const estudiantesUnicos = [...new Set(estudiantesMisionero.map(e => e.contacto_id))];
-        const horasTotales = estudiantesMisionero.reduce((sum, e) => sum + parseFloat(e.horas || 0), 0);
-        
+        const propios = todasEntradas.filter(r => r && esDeMisionero(r, misionero.id));
+        const estudios = propios.filter(r => r.contacto_id != null);
+        const evangelismo = propios.filter(r => r.contacto_id == null && r.tipo != null);
+        const nuevosEst = propios.filter(r => r.contacto_id == null && r.tipo == null && (r.dijeron_si > 0 || r.nuevos_contactos > 0 || r.potenciales > 0));
+
+        const estudiantesUnicos = [...new Set(estudios.map(e => e.contacto_id))];
+        const horasEstudios = estudios.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+        const horasEvangelismo = evangelismo.reduce((s, e) => s + parseFloat(e.horas || 0), 0);
+        const contactos = nuevosEst.reduce((s, e) => s + parseInt(e.nuevos_contactos || 0), 0);
+        const dijeronSi = nuevosEst.reduce((s, e) => s + parseInt(e.dijeron_si || 0), 0);
+        const potenciales = nuevosEst.reduce((s, e) => s + parseInt(e.potenciales || 0), 0);
+
+        // 1.2: no reportó = evangelismo + contactos + estudios en cero. Bajo rendimiento
+        // = reportó algo, pero por debajo del umbral de estudios.
+        const actividadTotal = horasEstudios + horasEvangelismo + contactos;
+        const alerta = actividadTotal === 0 ? 'rojo' : (horasEstudios < UMBRAL_BAJO_RENDIMIENTO ? 'amarillo' : null);
+
         return {
           ...misionero,
           totalEstudiantes: estudiantesUnicos.length,
-          totalHoras: horasTotales
+          totalHoras: horasEstudios,
+          horasEvangelismo,
+          contactos,
+          dijeronSi,
+          potenciales,
+          alerta
         };
       });
       
@@ -562,9 +591,21 @@ export default function Reportes() {
                 {t('rp_detalleMisionero')} — {paisesDelContinente.find(p => p.id === parseInt(paisSeleccionado))?.nombre}
               </h2>
             </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <input
+                type="text"
+                value={busquedaMisionero}
+                onChange={(e) => setBusquedaMisionero(e.target.value)}
+                placeholder={tx('Buscar miembro...', 'Search member...')}
+                style={{ width: "100%", maxWidth: "360px", padding: "10px 14px", borderRadius: "8px", border: "1.5px solid #dde3ef", fontSize: "14px", fontFamily: "'Lato',sans-serif", outline: "none" }}
+              />
+            </div>
             
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-              {misioneros.map(misionero => (
+              {misioneros
+                .filter(m => m.nombre?.toLowerCase().includes(busquedaMisionero.toLowerCase()))
+                .map(misionero => (
                 <div
                   key={misionero.id}
                   style={{
@@ -572,43 +613,61 @@ export default function Reportes() {
                     borderRadius: "12px",
                     padding: "20px",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                    border: "2px solid #e0e0e0",
+                    border: misionero.alerta === 'rojo' ? "2px solid #f44336" : misionero.alerta === 'amarillo' ? "2px solid #FF9800" : "2px solid #e0e0e0",
                     transition: "all 0.3s ease"
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#134069";
                     e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#e0e0e0";
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
                   }}
                 >
                   <div style={{ marginBottom: "15px" }}>
-                    <h3 style={{ color: "#134069", fontSize: "18px", margin: "0 0 5px 0" }}>
-                      {misionero.nombre}
-                    </h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <h3 style={{ color: "#134069", fontSize: "18px", margin: 0 }}>
+                        {misionero.nombre}
+                      </h3>
+                      {misionero.alerta === 'rojo' && (
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#c62828", background: "#ffebee", padding: "2px 8px", borderRadius: "10px" }}>
+                          {tx('No reportó', 'Did not report')}
+                        </span>
+                      )}
+                      {misionero.alerta === 'amarillo' && (
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#e65100", background: "#fff3e0", padding: "2px 8px", borderRadius: "10px" }}>
+                          {tx('Bajo rendimiento', 'Low performance')}
+                        </span>
+                      )}
+                    </div>
                     {misionero.identidad && (
-                      <p style={{ fontSize: "12px", color: "#999", margin: 0 }}>
+                      <p style={{ fontSize: "12px", color: "#999", margin: "5px 0 0" }}>
                         {t('rp_cedula')}: {misionero.identidad}
                       </p>
                     )}
                   </div>
 
-                  <div style={{ display: "flex", gap: "15px", marginBottom: "15px" }}>
-                    <div style={{ flex: 1, textAlign: "center", padding: "10px", background: "#f5f5f5", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#666" }}>{t('rp_estudiantes')}</div>
-                      <div style={{ fontSize: "24px", fontWeight: "700", color: "#2196F3" }}>
-                        {misionero.totalEstudiantes}
-                      </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "15px" }}>
+                    <div style={{ textAlign: "center", padding: "10px 6px", background: "#f5f5f5", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "11px", color: "#666" }}>{t('rp_estudiantes')}</div>
+                      <div style={{ fontSize: "20px", fontWeight: "700", color: "#2196F3" }}>{misionero.totalEstudiantes}</div>
                     </div>
-                    <div style={{ flex: 1, textAlign: "center", padding: "10px", background: "#f5f5f5", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#666" }}>{t('rp_horas')}</div>
-                      <div style={{ fontSize: "24px", fontWeight: "700", color: "#4CAF50" }}>
-                        {misionero.totalHoras.toFixed(1)}
-                      </div>
+                    <div style={{ textAlign: "center", padding: "10px 6px", background: "#f5f5f5", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "11px", color: "#666" }}>{tx('Estudios', 'Studies')}</div>
+                      <div style={{ fontSize: "20px", fontWeight: "700", color: misionero.alerta === 'rojo' ? "#f44336" : "#4CAF50" }}>{misionero.totalHoras.toFixed(1)}</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: "10px 6px", background: "#f5f5f5", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "11px", color: "#666" }}>{tx('Contactos', 'Contacts')}</div>
+                      <div style={{ fontSize: "20px", fontWeight: "700", color: "#00BCD4" }}>{misionero.contactos}</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: "10px 6px", background: "#f5f5f5", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "11px", color: "#666" }}>{tx('Dijeron que sí', 'Said yes')}</div>
+                      <div style={{ fontSize: "20px", fontWeight: "700", color: "#8BC34A" }}>{misionero.dijeronSi}</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: "10px 6px", background: "#f5f5f5", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "11px", color: "#666" }}>{t('rp_ovejasPotenciales')}</div>
+                      <div style={{ fontSize: "20px", fontWeight: "700", color: "#E91E63" }}>{misionero.potenciales}</div>
                     </div>
                   </div>
                   
