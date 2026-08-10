@@ -725,6 +725,7 @@ class IngresoBase(BaseModel):
     origen: Optional[str] = None
     donde_ingresa: str
     valor: Decimal
+    comision: Optional[Decimal] = None
     observaciones: Optional[str] = None
     fecha: date
 
@@ -746,6 +747,7 @@ class IngresoUpdate(BaseModel):
     origen: Optional[str] = None
     donde_ingresa: Optional[str] = None
     valor: Optional[Decimal] = None
+    comision: Optional[Decimal] = None
     observaciones: Optional[str] = None
     fecha: Optional[date] = None
 

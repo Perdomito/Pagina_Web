@@ -177,6 +177,11 @@ async def startup():
                 UPDATE ingresos i SET numero = n.num
                 FROM numbered n WHERE i.id = n.id AND i.numero IS NULL
             """))
+            # Comision descontada de cada deposito (reportes financieros del equipo).
+            # Nullable a proposito: los ingresos ya registrados no la tienen.
+            await conn.execute(text("""
+                ALTER TABLE ingresos ADD COLUMN IF NOT EXISTS comision NUMERIC(15,2)
+            """))
             # Codigos contables de caja/banco
             await conn.execute(text("""
                 ALTER TABLE saldos_caja_banco ADD COLUMN IF NOT EXISTS codigo_contable_caja VARCHAR(20)
@@ -248,6 +253,40 @@ async def startup():
             await conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_historial_seguimiento
                 ON public.seguimiento_leyes_historial (seguimiento_id, fecha_evento)
+            """))
+            # Detalle estructurado de dos etapas del flujo. El resto (Potencial,
+            # Ley 1-4, Camino al Discipulo) vive en el historial: no necesitan
+            # campos propios y una tabla por etapa duplicaria el estado.
+            # UNIQUE(seguimiento_id) fuerza el 1:1 con el seguimiento.
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.examenes_romanos (
+                    id                  SERIAL PRIMARY KEY,
+                    seguimiento_id      INTEGER NOT NULL UNIQUE
+                                        REFERENCES public.seguimiento_leyes(id) ON DELETE CASCADE,
+                    fecha               DATE,
+                    nota                NUMERIC(5,2),
+                    nota_maxima         NUMERIC(5,2) DEFAULT 100,
+                    aprobado            BOOLEAN,
+                    evaluador_id        VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    observaciones       TEXT,
+                    fecha_creacion      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    fecha_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.entrevistas (
+                    id                      SERIAL PRIMARY KEY,
+                    seguimiento_id          INTEGER NOT NULL UNIQUE
+                                            REFERENCES public.seguimiento_leyes(id) ON DELETE CASCADE,
+                    fecha                   DATE,
+                    entrevistador_id        VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    entrevistador_nombre    TEXT,
+                    resultado               VARCHAR(30) DEFAULT 'Pendiente',
+                    tipo_miembro_resultante VARCHAR(50),
+                    observaciones           TEXT,
+                    fecha_creacion          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    fecha_actualizacion     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
             """))
 
             # Tabla de archivos adjuntos (ingresos/gastos)

@@ -1,0 +1,55 @@
+name: Deploy API a Hugging Face
+
+# Redeploya el Space de Hugging Face (gnit-api) cada vez que backend/API
+# cambia en main. El Space está conectado por git a
+# https://huggingface.co/spaces/Laevateinn707/gnit-api — este workflow
+# sincroniza backend/API/ hacia ese repo y lo pushea, lo cual dispara
+# el build automático del Space.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/API/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Pagina_Web
+        uses: actions/checkout@v4
+        with:
+          path: pagina-web
+
+      - name: Checkout del Space de Hugging Face
+        run: |
+          git clone "https://user:${HF_TOKEN}@huggingface.co/spaces/Laevateinn707/gnit-api" hf-space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+      - name: Sincronizar backend/API con el Space
+        run: |
+          rsync -av --delete \
+            --exclude='.git' \
+            --exclude='venv' \
+            --exclude='tests' \
+            --exclude='__pycache__' \
+            --exclude='requirements-dev.txt' \
+            --exclude='pytest.ini' \
+            pagina-web/backend/API/ hf-space/
+
+      - name: Commit y push al Space
+        working-directory: hf-space
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Sin cambios que desplegar."
+            exit 0
+          fi
+          git commit -m "Deploy automatico desde Pagina_Web@${{ github.sha }}"
+          git push origin main
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}

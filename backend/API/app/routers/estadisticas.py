@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, extract
+from sqlalchemy import select, func, and_
 from app.database import get_db
-from app.models import Usuario, Miembro, Contacto, Reporte, EstadisticaPais, Pais, Ciudad, Iglesia
+from app.models import Usuario, Miembro, Contacto, EstudioDiario, EstadisticaPais, Pais, Ciudad, Iglesia
 from app.schemas import (
     EstadisticasOut, ComparacionEstudios, SerieData,
     RendimientoProfesores, ProfesorRendimiento,
@@ -14,6 +14,25 @@ router = APIRouter(prefix="/estadisticas", tags=["Estadisticas Generales"])
 
 MESES_LABELS = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
 
+# Fuente unica de verdad: estudios_diarios. La tabla reportes guarda los mismos
+# datos preagregados pero ya nadie la escribe, y sus totales no cuadran con los
+# que muestran Reportes.jsx / EstudiosBiblicos.jsx (que ya leen de aqui).
+#
+# Las tres clases de fila son las mismas que particiona Reportes.jsx:
+#   estudio     -> contacto_id NOT NULL          (un estudio dado a un contacto)
+#   evangelismo -> contacto_id NULL, tipo NOT NULL (horas de calle/online)
+#   contadores  -> contacto_id NULL, tipo NULL     (dijeron_si, nuevos, potenciales)
+ES_ESTUDIO = EstudioDiario.contacto_id.isnot(None)
+ES_EVANGELISMO = and_(EstudioDiario.contacto_id.is_(None), EstudioDiario.tipo.isnot(None))
+
+
+def _filtrar(query, anio: int | None = None, pais_id: int | None = None):
+    if anio is not None:
+        query = query.where(EstudioDiario.anio == anio)
+    if pais_id is not None:
+        query = query.where(EstudioDiario.pais_id == pais_id)
+    return query
+
 
 @router.get("", response_model=EstadisticasOut)
 async def obtener_estadisticas(
@@ -22,28 +41,32 @@ async def obtener_estadisticas(
     db: AsyncSession = Depends(get_db),
 ):
     if anio is None:
-        anio_result = await db.execute(select(func.max(EstadisticaPais.anio)))
+        anio_result = await db.execute(select(func.max(EstudioDiario.anio)))
         anio = anio_result.scalar() or 2025
 
     total_usuarios = (await db.execute(select(func.count(Usuario.id)))).scalar() or 0
 
     miembros_query = select(func.count(Miembro.id))
     contactos_query = select(func.count(Contacto.id))
-    reportes_query = select(func.count(Reporte.id)).where(extract("year", Reporte.fecha) == anio)
+    # Antes contaba filas de reportes (170 en total) y las devolvia como
+    # "estudios": ahora cuenta los estudios de verdad.
+    estudios_query = _filtrar(
+        select(func.count(EstudioDiario.id)).where(ES_ESTUDIO), anio, pais_id
+    )
 
     if pais_id is not None:
         miembros_query = miembros_query.where(Miembro.pais_id == pais_id)
         contactos_query = contactos_query.where(Contacto.pais_id == pais_id)
-        reportes_query = reportes_query.where(Reporte.pais_id == pais_id)
 
     total_miembros = (await db.execute(miembros_query)).scalar() or 0
     total_contactos = (await db.execute(contactos_query)).scalar() or 0
-    total_reportes = (await db.execute(reportes_query)).scalar() or 0
+    total_estudios = (await db.execute(estudios_query)).scalar() or 0
 
     anios_result = await db.execute(
-        select(EstadisticaPais.anio).distinct().order_by(EstadisticaPais.anio.desc())
+        _filtrar(select(EstudioDiario.anio).distinct(), None, pais_id)
+        .order_by(EstudioDiario.anio.desc())
     )
-    anios_disponibles = [a for a in anios_result.scalars().all()]
+    anios_disponibles = [a for a in anios_result.scalars().all() if a is not None]
 
     comparacion = await _build_comparacion_estudios(db, anio, pais_id)
     rendimiento = await _build_rendimiento_profesores(db, anio, pais_id)
@@ -56,7 +79,7 @@ async def obtener_estadisticas(
         total_usuarios=total_usuarios,
         total_miembros=total_miembros,
         total_contactos=total_contactos,
-        total_estudios=total_reportes,
+        total_estudios=total_estudios,
         comparacion_estudios=comparacion,
         rendimiento_profesores=rendimiento,
         evangelismo_profesores=evangelismo,
@@ -73,19 +96,22 @@ async def _build_comparacion_estudios(db: AsyncSession, anio: int, pais_id: int 
     data_actual = [0] * 12
     data_anterior = [0] * 12
 
-    query = (
-        select(EstadisticaPais.mes, func.sum(EstadisticaPais.cantidad_estudios))
-        .where(EstadisticaPais.anio.in_([anio, anio_anterior]))
-        .group_by(EstadisticaPais.anio, EstadisticaPais.mes)
+    # La version anterior agrupaba por (anio, mes) pero solo seleccionaba mes, asi
+    # que no habia forma de saber a que anio pertenecia cada fila y el bucle
+    # quedo en 'pass': las dos series salian siempre en cero.
+    query = _filtrar(
+        select(EstudioDiario.anio, EstudioDiario.mes, func.count(EstudioDiario.id))
+        .where(ES_ESTUDIO, EstudioDiario.anio.in_([anio, anio_anterior]))
+        .group_by(EstudioDiario.anio, EstudioDiario.mes),
+        None, pais_id,
     )
-    if pais_id is not None:
-        query = query.where(EstadisticaPais.pais_id == pais_id)
 
     result = await db.execute(query)
-    for row in result.all():
-        mes_idx = (row[0] or 1) - 1
+    for fila_anio, mes, total in result.all():
+        mes_idx = (mes or 1) - 1
         if 0 <= mes_idx < 12:
-            pass
+            destino = data_actual if fila_anio == anio else data_anterior
+            destino[mes_idx] = int(total or 0)
 
     serie_actual = SerieData(etiqueta=str(anio), data=data_actual)
     serie_anterior = SerieData(etiqueta=str(anio_anterior), data=data_anterior)
@@ -108,19 +134,18 @@ async def _build_comparacion_estudios(db: AsyncSession, anio: int, pais_id: int 
 
 
 async def _build_rendimiento_profesores(db: AsyncSession, anio: int, pais_id: int | None = None) -> RendimientoProfesores:
-    query = (
+    query = _filtrar(
         select(
-            Reporte.miembro_id,
+            EstudioDiario.miembro_id,
             Miembro.nombre,
-            func.count(Reporte.id).label("total_estudios"),
+            func.count(EstudioDiario.id).label("total_estudios"),
         )
-        .join(Miembro, Reporte.miembro_id == Miembro.id)
-        .where(extract("year", Reporte.fecha) == anio)
-        .group_by(Reporte.miembro_id, Miembro.nombre)
-        .order_by(func.count(Reporte.id).desc())
+        .join(Miembro, EstudioDiario.miembro_id == Miembro.id)
+        .where(ES_ESTUDIO)
+        .group_by(EstudioDiario.miembro_id, Miembro.nombre)
+        .order_by(func.count(EstudioDiario.id).desc()),
+        anio, pais_id,
     )
-    if pais_id is not None:
-        query = query.where(Reporte.pais_id == pais_id)
 
     result = await db.execute(query)
     profesores = []
@@ -137,34 +162,33 @@ async def _build_rendimiento_profesores(db: AsyncSession, anio: int, pais_id: in
 
 
 async def _build_evangelismo_profesores(db: AsyncSession, anio: int, pais_id: int | None = None) -> EvangelismoProfesores:
-    query = (
+    # estudios_diarios.horas ya viene en horas; reportes.tiempo_evangelizacion era
+    # un Interval que habia que convertir.
+    query = _filtrar(
         select(
-            Reporte.miembro_id,
+            EstudioDiario.miembro_id,
             Miembro.nombre,
-            func.sum(Reporte.tiempo_evangelizacion).label("total_horas"),
+            func.sum(EstudioDiario.horas).label("total_horas"),
         )
-        .join(Miembro, Reporte.miembro_id == Miembro.id)
-        .where(extract("year", Reporte.fecha) == anio)
-        .group_by(Reporte.miembro_id, Miembro.nombre)
-        .order_by(func.sum(Reporte.tiempo_evangelizacion).desc())
+        .join(Miembro, EstudioDiario.miembro_id == Miembro.id)
+        .where(ES_EVANGELISMO)
+        .group_by(EstudioDiario.miembro_id, Miembro.nombre)
+        .order_by(func.sum(EstudioDiario.horas).desc()),
+        anio, pais_id,
     )
-    if pais_id is not None:
-        query = query.where(Reporte.pais_id == pais_id)
 
     result = await db.execute(query)
     profesores = []
-    for row in result.all():
-        horas = 0
-        if row[2] is not None:
-            td = row[2]
-            horas = td.total_seconds() / 3600 if hasattr(td, "total_seconds") else float(td)
+    for miembro_id, nombre, total_horas in result.all():
         profesores.append(ProfesorEvangelismo(
-            id=row[0] or "", nombre=row[1] or "", total_horas=round(horas, 1)
+            id=miembro_id or "",
+            nombre=nombre or "",
+            total_horas=round(float(total_horas or 0), 1),
         ))
 
-    anios_query = select(func.distinct(extract("year", Reporte.fecha))).order_by(extract("year", Reporte.fecha).desc())
-    if pais_id is not None:
-        anios_query = anios_query.where(Reporte.pais_id == pais_id)
+    anios_query = _filtrar(
+        select(EstudioDiario.anio).distinct(), None, pais_id
+    ).order_by(EstudioDiario.anio.desc())
     anios_result = await db.execute(anios_query)
     anios_disponibles = [int(a) for a in anios_result.scalars().all() if a is not None]
 
@@ -179,18 +203,18 @@ async def _build_evangelismo_profesores(db: AsyncSession, anio: int, pais_id: in
 
 async def _build_crecimiento_estudiantes(db: AsyncSession, anio: int, pais_id: int | None = None) -> CrecimientoEstudiantes:
     serie = [0] * 12
-    query = (
-        select(EstadisticaPais.mes, func.sum(EstadisticaPais.cantidad_estudios))
-        .where(EstadisticaPais.anio == anio)
-        .group_by(EstadisticaPais.mes)
+    # Estudiantes distintos atendidos cada mes, no la suma de un contador manual.
+    query = _filtrar(
+        select(EstudioDiario.mes, func.count(func.distinct(EstudioDiario.contacto_id)))
+        .where(ES_ESTUDIO)
+        .group_by(EstudioDiario.mes),
+        anio, pais_id,
     )
-    if pais_id is not None:
-        query = query.where(EstadisticaPais.pais_id == pais_id)
 
     result = await db.execute(query)
-    for row in result.all():
-        if row[0] and 1 <= row[0] <= 12:
-            serie[row[0] - 1] = int(row[1] or 0)
+    for mes, total in result.all():
+        if mes and 1 <= mes <= 12:
+            serie[mes - 1] = int(total or 0)
     return CrecimientoEstudiantes(serie=serie, labels=MESES_LABELS, anio=anio)
 
 
