@@ -164,9 +164,10 @@ export default function Estadisticas() {
   const [ciudadesDelPais, setCiudadesDelPais] = useState([]);
   const [cargandoIglesias, setCargandoIglesias] = useState(false);
   const [guardandoIglesia, setGuardandoIglesia] = useState(false);
+  const [busquedaIglesia, setBusquedaIglesia] = useState("");
   const [nuevaIglesia, setNuevaIglesia] = useState({
     ciudad_id: "", nombre: "", direccion: "", pastor_encargado_nombre: "",
-    fecha_apertura: "", cantidad_miembros: ""
+    fecha_apertura: ""
   });
   const tf = (clave, valores = {}) =>
     Object.entries(valores).reduce(
@@ -189,8 +190,11 @@ export default function Estadisticas() {
         setContinentes(data);
         setPaisesDisponibles(paises);
         if (data.length > 0) {
-          setContinenteSeleccionado(data[0].id);
-          setPaisesDelContinente(data[0].paises || []);
+          const guardadoId = Number(localStorage.getItem('estadisticas_continente_id')) || null;
+          const continenteGuardado = guardadoId ? data.find(c => c.id === guardadoId) : null;
+          const continenteInicial = continenteGuardado || data[0];
+          setContinenteSeleccionado(continenteInicial.id);
+          setPaisesDelContinente(continenteInicial.paises || []);
           // No preseleccionar país — usuario elige
         }
       } catch {}
@@ -273,7 +277,7 @@ export default function Estadisticas() {
       await iglesiasService.crear({ ...nuevaIglesia, pais_id: paisSeleccionado });
       setNuevaIglesia({
         ciudad_id: "", nombre: "", direccion: "", pastor_encargado_nombre: "",
-        fecha_apertura: "", cantidad_miembros: ""
+        fecha_apertura: ""
       });
       setRefrescoIglesias(v => v + 1);
       toast.success(t('st_iglesiaRegistrada'));
@@ -284,6 +288,17 @@ export default function Estadisticas() {
       setGuardandoIglesia(false);
     }
   };
+
+  const paisSeleccionadoNombre = (
+    paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre || ""
+  ).toLowerCase();
+  const busquedaCoincideConPais = busquedaIglesia.trim() !== "" &&
+    paisSeleccionadoNombre.includes(busquedaIglesia.trim().toLowerCase());
+  const iglesiasFiltradas = busquedaCoincideConPais
+    ? iglesiasDelPais
+    : iglesiasDelPais.filter(ig =>
+        (ig.nombre || "").toLowerCase().includes(busquedaIglesia.trim().toLowerCase())
+      );
 
   const eliminarIglesia = async (iglesia) => {
     try {
@@ -915,7 +930,7 @@ export default function Estadisticas() {
 
         {/* Selector de región y país */}
         <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
-          <select value={continenteSeleccionado || ""} onChange={e => { setContinenteSeleccionado(Number(e.target.value)); setPaisSeleccionado(null); }}
+          <select value={continenteSeleccionado || ""} onChange={e => { const id = Number(e.target.value); setContinenteSeleccionado(id); localStorage.setItem('estadisticas_continente_id', String(id)); setPaisSeleccionado(null); }}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600", minWidth: "200px" }}>
             <option value="">{t('st_seleccionarRegion')}</option>
             {continentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -970,18 +985,6 @@ export default function Estadisticas() {
                 </div>
               </div>
               <div style={{ fontSize: "48px", opacity: 0.2 }}>🙋</div>
-            </div>
-          </div>
-
-          <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px" }}>{t('st_totalContactos')}</div>
-                <div style={{ fontSize: "32px", fontWeight: "700", color: "#FF9800" }}>
-                  {stats?.total_contactos || 0}
-                </div>
-              </div>
-              <div style={{ fontSize: "48px", opacity: 0.2 }}>📞</div>
             </div>
           </div>
 
@@ -1654,11 +1657,32 @@ export default function Estadisticas() {
               </p>
             </div>
             <div style={{ padding: "20px 24px" }}>
+              <input
+                type="text"
+                placeholder="Buscar iglesia..."
+                value={busquedaIglesia}
+                onChange={(e) => setBusquedaIglesia(e.target.value)}
+                style={{ ...estiloCampoIglesia, width: "100%", maxWidth: "320px", marginBottom: "18px" }}
+              />
+
+              {paisSeleccionado && (
+                <button
+                  onClick={() => setPaisSeleccionado(null)}
+                  style={{ background: "none", border: "none", color: "#134069", fontSize: "13px", fontWeight: "700", cursor: "pointer", padding: 0, marginBottom: "14px" }}
+                >
+                  ← Ver todos los países
+                </button>
+              )}
+
               {paisesDelContinente.length === 0 ? (
                 <div style={{ textAlign: "center", color: "#b0bcd0", padding: "40px" }}>{t('st_seleccionaRegionParaVer')}</div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-                  {paisesDelContinente.map((pais, i) => {
+                  {paisesDelContinente
+                    .filter(pais => paisSeleccionado
+                      ? pais.id === paisSeleccionado
+                      : (pais.nombre || "").toLowerCase().includes(busquedaIglesia.trim().toLowerCase()))
+                    .map((pais, i) => {
                     const colores = ["#134069","#4CAF50","#2196F3","#FF9800","#9C27B0","#E91E63","#00BCD4","#FF5722"];
                     const color = colores[i % colores.length];
                     return (
@@ -1695,67 +1719,12 @@ export default function Estadisticas() {
                     {tf('st_iglesiasDePais', { pais: paisesDelContinente.find(p => p.id === paisSeleccionado)?.nombre || "" })}
                   </h3>
                   <p style={{ margin: "0 0 16px", color: "#8a97b0", fontSize: "12px" }}>
-                    {t('st_iglesiasPaisDesc')}
+                    {iglesiasDelPais.length} {iglesiasDelPais.length === 1 ? "iglesia registrada" : "iglesias registradas"} — {iglesiasDelPais.reduce((suma, ig) => suma + (ig.cantidad_miembros || 0), 0)} miembros en total
                   </p>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "12px" }}>
-                    <select
-                      value={nuevaIglesia.ciudad_id}
-                      onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, ciudad_id: e.target.value })}
-                      style={estiloCampoIglesia}
-                    >
-                      <option value="">{t('st_ciudadPlaceholder')}</option>
-                      {ciudadesDelPais.map(c => (
-                        <option key={c.id} value={c.id}>{c.nombre}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      placeholder={t('st_nombreIglesiaPlaceholder')}
-                      value={nuevaIglesia.nombre}
-                      onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, nombre: e.target.value })}
-                      style={estiloCampoIglesia}
-                    />
-                    <input
-                      type="text"
-                      placeholder={t('st_pastorEncargadoPlaceholder')}
-                      value={nuevaIglesia.pastor_encargado_nombre}
-                      onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, pastor_encargado_nombre: e.target.value })}
-                      style={estiloCampoIglesia}
-                    />
-                    <input
-                      type="text"
-                      placeholder={t('st_direccionPlaceholder')}
-                      value={nuevaIglesia.direccion}
-                      onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, direccion: e.target.value })}
-                      style={estiloCampoIglesia}
-                    />
-                    <input
-                      type="date"
-                      value={nuevaIglesia.fecha_apertura}
-                      onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, fecha_apertura: e.target.value })}
-                      style={estiloCampoIglesia}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder={t('st_miembrosPlaceholder')}
-                      value={nuevaIglesia.cantidad_miembros}
-                      onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, cantidad_miembros: e.target.value })}
-                      style={estiloCampoIglesia}
-                    />
-                  </div>
-                  <button
-                    onClick={crearIglesia}
-                    disabled={guardandoIglesia}
-                    style={{ background: "#134069", color: "white", border: "none", borderRadius: "8px", padding: "10px 20px", fontSize: "13px", fontWeight: "700", cursor: guardandoIglesia ? "default" : "pointer", opacity: guardandoIglesia ? 0.6 : 1, marginBottom: "18px" }}
-                  >
-                    {guardandoIglesia ? t('st_guardando') : t('st_agregarIglesia')}
-                  </button>
 
                   {cargandoIglesias ? (
                     <div style={{ color: "#b0bcd0", fontSize: "13px" }}>{t('st_cargandoIglesias')}</div>
-                  ) : iglesiasDelPais.length === 0 ? (
+                  ) : iglesiasFiltradas.length === 0 ? (
                     <div style={{ color: "#b0bcd0", fontSize: "13px" }}>
                       {t('st_sinIglesiasPais')}
                     </div>
@@ -1769,25 +1738,16 @@ export default function Estadisticas() {
                             <th style={estiloCeldaIglesia}>{t('st_colPastor')}</th>
                             <th style={estiloCeldaIglesia}>{t('st_colApertura')}</th>
                             <th style={estiloCeldaIglesia}>{t('st_colMiembros')}</th>
-                            <th style={estiloCeldaIglesia}></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {iglesiasDelPais.map(ig => (
+                          {iglesiasFiltradas.map(ig => (
                             <tr key={ig.id} style={{ borderBottom: "1px solid #eef1f7" }}>
                               <td style={estiloCeldaIglesia}>{ig.ciudad_nombre || "—"}</td>
                               <td style={{ ...estiloCeldaIglesia, fontWeight: "700", color: "#1a2d5a" }}>{ig.nombre}</td>
                               <td style={estiloCeldaIglesia}>{ig.pastor_encargado_nombre || "—"}</td>
                               <td style={estiloCeldaIglesia}>{ig.fecha_apertura || "—"}</td>
                               <td style={estiloCeldaIglesia}>{ig.cantidad_miembros || 0}</td>
-                              <td style={estiloCeldaIglesia}>
-                                <button
-                                  onClick={() => eliminarIglesia(ig)}
-                                  style={{ background: "transparent", border: "none", color: "#c0392b", cursor: "pointer", fontWeight: "700" }}
-                                >
-                                  {t('eliminar')}
-                                </button>
-                              </td>
                             </tr>
                           ))}
                         </tbody>
