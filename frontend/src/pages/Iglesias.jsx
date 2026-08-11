@@ -35,7 +35,8 @@ const celdaStyle = { padding: "10px 12px", fontSize: "13px" };
 export default function Iglesias() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t } = useIdioma();
+  const { t, idioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es);
 
   const [paises, setPaises] = useState([]);
   const [paisSeleccionado, setPaisSeleccionado] = useState('');
@@ -106,7 +107,7 @@ export default function Iglesias() {
 
   const agregarIglesia = async () => {
     if (!nuevaIglesia.ciudad_id || !nuevaIglesia.nombre.trim()) {
-      toast.error('Selecciona la ciudad y escribe el nombre de la iglesia');
+      toast.error(tx('Selecciona la ciudad y escribe el nombre de la iglesia', 'Select the city and enter the church name'));
       return;
     }
     setGuardandoNueva(true);
@@ -121,9 +122,9 @@ export default function Iglesias() {
       });
       setNuevaIglesia({ ciudad_id: '', nombre: '', pastor_encargado_nombre: '', fecha_apertura: '' });
       recargarIglesias();
-      toast.success('Iglesia agregada');
+      toast.success(tx('Iglesia agregada', 'Church added'));
     } catch (error) {
-      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'No se pudo agregar la iglesia');
+      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : tx('No se pudo agregar la iglesia', 'Could not add the church'));
     } finally {
       setGuardandoNueva(false);
     }
@@ -150,22 +151,22 @@ export default function Iglesias() {
       });
       setEditandoId(null);
       recargarIglesias();
-      toast.success('Iglesia actualizada');
+      toast.success(tx('Iglesia actualizada', 'Church updated'));
     } catch (error) {
-      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'No se pudo guardar');
+      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : tx('No se pudo guardar', 'Could not save'));
     } finally {
       setGuardandoEdicion(false);
     }
   };
 
   const eliminarIglesia = async (ig) => {
-    if (!window.confirm(`¿Eliminar "${ig.nombre}"? Los miembros que la tenían asignada quedarán sin iglesia.`)) return;
+    if (!window.confirm(tx(`¿Eliminar "${ig.nombre}"? Los miembros que la tenían asignada quedarán sin iglesia.`, `Delete "${ig.nombre}"? Members assigned to it will be left without a church.`))) return;
     try {
       await iglesiasService.eliminar(ig.id);
       recargarIglesias();
-      toast.success('Iglesia eliminada');
+      toast.success(tx('Iglesia eliminada', 'Church deleted'));
     } catch (error) {
-      toast.error('No se pudo eliminar');
+      toast.error(tx('No se pudo eliminar', 'Could not delete'));
     }
   };
 
@@ -183,7 +184,7 @@ export default function Iglesias() {
               <FaArrowLeft /> {t('volver')}
             </button>
             <h1 style={{ color: "white", margin: 0, fontFamily: "'Cinzel', serif", fontSize: "26px", fontWeight: "700", letterSpacing: "1px" }}>
-              Iglesias
+              {tx('Iglesias', 'Churches')}
             </h1>
           </div>
           {user?.pais_nombre && (
@@ -196,23 +197,23 @@ export default function Iglesias() {
         {/* ── SELECTOR DE PAÍS + BUSCADOR ── */}
         <div style={{ background: "white", padding: "18px 20px", borderRadius: "14px", marginBottom: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 240px" }}>
-            <label style={labelStyle}>País</label>
+            <label style={labelStyle}>{tx('País', 'Country')}</label>
             <select
               value={paisSeleccionado}
               onChange={(e) => setPaisSeleccionado(e.target.value)}
               style={inputStyle}
             >
-              <option value="">Selecciona un país...</option>
+              <option value="">{tx('Selecciona un país...', 'Select a country...')}</option>
               {paises.map(p => (
                 <option key={p.id} value={p.id}>{p.nombre}</option>
               ))}
             </select>
           </div>
           <div style={{ flex: "1 1 240px" }}>
-            <label style={labelStyle}>Buscar iglesia</label>
+            <label style={labelStyle}>{tx('Buscar iglesia', 'Search church')}</label>
             <input
               type="text"
-              placeholder="Buscar por nombre..."
+              placeholder={tx('Buscar por nombre...', 'Search by name...')}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               disabled={!paisSeleccionado}
@@ -223,51 +224,51 @@ export default function Iglesias() {
 
         {!paisSeleccionado ? (
           <div style={{ background: "white", borderRadius: "14px", padding: "40px", textAlign: "center", color: "#8a97b0" }}>
-            Selecciona un país para ver y agregar sus iglesias.
+            {tx('Selecciona un país para ver y agregar sus iglesias.', 'Select a country to view and add its churches.')}
           </div>
         ) : (
           <>
             {/* ── AGREGAR IGLESIA ── */}
             <div style={{ background: "white", padding: "20px", borderRadius: "14px", marginBottom: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 14px", fontFamily: "'Cinzel', serif", fontSize: "17px", color: PRIMARY }}>
-                Agregar iglesia
+                {tx('Agregar iglesia', 'Add church')}
               </h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "12px" }}>
                 <div>
-                  <label style={labelStyle}>Ciudad</label>
+                  <label style={labelStyle}>{tx('Ciudad', 'City')}</label>
                   <select
                     value={nuevaIglesia.ciudad_id}
                     onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, ciudad_id: e.target.value })}
                     style={inputStyle}
                   >
-                    <option value="">Selecciona ciudad...</option>
+                    <option value="">{tx('Selecciona ciudad...', 'Select city...')}</option>
                     {ciudadesPais.map(c => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Nombre de la iglesia</label>
+                  <label style={labelStyle}>{tx('Nombre de la iglesia', 'Church name')}</label>
                   <input
                     type="text"
-                    placeholder="Ej. Iglesia Emanuel - Santiago"
+                    placeholder={tx('Ej. Iglesia Emanuel - Santiago', 'E.g. Emanuel Church - Santiago')}
                     value={nuevaIglesia.nombre}
                     onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, nombre: e.target.value })}
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Pastor encargado</label>
+                  <label style={labelStyle}>{tx('Pastor encargado', 'Lead pastor')}</label>
                   <input
                     type="text"
-                    placeholder="Nombre del pastor"
+                    placeholder={tx('Nombre del pastor', "Pastor's name")}
                     value={nuevaIglesia.pastor_encargado_nombre}
                     onChange={(e) => setNuevaIglesia({ ...nuevaIglesia, pastor_encargado_nombre: e.target.value })}
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Fecha de apertura</label>
+                  <label style={labelStyle}>{tx('Fecha de apertura', 'Opening date')}</label>
                   <input
                     type="date"
                     value={nuevaIglesia.fecha_apertura}
@@ -281,28 +282,28 @@ export default function Iglesias() {
                 disabled={guardandoNueva}
                 style={{ background: "#4CAF50", border: "none", borderRadius: "10px", padding: "10px 20px", color: "white", cursor: guardandoNueva ? "default" : "pointer", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", opacity: guardandoNueva ? 0.6 : 1 }}
               >
-                <FaPlus /> {guardandoNueva ? "Guardando..." : "Agregar iglesia"}
+                <FaPlus /> {guardandoNueva ? tx('Guardando...', 'Saving...') : tx('Agregar iglesia', 'Add church')}
               </button>
             </div>
 
             {/* ── TABLA ── */}
             <div style={{ background: "white", borderRadius: "14px", overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}>
               {cargando ? (
-                <div style={{ padding: "40px", textAlign: "center", color: "#8a97b0" }}>Cargando...</div>
+                <div style={{ padding: "40px", textAlign: "center", color: "#8a97b0" }}>{tx('Cargando...', 'Loading...')}</div>
               ) : iglesiasFiltradas.length === 0 ? (
                 <div style={{ padding: "40px", textAlign: "center", color: "#8a97b0" }}>
-                  Todavía no hay iglesias registradas en este país.
+                  {tx('Todavía no hay iglesias registradas en este país.', 'No churches registered in this country yet.')}
                 </div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ background: "#f4f6fb", color: "#8a97b0", textAlign: "left" }}>
-                        <th style={celdaStyle}>Ciudad</th>
-                        <th style={celdaStyle}>Iglesia</th>
-                        <th style={celdaStyle}>Pastor</th>
-                        <th style={celdaStyle}>Apertura</th>
-                        <th style={celdaStyle}>Miembros</th>
+                        <th style={celdaStyle}>{tx('Ciudad', 'City')}</th>
+                        <th style={celdaStyle}>{tx('Iglesia', 'Church')}</th>
+                        <th style={celdaStyle}>{tx('Pastor', 'Pastor')}</th>
+                        <th style={celdaStyle}>{tx('Apertura', 'Opened')}</th>
+                        <th style={celdaStyle}>{tx('Miembros', 'Members')}</th>
                         <th style={celdaStyle}></th>
                       </tr>
                     </thead>
@@ -326,7 +327,7 @@ export default function Iglesias() {
                               {editando ? (
                                 <input
                                   type="text"
-                                  placeholder="Nombre del pastor"
+                                  placeholder={tx('Nombre del pastor', "Pastor's name")}
                                   value={edicion.pastor_encargado_nombre}
                                   onChange={(e) => setEdicion({ ...edicion, pastor_encargado_nombre: e.target.value })}
                                   style={{ ...inputStyle, padding: "6px 8px" }}
@@ -352,13 +353,13 @@ export default function Iglesias() {
                                     disabled={guardandoEdicion}
                                     style={{ background: PRIMARY, color: "white", border: "none", borderRadius: "6px", padding: "5px 10px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
                                   >
-                                    Guardar
+                                    {tx('Guardar', 'Save')}
                                   </button>
                                   <button
                                     onClick={cancelarEdicion}
                                     style={{ background: "transparent", color: "#8a97b0", border: "none", cursor: "pointer", fontSize: "12px" }}
                                   >
-                                    Cancelar
+                                    {tx('Cancelar', 'Cancel')}
                                   </button>
                                 </div>
                               ) : (
@@ -367,13 +368,13 @@ export default function Iglesias() {
                                     onClick={() => iniciarEdicion(ig)}
                                     style={{ background: "transparent", border: "none", color: PRIMARY, cursor: "pointer", fontWeight: "700", fontSize: "12px" }}
                                   >
-                                    Editar
+                                    {tx('Editar', 'Edit')}
                                   </button>
                                   <button
                                     onClick={() => eliminarIglesia(ig)}
                                     style={{ background: "transparent", border: "none", color: "#c0392b", cursor: "pointer", fontWeight: "700", fontSize: "12px" }}
                                   >
-                                    Eliminar
+                                    {tx('Eliminar', 'Delete')}
                                   </button>
                                 </div>
                               )}

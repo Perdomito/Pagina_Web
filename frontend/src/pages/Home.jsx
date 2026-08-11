@@ -28,6 +28,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { t, idioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es); // bilingüe directo para textos sin clave en el diccionario central
   const [permisosUsuario, setPermisosUsuario] = useState([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
@@ -91,7 +92,7 @@ export default function Home() {
 
   const modulosConPermisos = [
     {
-      titulo: t('Miembresia'),
+      titulo: tx('Membresía', 'Membership'),
       desc: t('miembrosDesc'),
       ruta: "/miembros",
       icon: <FaUsers size={32} />,
@@ -114,7 +115,7 @@ export default function Home() {
       ruta: "/seguimiento-leyes",
       icon: <FaRoute size={32} />,
       color: "#ffb703",
-      permiso: "estudios_biblicos",
+      permiso: "leyes",
       animacion: "pulse"
     },
     {
@@ -170,6 +171,8 @@ export default function Home() {
     if (tarjeta.permiso === 'administracion' && user?.rol_id !== 1 && user?.rol_id !== 4) return false;
     // Configuración solo para admin (1) o pastor (2)
     if (tarjeta.permiso === 'configuracion' && user?.rol_id !== 1 && user?.rol_id !== 2) return false;
+    // Seguimiento de Leyes solo para admin (1) o pastor (2)
+    if (tarjeta.permiso === 'leyes' && user?.rol_id !== 1 && user?.rol_id !== 2) return false;
     return true;
   });
 

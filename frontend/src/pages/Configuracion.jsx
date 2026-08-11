@@ -21,6 +21,7 @@ export default function Configuracion() {
     { id: 8, nombre: 'Seguimiento de Leyes', label: 'Seguimiento de Leyes', icono: '⚖️' },
   ];
   const { t, tv, idioma, setIdioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es); // bilingüe directo para textos sin clave en el diccionario central
   
   const [tabActive, setTabActive] = useState("usuarios");
   const [cargando, setCargando] = useState(false);
@@ -662,7 +663,7 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                 <div key={permiso.id} className="permiso-item">
                   <div>
                     <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>
-                      {permiso.icono} {tv(permiso.nombre.replace(/_/g, ' '))}
+                      {permiso.icono} {permiso.id === 8 ? tx('Seguimiento de Leyes', 'Laws Tracking') : tv(permiso.nombre.replace(/_/g, ' '))}
                     </div>
                     <div style={{ fontSize: "12px", color: "#999" }}>
                       {permiso.descripcion || ''}
@@ -707,7 +708,7 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                 <div key={permiso.id} className="permiso-item">
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: "600", color: "#333", marginBottom: "3px" }}>
-                      {permiso.icono} {tv(permiso.nombre.replace(/_/g, ' '))}
+                      {permiso.icono} {permiso.id === 8 ? tx('Seguimiento de Leyes', 'Laws Tracking') : tv(permiso.nombre.replace(/_/g, ' '))}
                       {permisoRolActive && <span className="permiso-badge badge-rol">{t('cf_badgeRol')}</span>}
                       {permisoPersonalizado && <span className="permiso-badge badge-personalizado">{t('cf_badgePersonalizado')}</span>}
                     </div>

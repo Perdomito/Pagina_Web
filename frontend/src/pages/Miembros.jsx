@@ -94,7 +94,8 @@ const labelStyle = {
 export default function Miembros() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { t, tv } = useIdioma();
+  const { t, tv, idioma } = useIdioma();
+  const tx = (es, en) => (idioma === 'en' ? en : es); // texto bilingüe directo, para textos nuevos aún no agregados al diccionario del traductor
   const [miembros, setMiembros] = useState([]);
   const [paises, setPaises] = useState([]);
   const [filtro, setFiltro] = useState("");
@@ -492,7 +493,7 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
               onClick={() => navigate("/iglesias")}
               style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(10px)", border: "none", borderRadius: "10px", padding: "12px 22px", color: "white", cursor: "pointer", fontWeight: "700", fontFamily: "'Lato', sans-serif", fontSize: "14px" }}
             >
-              Iglesias
+              {tx('Iglesias', 'Churches')}
             </button>
             <button
               onClick={() => abrirModal()}
@@ -650,7 +651,7 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                     </div>
 
                     <div style={{ marginBottom: "16px" }}>
-                      <label style={labelStyle}>Iglesia *</label>
+                      <label style={labelStyle}>{tx('Iglesia', 'Church')} *</label>
                       <select
                         className="mbr-input"
                         required
@@ -660,19 +661,19 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
                         style={inputStyle}
                       >
                         <option value="">
-                          {!formData.pais_id ? 'Selecciona primero un país' : 'Selecciona una iglesia...'}
+                          {!formData.pais_id ? tx('Selecciona primero un país', 'Select a country first') : tx('Selecciona una iglesia...', 'Select a church...')}
                         </option>
                         {opcionesIglesia.map(o => (
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
                       <div style={{ fontSize: 12, color: "#8a97b0", marginTop: 4 }}>
-                        ¿No está la iglesia que buscas? Agrégala en{' '}
+                        {tx('¿No está la iglesia que buscas? Agrégala en', "Don't see the church you're looking for? Add it in")}{' '}
                         <span
                           onClick={() => navigate('/iglesias')}
                           style={{ color: PRIMARY, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
                         >
-                          el módulo de Iglesias
+                          {tx('el módulo de Iglesias', 'the Churches module')}
                         </span>.
                       </div>
                     </div>

@@ -14,6 +14,7 @@ PERMISO_NAMES = {
     4: "contactos",
     5: "administracion",
     6: "configuracion",
+    8: "leyes",
 }
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
