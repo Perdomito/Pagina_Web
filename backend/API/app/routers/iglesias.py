@@ -3,13 +3,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from app.database import get_db
-from app.models import Ciudad, Iglesia, Pais
+from app.models import Ciudad, Iglesia, Pais, Miembro
 from app.schemas import IglesiaCreate, IglesiaUpdate, IglesiaOut
 
 router = APIRouter(prefix="/iglesias", tags=["Iglesias"])
 
 
-def _enrich_iglesia(obj: Iglesia) -> dict:
+async def _conteo_miembros_por_iglesia(db: AsyncSession, iglesia_ids: list[int]) -> dict[int, int]:
+    """Cuenta miembros reales (Miembro.iglesia_id) por iglesia, no el campo manual viejo."""
+    if not iglesia_ids:
+        return {}
+    q = (
+        select(Miembro.iglesia_id, func.count(Miembro.id))
+        .where(Miembro.iglesia_id.in_(iglesia_ids))
+        .group_by(Miembro.iglesia_id)
+    )
+    result = await db.execute(q)
+    return {iglesia_id: int(cantidad) for iglesia_id, cantidad in result.all()}
+
+
+def _enrich_iglesia(obj: Iglesia, conteo_real: int | None = None) -> dict:
     return {
         "id": obj.id,
         "ciudad_id": obj.ciudad_id,
@@ -19,7 +32,7 @@ def _enrich_iglesia(obj: Iglesia) -> dict:
         "pastor_encargado_id": obj.pastor_encargado_id,
         "pastor_encargado_nombre": obj.pastor_encargado_nombre,
         "fecha_apertura": obj.fecha_apertura,
-        "cantidad_miembros": obj.cantidad_miembros or 0,
+        "cantidad_miembros": conteo_real if conteo_real is not None else 0,
         "activa": obj.activa,
         "notas": obj.notas,
         "fecha_creacion": obj.fecha_creacion,
@@ -61,7 +74,9 @@ async def listar(
     if activa is not None:
         q = q.where(Iglesia.activa == activa)
     result = await db.execute(q)
-    return [IglesiaOut.model_validate(_enrich_iglesia(i)) for i in result.scalars().all()]
+    iglesias = result.scalars().all()
+    conteos = await _conteo_miembros_por_iglesia(db, [i.id for i in iglesias])
+    return [IglesiaOut.model_validate(_enrich_iglesia(i, conteos.get(i.id, 0))) for i in iglesias]
 
 
 @router.get("/conteo-por-pais")
@@ -91,7 +106,8 @@ async def obtener(id: int, db: AsyncSession = Depends(get_db)):
     obj = (await db.execute(q)).scalar_one_or_none()
     if not obj:
         raise HTTPException(404, "Iglesia no encontrada")
-    return IglesiaOut.model_validate(_enrich_iglesia(obj))
+    conteo = await _conteo_miembros_por_iglesia(db, [obj.id])
+    return IglesiaOut.model_validate(_enrich_iglesia(obj, conteo.get(obj.id, 0)))
 
 
 @router.post("", response_model=IglesiaOut, status_code=201)

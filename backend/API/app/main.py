@@ -411,3 +411,5 @@ async def root():
 @app.get("/health", tags=["Estado"])
 async def health():
     return {"status": "healthy"}
+
+# forzar redeploy
