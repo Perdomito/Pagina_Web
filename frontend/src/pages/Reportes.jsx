@@ -88,12 +88,14 @@ export default function Reportes() {
   const [misioneroSeleccionado, setMisioneroSeleccionado] = useState(null);
   const [estudiantesMisionero, setEstudiantesMisionero] = useState([]);
   const [continentes, setContinentes] = useState([]);
+  const [roles, setRoles] = useState([]);
   
   useEffect(() => {
     const cargarContinentes = async () => {
       try {
         const continentesData = await administracionService.getAllContinentes();
         setContinentes(continentesData);
+        administracionService.getAllRoles().then(setRoles).catch(() => setRoles([]));
         
         // Auto-seleccionar la región del usuario
         if (user?.region) {
@@ -121,6 +123,17 @@ export default function Reportes() {
   const paisesDelContinente = continenteSeleccionado 
     ? continentes.find(c => c.id === parseInt(continenteSeleccionado))?.paises || []
     : [];
+
+  const esAdmin = user?.rol_id === 1;
+  const esPastor = !esAdmin && roles.find(r => r.id === user?.rol_id)?.nombre?.toLowerCase() === 'pastor';
+  // Admin ve todos los continentes; Pastor y los demás quedan limitados a su propio continente.
+  const continentesVisibles = esAdmin
+    ? continentes
+    : continentes.filter(c => (c.paises || []).some(p => p.id === user?.pais_id));
+  // Dentro del continente: Admin y Pastor ven todos los países; el resto solo el suyo.
+  const paisesVisibles = (esAdmin || esPastor)
+    ? paisesDelContinente
+    : paisesDelContinente.filter(p => p.id === user?.pais_id);
   
   const obtenerPeriodos = () => {
     const periodos = [];
@@ -503,8 +516,8 @@ export default function Reportes() {
         
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }} className="no-print">
           {[
-            { value: continenteSeleccionado, onChange: (v) => { setContinenteSeleccionado(v); setPaisSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: continentes.map(c => ({ val: c.id, label: c.nombre })), placeholder: t('rp_seleccionarRegion'), disabled: false },
-            { value: paisSeleccionado, onChange: (v) => { setPaisSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: paisesDelContinente.map(p => ({ val: p.id, label: p.nombre })), placeholder: t('rp_seleccionarPais'), disabled: !continenteSeleccionado },
+            { value: continenteSeleccionado, onChange: (v) => { setContinenteSeleccionado(v); setPaisSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: continentesVisibles.map(c => ({ val: c.id, label: c.nombre })), placeholder: t('rp_seleccionarRegion'), disabled: false },
+            { value: paisSeleccionado, onChange: (v) => { setPaisSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: paisesVisibles.map(p => ({ val: p.id, label: p.nombre })), placeholder: t('rp_seleccionarPais'), disabled: !continenteSeleccionado },
             { value: tipoReporte, onChange: (v) => { setTipoReporte(v); setPeriodoSeleccionado(""); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: [{ val: "mensual", label: t('rp_reporteMensual') }, { val: "semanal", label: t('rp_reporteSemanal') }], placeholder: null, disabled: false },
             { value: periodoSeleccionado, onChange: (v) => { setPeriodoSeleccionado(v); setMostrandoDetalle(false); setMisioneroSeleccionado(null); }, options: obtenerPeriodos().map(p => ({ val: p.valor, label: p.etiqueta })), placeholder: t('rp_seleccionarPeriodo'), disabled: false, key: tipoReporte },
           ].map((sel, i) => (

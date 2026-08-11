@@ -21,7 +21,7 @@ const { t, idioma } = useIdioma();
 
   const modulos = [
     {
-      titulo: t('miembros'),
+      titulo: t('Miembresia'),
       desc: t('miembrosDesc'),
       ruta: "/miembros",
       icon: <FaUsers size={20} />,

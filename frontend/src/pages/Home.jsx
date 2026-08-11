@@ -91,7 +91,7 @@ export default function Home() {
 
   const modulosConPermisos = [
     {
-      titulo: t('miembros'),
+      titulo: t('Miembresia'),
       desc: t('miembrosDesc'),
       ruta: "/miembros",
       icon: <FaUsers size={32} />,

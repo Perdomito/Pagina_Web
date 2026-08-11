@@ -40,6 +40,7 @@ export default function EstudiosBiblicos() {
 const [, setCargandoDatos] = useState(false);
 
  const [continentes, setContinentes] = useState([]);
+ const [roles, setRoles] = useState([]);
   
   const meses = [
     "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
@@ -76,6 +77,8 @@ const cargarDatosIniciales = async () => {
     
     const continentesData = await administracionService.getAllContinentes();
     setContinentes(continentesData);
+
+    administracionService.getAllRoles().then(setRoles).catch(() => setRoles([]));
     
     // Cargar countries desde la API
     const paisesData = await administracionService.getAllPaises();
@@ -824,6 +827,11 @@ const eliminarPais = async (continenteId, paisId) => {
   const paisesDelContinente = continenteSeleccionado 
     ? continentes.find(c => c.id === continenteSeleccionado)?.paises || []
     : [];
+
+  const esAdmin = user?.rol_id === 1;
+  const esPastor = !esAdmin && roles.find(r => r.id === user?.rol_id)?.nombre?.toLowerCase() === 'pastor';
+  // Admin ve todo, Pastor ve toda su región, cualquier otro rol ve solo su propio país.
+  const puedeVerVariosPaises = esAdmin || esPastor;
   
   const diasDelMes = mesSeleccionado ? obtenerDiasDelMes(mesSeleccionado, añoActual) : [];
 
@@ -1259,26 +1267,37 @@ const eliminarPais = async (continenteId, paisId) => {
             {t('eb_seleccionaPais')}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "20px" }}>
-            {paisesDelContinente.map(pais => (
+            {paisesDelContinente.map(pais => {
+              const esSuPais = pais.id === user?.pais_id;
+              const puedeEntrarPais = puedeVerVariosPaises || esSuPais;
+              return (
               <div
                 key={pais.id}
                 className="card-item"
-                onClick={() => setPaisSeleccionado(pais.id)}
+                onClick={() => { if (puedeEntrarPais) setPaisSeleccionado(pais.id); }}
+                style={{
+                  opacity: puedeEntrarPais ? 1 : 0.45,
+                  cursor: puedeEntrarPais ? "pointer" : "not-allowed",
+                  border: esSuPais ? "2px solid #134069" : undefined,
+                }}
               >
-                <button
-                  className="card-delete-btn no-print"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    eliminarPais(continenteSeleccionado, pais.id);
-                  }}
-                >
-                  <FaTrash size={14} />
-                </button>
+                {puedeVerVariosPaises && (
+                  <button
+                    className="card-delete-btn no-print"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      eliminarPais(continenteSeleccionado, pais.id);
+                    }}
+                  >
+                    <FaTrash size={14} />
+                  </button>
+                )}
                 <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a5490" }}>
                   {pais.nombre}
                 </div>
               </div>
-            ))}
+            );})}
+            {puedeVerVariosPaises && (
             <div
               className="card-item"
               onClick={() => {
@@ -1292,6 +1311,7 @@ const eliminarPais = async (continenteId, paisId) => {
                 <div style={{ fontSize: "16px", fontWeight: "700" }}>New Country</div>
               </div>
             </div>
+            )}
           </div>
         </div>
       )}

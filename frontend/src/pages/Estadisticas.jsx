@@ -192,7 +192,12 @@ export default function Estadisticas() {
         if (data.length > 0) {
           const guardadoId = Number(localStorage.getItem('estadisticas_continente_id')) || null;
           const continenteGuardado = guardadoId ? data.find(c => c.id === guardadoId) : null;
-          const continenteInicial = continenteGuardado || data[0];
+          // Si no hay nada guardado en este navegador, usar el continente real
+          // del país del usuario que inició sesión (no el primero de la lista).
+          const continenteDelUsuario = !continenteGuardado && user?.pais_id
+            ? data.find(c => (c.paises || []).some(p => p.id === user.pais_id))
+            : null;
+          const continenteInicial = continenteGuardado || continenteDelUsuario || data[0];
           setContinenteSeleccionado(continenteInicial.id);
           setPaisesDelContinente(continenteInicial.paises || []);
           // No preseleccionar país — usuario elige
@@ -200,7 +205,7 @@ export default function Estadisticas() {
       } catch {}
     };
     cargarContinentes();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const paisDesdeSesion = user?.pais_id || (user?.region && !Number.isNaN(Number(user.region)) ? Number(user.region) : null);
@@ -299,17 +304,6 @@ export default function Estadisticas() {
     : iglesiasDelPais.filter(ig =>
         (ig.nombre || "").toLowerCase().includes(busquedaIglesia.trim().toLowerCase())
       );
-
-  const eliminarIglesia = async (iglesia) => {
-    try {
-      await iglesiasService.eliminar(iglesia.id);
-      setRefrescoIglesias(v => v + 1);
-      toast.success(t('st_iglesiaEliminada'));
-    } catch (error) {
-      console.error('Error deleting church:', error);
-      toast.error(t('st_errorEliminarIglesia'));
-    }
-  };
 
   useEffect(() => {
     if (paisUsuarioResuelto && !paisCrecimientoSeleccionado) {

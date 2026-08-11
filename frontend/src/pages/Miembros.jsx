@@ -103,13 +103,9 @@ export default function Miembros() {
   const [miembroEditando, setMiembroEditando] = useState(null);
   const [pestanaActiva, setPestanaActiva] = useState('basic');
 
-  // Iglesia (punto 13): iglesias del país seleccionado en el form + alta rápida "Iglesia Emanuel De {Ciudad}"
+  // Iglesia: solo se eligen las ya existentes. Se crean/editan en el módulo Iglesias.
   const [iglesiasPais, setIglesiasPais] = useState([]);
   const [ciudadesPais, setCiudadesPais] = useState([]);
-  const [mostrarNuevaIglesia, setMostrarNuevaIglesia] = useState(false);
-  const [nombreLugarNuevaIglesia, setNombreLugarNuevaIglesia] = useState('');
-  const [ciudadNuevaIglesiaId, setCiudadNuevaIglesiaId] = useState('');
-  const [creandoIglesia, setCreandoIglesia] = useState(false);
 
   const [mostrarModalInfo, setMostrarModalInfo] = useState(false);
   const [miembroParaInfo, setMiembroParaInfo] = useState(null);
@@ -217,105 +213,15 @@ export default function Miembros() {
   const esRD = isoPaisSeleccionado === 'DO' ||
     (paisSeleccionado && normalizarTexto(paisSeleccionado.nombre) === 'republica dominicana');
 
-  // Desplegable de Iglesia = iglesias reales ya creadas + "plantillas" listas para
-  // usar de las provincias/divisiones principales del país (RD: las 32 verificadas;
-  // otros países: DIVISIONES_POR_PAIS). Elegir una plantilla crea la iglesia al vuelo.
-  const opcionesIglesia = useMemo(() => {
-    const reales = iglesiasPais.map(ig => ({ value: `real:${ig.id}`, label: ig.nombre }));
+  // Desplegable de Iglesia = solo iglesias reales ya creadas en el módulo Iglesias.
+  const opcionesIglesia = useMemo(
+    () => iglesiasPais.map(ig => ({ value: `real:${ig.id}`, label: ig.nombre })),
+    [iglesiasPais]
+  );
 
-    const divisiones = esRD
-      ? PROVINCIAS_RD.map(({ provincia, capital }) => ({ nombre: provincia, buscar: capital }))
-      : (DIVISIONES_POR_PAIS[isoPaisSeleccionado] || []).map(d => ({ nombre: d, buscar: d }));
-
-    const plantillas = divisiones
-      .map(({ nombre, buscar }) => {
-        const ciudad = esRD
-          ? ciudadesPais.find(c => normalizarTexto(c.nombre) === normalizarTexto(buscar))
-          : emparejarDivisionConCiudad(buscar, ciudadesPais);
-        if (!ciudad) return null;
-        // si ya hay una iglesia real en esa misma ciudad, no repetirla como plantilla
-        if (iglesiasPais.some(ig => ig.ciudad_id === ciudad.id)) return null;
-        const nombreCompleto = `Iglesia Emanuel - ${nombre}`;
-        return { value: `plantilla:${ciudad.id}:${nombreCompleto}`, label: nombreCompleto };
-      })
-      .filter(Boolean);
-
-    return [...reales, ...plantillas];
-  }, [iglesiasPais, ciudadesPais, esRD, isoPaisSeleccionado]);
-
-  const manejarSeleccionIglesia = async (e) => {
+  const manejarSeleccionIglesia = (e) => {
     const val = e.target.value;
-    if (!val) { setFormData(prev => ({ ...prev, iglesia_id: '' })); return; }
-    if (val.startsWith('real:')) {
-      setFormData(prev => ({ ...prev, iglesia_id: val.slice(5) }));
-      return;
-    }
-    // "plantilla:<ciudad_id>:<nombre completo>" — se crea la iglesia en este momento.
-    const resto = val.slice('plantilla:'.length);
-    const separador = resto.indexOf(':');
-    const ciudadId = resto.slice(0, separador);
-    const nombreCompleto = resto.slice(separador + 1);
-    try {
-      setCreandoIglesia(true);
-      const nueva = await administracionService.crearIglesia({
-        nombre: nombreCompleto,
-        pais_id: Number(formData.pais_id),
-        ciudad_id: Number(ciudadId),
-        activa: true,
-        cantidad_miembros: 0
-      });
-      setIglesiasPais(prev => [...prev, nueva]);
-      setFormData(prev => ({ ...prev, iglesia_id: nueva.id }));
-      toast.success('Iglesia creada');
-    } catch (error) {
-      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'Error al crear la iglesia');
-    } finally {
-      setCreandoIglesia(false);
-    }
-  };
-
-  const crearNuevaIglesia = async () => {
-    try {
-      setCreandoIglesia(true);
-      let ciudad = null;
-      let nombreLugar = '';
-
-      if (ciudadNuevaIglesiaId) {
-        // Eligieron una ciudad de la lista existente.
-        ciudad = ciudadesPais.find(c => String(c.id) === String(ciudadNuevaIglesiaId));
-        nombreLugar = ciudad?.nombre || '';
-      } else {
-        // No estaba en la lista: la escribieron a mano.
-        nombreLugar = nombreLugarNuevaIglesia.trim();
-        if (!nombreLugar) { toast.error('Selecciona una ciudad de la lista, o escribe el nombre de una nueva'); setCreandoIglesia(false); return; }
-        ciudad = ciudadesPais.find(c => normalizarTexto(c.nombre) === normalizarTexto(nombreLugar));
-        if (!ciudad) {
-          ciudad = await administracionService.crearCiudad({
-            nombre: nombreLugar,
-            pais_iso2: isoPaisSeleccionado || undefined,
-          });
-          setCiudadesPais(prev => [...prev, ciudad]);
-        }
-      }
-
-      const nueva = await administracionService.crearIglesia({
-        nombre: `Iglesia Emanuel - ${nombreLugar}`,
-        pais_id: Number(formData.pais_id),
-        ciudad_id: ciudad.id,
-        activa: true,
-        cantidad_miembros: 0
-      });
-      setIglesiasPais(prev => [...prev, nueva]);
-      setFormData(prev => ({ ...prev, iglesia_id: nueva.id }));
-      setMostrarNuevaIglesia(false);
-      setNombreLugarNuevaIglesia('');
-      setCiudadNuevaIglesiaId('');
-      toast.success('Iglesia creada');
-    } catch (error) {
-      toast.error(error.response?.data?.detail ? String(error.response.data.detail).slice(0, 160) : 'Error al crear la iglesia');
-    } finally {
-      setCreandoIglesia(false);
-    }
+    setFormData(prev => ({ ...prev, iglesia_id: val.startsWith('real:') ? val.slice(5) : '' }));
   };
 
   const paisesMap = useMemo(() => {
@@ -581,12 +487,20 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
             </div>
           </div>
 
-          <button
-            onClick={() => abrirModal()}
-            style={{ background: "#4CAF50", border: "none", borderRadius: "10px", padding: "12px 22px", color: "white", cursor: "pointer", fontWeight: "700", fontFamily: "'Lato', sans-serif", display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", boxShadow: "0 4px 12px rgba(76,175,80,0.3)" }}
-          >
-            <FaPlus /> {t('mi_agregarMiembro')}
-          </button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              onClick={() => navigate("/iglesias")}
+              style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(10px)", border: "none", borderRadius: "10px", padding: "12px 22px", color: "white", cursor: "pointer", fontWeight: "700", fontFamily: "'Lato', sans-serif", fontSize: "14px" }}
+            >
+              Iglesias
+            </button>
+            <button
+              onClick={() => abrirModal()}
+              style={{ background: "#4CAF50", border: "none", borderRadius: "10px", padding: "12px 22px", color: "white", cursor: "pointer", fontWeight: "700", fontFamily: "'Lato', sans-serif", display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", boxShadow: "0 4px 12px rgba(76,175,80,0.3)" }}
+            >
+              <FaPlus /> {t('mi_agregarMiembro')}
+            </button>
+          </div>
         </div>
 
         {/* ── BUSCADOR ── */}
@@ -737,82 +651,30 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
 
                     <div style={{ marginBottom: "16px" }}>
                       <label style={labelStyle}>Iglesia *</label>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <select
-                          className="mbr-input"
-                          required
-                          value={formData.iglesia_id ? `real:${formData.iglesia_id}` : ''}
-                          onChange={manejarSeleccionIglesia}
-                          disabled={!formData.pais_id || creandoIglesia}
-                          style={{ ...inputStyle, flex: 1 }}
-                        >
-                          <option value="">
-                            {!formData.pais_id ? 'Selecciona primero un país' : (creandoIglesia ? 'Creando...' : 'Selecciona una iglesia...')}
-                          </option>
-                          {opcionesIglesia.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setMostrarNuevaIglesia(v => !v)}
-                          disabled={!formData.pais_id}
-                          title="Agregar una iglesia que no está en la lista"
-                          style={{ padding: "0 16px", background: !formData.pais_id ? "#e8edf5" : PRIMARY, color: !formData.pais_id ? "#b0bcd0" : "white", border: "none", borderRadius: "8px", cursor: !formData.pais_id ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 18 }}
-                        >
-                          <FaPlus />
-                        </button>
-                      </div>
+                      <select
+                        className="mbr-input"
+                        required
+                        value={formData.iglesia_id ? `real:${formData.iglesia_id}` : ''}
+                        onChange={manejarSeleccionIglesia}
+                        disabled={!formData.pais_id}
+                        style={inputStyle}
+                      >
+                        <option value="">
+                          {!formData.pais_id ? 'Selecciona primero un país' : 'Selecciona una iglesia...'}
+                        </option>
+                        {opcionesIglesia.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
                       <div style={{ fontSize: 12, color: "#8a97b0", marginTop: 4 }}>
-                        ¿No está la ciudad que buscas en la lista? Usa el botón + para agregarla.
+                        ¿No está la iglesia que buscas? Agrégala en{' '}
+                        <span
+                          onClick={() => navigate('/iglesias')}
+                          style={{ color: PRIMARY, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+                        >
+                          el módulo de Iglesias
+                        </span>.
                       </div>
-
-                      {mostrarNuevaIglesia && (
-                        <div style={{ marginTop: "10px", padding: "12px", background: "#f0f4fa", borderRadius: "8px" }}>
-                          <div style={{ marginBottom: "10px" }}>
-                            <label style={{ ...labelStyle, marginBottom: 4, fontSize: 12 }}>Ciudad de la nueva iglesia</label>
-                            <select
-                              className="mbr-input"
-                              value={ciudadNuevaIglesiaId}
-                              onChange={(e) => { setCiudadNuevaIglesiaId(e.target.value); setNombreLugarNuevaIglesia(''); }}
-                              style={inputStyle}
-                            >
-                              <option value="">
-                                {ciudadesPais.length === 0 ? 'No hay ciudades cargadas para este país todavía' : 'Selecciona una ciudad...'}
-                              </option>
-                              {ciudadesPais.map(c => (
-                                <option key={c.id} value={c.id}>{c.nombre}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div style={{ fontSize: 12, color: "#8a97b0", textAlign: "center", margin: "6px 0" }}>
-                            — {ciudadesPais.length === 0 ? 'escribe el nombre de la ciudad abajo' : '¿no está en la lista? escríbela abajo'} —
-                          </div>
-
-                          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
-                            <div style={{ flex: 1 }}>
-                              <label style={{ ...labelStyle, marginBottom: 4, fontSize: 12 }}>Nombre de la ciudad nueva</label>
-                              <input
-                                className="mbr-input"
-                                type="text"
-                                value={nombreLugarNuevaIglesia}
-                                onChange={(e) => { setNombreLugarNuevaIglesia(e.target.value); setCiudadNuevaIglesiaId(''); }}
-                                placeholder="Ej. Santiago"
-                                style={inputStyle}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={crearNuevaIglesia}
-                              disabled={creandoIglesia || (!ciudadNuevaIglesiaId && !nombreLugarNuevaIglesia.trim())}
-                              style={{ padding: "10px 16px", background: "#4CAF50", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: creandoIglesia ? "not-allowed" : "pointer" }}
-                            >
-                              {creandoIglesia ? '...' : 'Añadir'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>

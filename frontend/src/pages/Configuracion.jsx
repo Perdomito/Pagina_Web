@@ -18,6 +18,7 @@ export default function Configuracion() {
     { id: 5, nombre: 'administration', label: 'Administration', icono: '💰' },
     { id: 6, nombre: 'statistics',     label: 'Statistics',     icono: '📈' },
     { id: 7, nombre: 'settings',       label: 'Settings',       icono: '⚙️' },
+    { id: 8, nombre: 'Seguimiento de Leyes', label: 'Seguimiento de Leyes', icono: '⚖️' },
   ];
   const { t, tv, idioma, setIdioma } = useIdioma();
   

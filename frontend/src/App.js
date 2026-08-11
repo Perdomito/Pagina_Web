@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
 import Miembros from './pages/Miembros';
+import Iglesias from './pages/Iglesias';
 import EstudiosLista from './pages/EstudiosLista';
 import EstudiosBiblicos from './pages/EstudiosBiblicos';
 import Estadisticas from './pages/Estadisticas';
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/home" element={<PrivateRoute><Home /></PrivateRoute>} />
         <Route path="/miembros" element={<PrivateRoute><Miembros /></PrivateRoute>} />
+        <Route path="/iglesias" element={<PrivateRoute><Iglesias /></PrivateRoute>} />
         <Route path="/estudios-biblicos" element={<PrivateRoute><EstudiosBiblicos /></PrivateRoute>} />
         <Route path="/estudios" element={<PrivateRoute><EstudiosLista /></PrivateRoute>} />
         <Route path="/estadisticas" element={<PrivateRoute><Estadisticas /></PrivateRoute>} />
