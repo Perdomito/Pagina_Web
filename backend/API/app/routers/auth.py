@@ -8,12 +8,13 @@ from app.schemas import LoginRequest, TokenResponse, UsuarioLoginOut
 from app.auth_middleware import create_access_token
 
 PERMISO_NAMES = {
-    1: "miembros",
-    2: "estudios_biblicos",
-    3: "reportes",
+    1: "estudios_biblicos",
+    2: "reportes",
+    3: "miembros",
     4: "contactos",
     5: "administracion",
-    6: "configuracion",
+    6: "estadisticas",
+    7: "configuracion",
     8: "leyes",
 }
 
@@ -67,21 +68,34 @@ from app.auth_middleware import get_current_user
 
 @router.get("/mis-permisos")
 async def mis_permisos(user: Usuario = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    from app.models import RolPermiso
-    result = await db.execute(
+    from app.models import RolPermiso, UsuarioPermiso
+
+    rol_result = await db.execute(
         select(RolPermiso.permiso_id, RolPermiso.activo)
         .where(RolPermiso.rol_id == user.rol)
     )
-    permisos = result.all()
+    # Empezamos con los permisos del rol...
+    permisos_finales = {p.permiso_id: p.activo for p in rol_result.all()}
+
+    usuario_result = await db.execute(
+        select(UsuarioPermiso.permiso_id, UsuarioPermiso.tiene_acceso)
+        .where(UsuarioPermiso.usuario_id == user.id)
+    )
+    # ...y los personalizados del usuario los pisan (antes esto nunca se leia,
+    # asi que la pantalla de "Permisos personalizados de X" no tenia ningun
+    # efecto real en la app).
+    for permiso_id, tiene_acceso in usuario_result.all():
+        permisos_finales[permiso_id] = tiene_acceso
+
     return {
         "usuario_id": user.id,
         "rol_id": user.rol,
         "permisos": [
             {
-                "permiso_id": p.permiso_id,
-                "nombre": PERMISO_NAMES.get(p.permiso_id, ""),
-                "activo": p.activo,
+                "permiso_id": permiso_id,
+                "nombre": PERMISO_NAMES.get(permiso_id, ""),
+                "activo": activo,
             }
-            for p in permisos
+            for permiso_id, activo in permisos_finales.items()
         ],
     }
