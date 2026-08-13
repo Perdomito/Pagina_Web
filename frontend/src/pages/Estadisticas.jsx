@@ -129,6 +129,15 @@ const obtenerLecturaPronostico = (variacion) => {
   };
 };
 
+const obtenerListaProfesores = (bloque = {}) =>
+  bloque?.profesores || bloque?.missionaries || [];
+
+const normalizarBloqueRendimiento = (stats = null) =>
+  stats?.rendimiento_profesores || stats?.rendimiento_missionaries || {};
+
+const normalizarBloqueEvangelismo = (stats = null) =>
+  stats?.evangelismo_profesores || stats?.evangelismo_missionaries || {};
+
 export default function Estadisticas() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -394,7 +403,7 @@ export default function Estadisticas() {
   }, [anioSeleccionadoFiltro, paisUsuarioResuelto, stats?.resumen_pais]);
 
   useEffect(() => {
-    const missionaries = stats?.rendimiento_missionaries?.missionaries || [];
+    const missionaries = obtenerListaProfesores(normalizarBloqueRendimiento(stats));
 
     if (!missionaries.length) {
       setMissionarySelectdo("");
@@ -462,7 +471,7 @@ export default function Estadisticas() {
   }, [continenteSeleccionado, continentes]);
 
   useEffect(() => {
-    const aniosDisponibles = stats?.evangelismo_missionaries?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
+    const aniosDisponibles = normalizarBloqueEvangelismo(stats)?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
     const aniosComparables = aniosDisponibles.filter((anio) => anio !== anioEvangelismoSelectdo);
     const sugerido = aniosComparables.includes(anioEvangelismoSelectdo - 1)
       ? anioEvangelismoSelectdo - 1
@@ -484,15 +493,17 @@ export default function Estadisticas() {
   }
 
   const comparacion = stats?.comparacion_estudios || {};
-  const rendimientoMissionaryes = stats?.rendimiento_missionaries?.missionaries || [];
-  const anioRendimiento = stats?.rendimiento_missionaries?.anio || new Date().getFullYear();
-  const evangelismoMissionaryes = stats?.evangelismo_missionaries?.missionaries || [];
-  const evangelismoMissionaryesComparacion = stats?.evangelismo_missionaries?.missionaries_comparacion || [];
-  const modoEvangelismo = stats?.evangelismo_missionaries?.modo || modoEvangelismoSelectdo;
-  const mesEvangelismo = traducirMes(stats?.evangelismo_missionaries?.mes || "");
-  const anioEvangelismo = stats?.evangelismo_missionaries?.anio || new Date().getFullYear();
-  const anioComparacionEvangelismo = stats?.evangelismo_missionaries?.anio_comparacion || anioComparacionEvangelismoSelectdo;
-  const aniosEvangelismoDisponibles = stats?.evangelismo_missionaries?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
+  const rendimientoBloque = normalizarBloqueRendimiento(stats);
+  const evangelismoBloque = normalizarBloqueEvangelismo(stats);
+  const rendimientoMissionaryes = obtenerListaProfesores(rendimientoBloque);
+  const anioRendimiento = rendimientoBloque?.anio || new Date().getFullYear();
+  const evangelismoMissionaryes = obtenerListaProfesores(evangelismoBloque);
+  const evangelismoMissionaryesComparacion = evangelismoBloque?.profesores_comparacion || evangelismoBloque?.missionaries_comparacion || [];
+  const modoEvangelismo = evangelismoBloque?.modo || modoEvangelismoSelectdo;
+  const mesEvangelismo = traducirMes(evangelismoBloque?.mes || "");
+  const anioEvangelismo = evangelismoBloque?.anio || new Date().getFullYear();
+  const anioComparacionEvangelismo = evangelismoBloque?.anio_comparacion || anioComparacionEvangelismoSelectdo;
+  const aniosEvangelismoDisponibles = evangelismoBloque?.anios_disponibles || [anioActualPorDefecto, anioActualPorDefecto - 1];
   const aniosEvangelismoComparables = aniosEvangelismoDisponibles.filter((anio) => anio !== anioEvangelismoSelectdo);
   const totalEvangelismoActual = evangelismoMissionaryes.reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
   const totalEvangelismoComparacion = evangelismoMissionaryesComparacion.reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
@@ -505,7 +516,7 @@ export default function Estadisticas() {
   const crecimientoEstudiantesProyeccion = statsProyeccion?.crecimiento_estudiantes || crecimientoEstudiantes;
   const crecimientoMiembrosProyeccion = statsProyeccion?.crecimiento_miembros || crecimientoMiembros;
   const comparacionEstudiosProyeccion = statsProyeccion?.comparacion_estudios || comparacion;
-  const evangelismoProyeccion = statsProyeccion?.evangelismo_missionaries || {};
+  const evangelismoProyeccion = normalizarBloqueEvangelismo(statsProyeccion);
   const anioSelectdo = statsMiembros?.anio_seleccionado || stats?.anio_seleccionado || anioActualPorDefecto;
   const aniosDisponibles = stats?.anios_disponibles || [anioSelectdo];
   const tiposMiembroDisponibles = crecimientoMiembros.tipos_disponibles || ["Todos"];
@@ -558,8 +569,8 @@ export default function Estadisticas() {
   const serieEstudiantesActualProyeccion = crecimientoEstudiantesProyeccion.serie || Array(MESES_EN_ANIO).fill(0);
   const acumuladoEstudiantesActual = sumarSerieHastaMes(serieEstudiantesActualProyeccion, mesCorteProyeccion);
   const proyeccionEstudiantes = proyectarCierreAnnual(acumuladoEstudiantesActual, mesesTranscurridosProyeccion);
-  const totalEvangelismoActualProyeccion = (evangelismoProyeccion.missionaries || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
-  const totalEvangelismoAnteriorProyeccion = (evangelismoProyeccion.missionaries_comparacion || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const totalEvangelismoActualProyeccion = obtenerListaProfesores(evangelismoProyeccion).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
+  const totalEvangelismoAnteriorProyeccion = (evangelismoProyeccion.profesores_comparacion || evangelismoProyeccion.missionaries_comparacion || []).reduce((sum, profesor) => sum + Number(profesor.total_horas || 0), 0);
   const proyeccionEvangelismo = proyectarCierreAnnual(totalEvangelismoActualProyeccion, mesesTranscurridosProyeccion);
   const variacionProyeccionEvangelismo = calcularVariacion(proyeccionEvangelismo, totalEvangelismoAnteriorProyeccion);
   const lecturaEvangelismo = obtenerLecturaPronostico(variacionProyeccionEvangelismo);
@@ -923,11 +934,23 @@ export default function Estadisticas() {
         </div>
 
         {/* Selector de región y país */}
-        <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
           <select value={continenteSeleccionado || ""} onChange={e => { const id = Number(e.target.value); setContinenteSeleccionado(id); localStorage.setItem('estadisticas_continente_id', String(id)); setPaisSeleccionado(null); }}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600", minWidth: "200px" }}>
             <option value="">{t('st_seleccionarRegion')}</option>
             {continentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+          <select
+            value={paisSeleccionado || ""}
+            onChange={e => setPaisSeleccionado(e.target.value ? Number(e.target.value) : null)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600", minWidth: "220px" }}
+          >
+            <option value="">{t('st_pais')} ({t('st_sinDatosLabel')})</option>
+            {paisesDelContinente.map((pais) => (
+              <option key={pais.id} value={pais.id}>
+                {pais.nombre}
+              </option>
+            ))}
           </select>
           <select value={anioSeleccionadoFiltro} onChange={e => setAnioSeleccionadoFiltro(Number(e.target.value))}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "none", fontSize: "13px", fontFamily: "'Lato',sans-serif", color: "#1a2d5a", fontWeight: "600" }}>
