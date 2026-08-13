@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import administracionService from '../services/AdministracionService';
 import {
   FaUsers,
   FaBook,
@@ -30,12 +31,14 @@ export default function Home() {
   const { t, idioma } = useIdioma();
   const tx = (es, en) => (idioma === 'en' ? en : es); // bilingüe directo para textos sin clave en el diccionario central
   const [permisosUsuario, setPermisosUsuario] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
   const [mostrarNotif, setMostrarNotif] = useState(false);
 
   useEffect(() => {
     cargarPermisos();
+    administracionService.getAllRoles().then(setRoles).catch(() => setRoles([]));
     if (user?.rol_id === 2) {
       cargarNotificaciones();
     }
@@ -87,7 +90,10 @@ export default function Home() {
   const getRolLabel = (rol_id) => {
     if (rol_id === 1) return t('administrador');
     if (rol_id === 2) return t('pastor');
-    return t('misionero');
+    // Cualquier otro rol: usar el nombre real de la tabla de roles
+    // (antes esto siempre decía "Misionero" sin importar el rol de verdad).
+    const rolReal = roles.find(r => r.id === rol_id)?.nombre;
+    return rolReal || t('misionero');
   };
 
   const modulosConPermisos = [
@@ -151,7 +157,7 @@ export default function Home() {
       ruta: "/estadisticas",
       icon: <FaChartLine size={32} />,
       color: "#673AB7",
-      permiso: "reportes",
+      permiso: "estadisticas",
       animacion: "pulse"
     },
     {
@@ -171,8 +177,8 @@ export default function Home() {
     if (tarjeta.permiso === 'administracion' && user?.rol_id !== 1 && user?.rol_id !== 4) return false;
     // Configuración solo para admin (1) o pastor (2)
     if (tarjeta.permiso === 'configuracion' && user?.rol_id !== 1 && user?.rol_id !== 2) return false;
-    // Seguimiento de Leyes solo para admin (1) o pastor (2)
-    if (tarjeta.permiso === 'leyes' && user?.rol_id !== 1 && user?.rol_id !== 2) return false;
+    // Seguimiento de Leyes: sin restricción dura de rol — depende solo del
+    // permiso (heredado del rol, o personalizado por usuario en Configuración).
     return true;
   });
 

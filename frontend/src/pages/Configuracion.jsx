@@ -249,6 +249,17 @@ const [permisosRol, permisosUsuario] = await Promise.all([
   const tienePermisoPersonalizado = (permisoId) => {
     return usuarioPermisos?.permisosPersonalizados?.find(p => p.permiso_id === permisoId);
   };
+
+  const quitarPersonalizacion = async (permisoId) => {
+    try {
+      await configuracionService.eliminarPermisoUsuario(usuarioPermisos.id, permisoId);
+      const permisosActualizados = await configuracionService.getPermisosUsuario(usuarioPermisos.id);
+      setUsuarioPermissions({ ...usuarioPermisos, permisosPersonalizados: permisosActualizados });
+      toast.success(tx('Vuelve a heredar del rol', 'Back to inheriting from role'));
+    } catch (error) {
+      toast.error(tx('No se pudo quitar la personalización', "Couldn't remove the customization"));
+    }
+  };
   
   const tienePermisoRol = (permisoId) => {
     return usuarioPermisos?.permisosRol?.find(p => p.permiso_id === permisoId && p.tiene_acceso);
@@ -711,6 +722,14 @@ const [permisosRol, permisosUsuario] = await Promise.all([
                       {permiso.icono} {permiso.id === 8 ? tx('Seguimiento de Leyes', 'Laws Tracking') : tv(permiso.nombre.replace(/_/g, ' '))}
                       {permisoRolActive && <span className="permiso-badge badge-rol">{t('cf_badgeRol')}</span>}
                       {permisoPersonalizado && <span className="permiso-badge badge-personalizado">{t('cf_badgePersonalizado')}</span>}
+                      {permisoPersonalizado && (
+                        <button
+                          onClick={() => quitarPersonalizacion(permiso.id)}
+                          style={{ marginLeft: "8px", background: "none", border: "none", color: "#8a97b0", fontSize: "11px", textDecoration: "underline", cursor: "pointer" }}
+                        >
+                          {tx('Quitar personalización', 'Remove customization')}
+                        </button>
+                      )}
                     </div>
                     <div style={{ fontSize: "12px", color: "#999" }}>
                       {permiso.descripcion || ''}
