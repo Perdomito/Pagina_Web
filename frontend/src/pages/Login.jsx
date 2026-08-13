@@ -433,7 +433,7 @@ export default function Login() {
                   <FaEnvelope className="field-icon" />
                   <input
                     type="email"
-                    placeholder="algo@probando.com"
+                    placeholder="UsuarioPais@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="field-input"
