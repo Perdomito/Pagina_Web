@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaSave, FaTimes, FaUser, FaLock, FaShieldAlt, FaUserShield, FaGlobe } from "react-icons/fa";
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaSave, FaTimes, FaUser, FaLock, FaShieldAlt, FaUserShield, FaGlobe, FaUserPlus, FaCheck } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import configuracionService from '../services/ConfiguracionService';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +38,9 @@ export default function Configuracion() {
   const [usuarioEditando, setUsuarioEditando] = useState(null);
   const [rolSeleccionado, setRolSeleccionado] = useState(null);
   const [usuarioPermisos, setUsuarioPermissions] = useState(null);
+  const [solicitudes, setSolicitudes] = useState([]);
+  const [aprobandoSolicitudId, setAprobandoSolicitudId] = useState(null);
+  const [formAprobar, setFormAprobar] = useState({ rol_id: "", pais_id: "" });
   
   // Estados de formularios
   const [nuevoUsuario, setNuevoUsuario] = useState({
@@ -56,21 +59,59 @@ export default function Configuracion() {
   const cargarDatosIniciales = async () => {
     try {
       setCargando(true);
-      const [usuariosData, rolesData, permisosData, paisesData] = await Promise.all([
+      const [usuariosData, rolesData, permisosData, paisesData, solicitudesData] = await Promise.all([
         configuracionService.getAllUsuarios().catch(() => []),
         configuracionService.getAllRoles().catch(() => []),
         configuracionService.getAllPermisos().catch(() => []),
-        configuracionService.getAllPaises().catch(() => [])
+        configuracionService.getAllPaises().catch(() => []),
+        configuracionService.getSolicitudesAcceso().catch(() => [])
       ]);
       setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
       setRoles(Array.isArray(rolesData) ? rolesData : []);
       setPermissions(Array.isArray(permisosData) ? permisosData : []);
       setPaises(Array.isArray(paisesData) ? paisesData : []);
+      setSolicitudes(Array.isArray(solicitudesData) ? solicitudesData : []);
     } catch (error) {
       console.error('Error al cargar datos:', error);
       toast.error(t('error'));
     } finally {
       setCargando(false);
+    }
+  };
+
+  const solicitudesPendientes = solicitudes.filter(s => s.estado === "pendiente");
+
+  const iniciarAprobacion = (solicitud) => {
+    setAprobandoSolicitudId(solicitud.id);
+    setFormAprobar({ rol_id: "", pais_id: "" });
+  };
+
+  const confirmarAprobacion = async (solicitud) => {
+    if (!formAprobar.rol_id) {
+      toast.error(tx('Elige un rol primero', 'Choose a role first'));
+      return;
+    }
+    try {
+      await configuracionService.aprobarSolicitud(solicitud.id, {
+        rol_id: Number(formAprobar.rol_id),
+        pais_id: formAprobar.pais_id ? Number(formAprobar.pais_id) : null
+      });
+      toast.success(tx('Solicitud aprobada, usuario creado', 'Request approved, user created'));
+      setAprobandoSolicitudId(null);
+      await cargarDatosIniciales();
+    } catch (error) {
+      toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || tx('No se pudo aprobar', "Couldn't approve"));
+    }
+  };
+
+  const rechazarSolicitud = async (solicitud) => {
+    if (!window.confirm(tx(`¿Rechazar el acceso de ${solicitud.email}?`, `Reject access for ${solicitud.email}?`))) return;
+    try {
+      await configuracionService.rechazarSolicitud(solicitud.id);
+      toast.success(tx('Solicitud rechazada', 'Request rejected'));
+      await cargarDatosIniciales();
+    } catch (error) {
+      toast.error(tx('No se pudo rechazar', "Couldn't reject"));
     }
   };
   
@@ -503,6 +544,18 @@ const [permisosRol, permisosUsuario] = await Promise.all([
             >
               <FaGlobe /> {t('idiomaTab')}
             </button>
+            <button
+              onClick={() => { setTabActive("solicitudes"); setRolSeleccionado(null); setUsuarioPermissions(null); }}
+              className={`tab-button ${tabActive === "solicitudes" ? 'active' : ''}`}
+              style={{ position: "relative" }}
+            >
+              <FaUserPlus /> {tx('Solicitudes de acceso', 'Access requests')}
+              {solicitudesPendientes.length > 0 && (
+                <span style={{ background: "#c62828", color: "white", borderRadius: "999px", padding: "1px 7px", fontSize: "11px", fontWeight: "800", marginLeft: "6px" }}>
+                  {solicitudesPendientes.length}
+                </span>
+              )}
+            </button>
             {rolSeleccionado && (
               <button
                 onClick={() => setTabActive("permisos_rol")}
@@ -521,6 +574,85 @@ const [permisosRol, permisosUsuario] = await Promise.all([
             )}
           </div>
         </div>
+
+        {/* TAB SOLICITUDES DE ACCESO */}
+        {tabActive === "solicitudes" && (
+          <div className="card">
+            <h2 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: "700" }}>
+              👤➕ {tx('Solicitudes de acceso', 'Access requests')}
+            </h2>
+            <p style={{ color: "#666", margin: "0 0 25px", fontSize: "14px" }}>
+              {tx('Personas que intentaron entrar con Google y todavía no tienen usuario.', "People who tried signing in with Google and don't have an account yet.")}
+            </p>
+
+            {solicitudes.length === 0 ? (
+              <p style={{ color: "#999" }}>{tx('No hay solicitudes todavía.', 'No requests yet.')}</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {solicitudes.map((solicitud) => (
+                  <div key={solicitud.id} style={{ border: "1px solid #eee", borderRadius: "10px", padding: "16px", background: solicitud.estado === "pendiente" ? "#fffdf5" : "white" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        {solicitud.foto_url && (
+                          <img src={solicitud.foto_url} alt="" style={{ width: 36, height: 36, borderRadius: "50%" }} />
+                        )}
+                        <div>
+                          <div style={{ fontWeight: "700" }}>{solicitud.nombre || solicitud.email}</div>
+                          <div style={{ fontSize: "13px", color: "#666" }}>{solicitud.email}</div>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: "12px", fontWeight: "700", padding: "3px 10px", borderRadius: "999px",
+                        background: solicitud.estado === "pendiente" ? "#fff3cd" : solicitud.estado === "aprobado" ? "#d4edda" : "#f8d7da",
+                        color: solicitud.estado === "pendiente" ? "#856404" : solicitud.estado === "aprobado" ? "#155724" : "#721c24"
+                      }}>
+                        {solicitud.estado === "pendiente" ? tx('Pendiente', 'Pending') : solicitud.estado === "aprobado" ? tx('Aprobado', 'Approved') : tx('Rechazado', 'Rejected')}
+                      </span>
+                    </div>
+
+                    {solicitud.estado === "pendiente" && (
+                      <div style={{ marginTop: "14px" }}>
+                        {aprobandoSolicitudId === solicitud.id ? (
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: "12px", fontWeight: "700", marginBottom: "4px" }}>{tx('Rol', 'Role')}</label>
+                              <select value={formAprobar.rol_id} onChange={(e) => setFormAprobar({ ...formAprobar, rol_id: e.target.value })} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #ddd" }}>
+                                <option value="">-</option>
+                                {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ display: "block", fontSize: "12px", fontWeight: "700", marginBottom: "4px" }}>{tx('País', 'Country')}</label>
+                              <select value={formAprobar.pais_id} onChange={(e) => setFormAprobar({ ...formAprobar, pais_id: e.target.value })} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #ddd" }}>
+                                <option value="">-</option>
+                                {paises.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                              </select>
+                            </div>
+                            <button onClick={() => confirmarAprobacion(solicitud)} style={{ background: "#28a745", color: "white", border: "none", borderRadius: "6px", padding: "9px 14px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                              <FaCheck /> {tx('Confirmar', 'Confirm')}
+                            </button>
+                            <button onClick={() => setAprobandoSolicitudId(null)} style={{ background: "transparent", border: "none", color: "#666", cursor: "pointer" }}>
+                              {tx('Cancelar', 'Cancel')}
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", gap: "10px" }}>
+                            <button onClick={() => iniciarAprobacion(solicitud)} style={{ background: "#28a745", color: "white", border: "none", borderRadius: "6px", padding: "8px 14px", fontWeight: "700", cursor: "pointer" }}>
+                              {tx('Aprobar', 'Approve')}
+                            </button>
+                            <button onClick={() => rechazarSolicitud(solicitud)} style={{ background: "#fff", color: "#c62828", border: "1px solid #c62828", borderRadius: "6px", padding: "8px 14px", fontWeight: "700", cursor: "pointer" }}>
+                              {tx('Rechazar', 'Reject')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* TAB IDIOMA */}
         {tabActive === "idioma" && (

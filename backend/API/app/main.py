@@ -74,7 +74,7 @@ async def startup():
                 INSERT INTO permisos (id, nombre) VALUES
                     (1, 'Bible Studies'), (2, 'Reports'), (3, 'Members'),
                     (4, 'Contacts'), (5, 'Administration'), (6, 'Statistics'),
-                    (7, 'Settings'), (8, 'Laws Tracking')
+                    (7, 'Settings')
                 ON CONFLICT (id) DO NOTHING
             """))
 
