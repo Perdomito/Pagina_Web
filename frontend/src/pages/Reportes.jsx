@@ -788,7 +788,6 @@ export default function Reportes() {
         
         </div>{/* cierre padding div */}
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
           ${estilosImpresion}
         `}</style>
       </div>

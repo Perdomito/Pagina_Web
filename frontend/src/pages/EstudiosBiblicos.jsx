@@ -838,7 +838,6 @@ const eliminarPais = async (continenteId, paisId) => {
   return (
     <div style={{ minHeight: "100vh", background: "#f5f7fa", padding: "20px", fontFamily: "'Lato', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         @media print {
           .no-print { display: none !important; }
         }
@@ -1242,7 +1241,7 @@ const eliminarPais = async (continenteId, paisId) => {
           </div>
 
           {/* Mapamundi centrado debajo de las tarjetas */}
-          <div style={{ display: "flex", justifyContent: "center", marginTop: "-90px" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
             <img
               src="/mapamundi.png"
               alt="World map"

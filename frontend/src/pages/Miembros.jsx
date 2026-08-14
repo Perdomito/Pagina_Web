@@ -434,8 +434,6 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
       fontFamily: "'Lato', sans-serif"
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
-
         .mbr-input:focus {
           border-color: ${PRIMARY} !important;
           box-shadow: 0 0 0 3px rgba(26,84,144,0.1);

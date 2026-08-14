@@ -4,6 +4,15 @@
   padding: 0;
 }
 
+/* Ancho 100% explícito — sin esto, algunos navegadores integrados
+   (WhatsApp, Instagram, Facebook) calculan mal el ancho inicial de la
+   página mientras React todavía no terminó de dibujar el contenido, y
+   se quedan con un ancho angosto que no se corrige solo. */
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

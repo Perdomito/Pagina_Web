@@ -915,6 +915,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class GoogleLoginRequest(BaseModel):
+    credential: str  # el token JWT que devuelve el boton de Google
+
 class UsuarioLoginOut(BaseModel):
     id: str
     nombre: str

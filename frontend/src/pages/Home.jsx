@@ -77,7 +77,12 @@ export default function Home() {
       setPermisosUsuario(permisosActivos);
     } catch (error) {
       console.error('Error loading permissions:', error);
-      setPermisosUsuario(['estudios_biblicos', 'reportes', 'administracion', 'miembros', 'contactos', 'configuracion']);
+      // Si falla la carga de permisos, no mostrar ningún módulo extra por
+      // seguridad (antes mostraba casi todos por defecto, lo cual dejaba
+      // ver módulos que el usuario no debía tener, incluso los que ya se
+      // le habían quitado).
+      setPermisosUsuario([]);
+      toast.error(t('cf_errorActualizarPermiso') || 'No se pudieron cargar tus permisos, intenta recargar la página');
     }
   };
 
@@ -220,8 +225,6 @@ export default function Home() {
       fontFamily: "'Lato', sans-serif"
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
-
         body { font-family: 'Lato', sans-serif; }
 
         /* ── Animaciones ── */

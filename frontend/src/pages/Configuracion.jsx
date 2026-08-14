@@ -286,7 +286,6 @@ const [permisosRol, permisosUsuario] = await Promise.all([
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #134069 0%, #1a5490 40%, #f4f6fb 40%)", padding: "28px", fontFamily: "'Lato', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         .tab-button {
           padding: 12px 24px;
           border: none;

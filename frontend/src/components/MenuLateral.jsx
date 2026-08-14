@@ -18,10 +18,11 @@ import { useIdioma } from '../context/IdiomaContext';
 export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
   const navigate = useNavigate();
 const { t, idioma } = useIdioma();
+const tx = (es, en) => (idioma === 'en' ? en : es); // bilingüe directo para textos sin clave en el diccionario central
 
   const modulos = [
     {
-      titulo: t('Miembresia'),
+      titulo: tx('Membresía', 'Membership'),
       desc: t('miembrosDesc'),
       ruta: "/miembros",
       icon: <FaUsers size={20} />,
@@ -39,7 +40,7 @@ const { t, idioma } = useIdioma();
       desc: t('sl_moduloDesc'),
       ruta: "/seguimiento-leyes",
       icon: <FaRoute size={20} />,
-      permiso: "estudios_biblicos"
+      permiso: "leyes"
     },
     {
       titulo: t('reportes'),
@@ -67,15 +68,7 @@ const { t, idioma } = useIdioma();
       desc: t('estadisticasDesc'),
       ruta: "/estadisticas",
       icon: <FaChartLine size={20} />,
-      permiso: "reportes"
-    },
-    {
-      titulo: t('estudios'),
-      desc: t('enConstruccion'),
-      ruta: null,
-      icon: <FaHammer size={20} />,
-      permiso: "estudios_biblicos",
-      enConstruccion: true
+      permiso: "estadisticas"
     },
     {
       titulo: t('configuracion'),
