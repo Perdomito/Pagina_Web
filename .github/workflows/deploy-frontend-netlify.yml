@@ -1,0 +1,48 @@
+name: Deploy Frontend a Netlify
+
+# Publica el frontend (CRA) en Netlify cada vez que frontend/ cambia en main.
+# Construye con npm ci + npm run build y sube la carpeta build/ al sitio de
+# Netlify usando netlify-cli. Requiere dos secrets en el repo de GitHub:
+#   NETLIFY_AUTH_TOKEN  -> token personal de Netlify (User settings > Applications)
+#   NETLIFY_SITE_ID     -> API ID del sitio (Site settings > General > Site information)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        # npm install (no npm ci) porque package-lock.json esta gitignoreado y no
+        # viaja en el repo. Si en el futuro se commitea el lockfile, cambiar a
+        # 'npm ci' y añadir cache: 'npm' para builds mas rapidos y reproducibles.
+        run: npm install
+
+      - name: Build
+        # CI=false: CRA trata los warnings de ESLint como errores cuando CI=true
+        # (valor por defecto en GitHub Actions); sin esto el build falla.
+        run: npm run build
+        env:
+          CI: false
+
+      - name: Deploy a Netlify (produccion)
+        run: npx netlify-cli@17 deploy --prod --dir=build --message "Deploy Pagina_Web@${GITHUB_SHA}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
