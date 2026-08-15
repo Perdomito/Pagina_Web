@@ -33,6 +33,11 @@ const seguimientoLeyesService = {
     return response.data;
   },
 
+  retroceder: async (id) => {
+    const response = await API.post(`/seguimiento-leyes/${id}/retroceder`);
+    return response.data;
+  },
+
   getEtapas: async () => {
     const response = await API.get('/seguimiento-leyes/meta/etapas');
     return response.data.etapas || [];

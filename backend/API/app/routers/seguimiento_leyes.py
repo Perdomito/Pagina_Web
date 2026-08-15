@@ -7,7 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import Contacto, Miembro, SeguimientoLey, SeguimientoLeyHistorial
+from app.models import (
+    Contacto,
+    Entrevista,
+    ExamenRomanos,
+    Miembro,
+    SeguimientoLey,
+    SeguimientoLeyHistorial,
+)
 from app.schemas import (
     SeguimientoLeyAvance,
     SeguimientoLeyCreate,
@@ -101,7 +108,20 @@ def _dias_inactivo(fecha_ultimo_avance: datetime | None) -> int:
 
 
 def _serializar(historial: list[SeguimientoLeyHistorial]) -> list[SeguimientoLeyHistorialOut]:
-    return [SeguimientoLeyHistorialOut.model_validate(item) for item in historial]
+    salida = []
+    for item in historial:
+        payload = {
+            "id": item.id,
+            "etapa": item.etapa,
+            "etapa_orden": item.etapa_orden,
+            "notas": item.notas,
+            "maestro_id": item.maestro_id,
+            "maestro_nombre": item.maestro_rel.nombre if item.maestro_rel else None,
+            "calificacion_estrellas": item.calificacion_estrellas,
+            "fecha_evento": item.fecha_evento,
+        }
+        salida.append(SeguimientoLeyHistorialOut.model_validate(payload))
+    return salida
 
 
 def _enriquecer(obj: SeguimientoLey) -> SeguimientoLeyOut:
@@ -115,15 +135,17 @@ def _enriquecer(obj: SeguimientoLey) -> SeguimientoLeyOut:
         miembro_estudios_id=obj.miembro_estudios_id,
         estado_actual=obj.estado_actual,
         etapa_actual_orden=obj.etapa_actual_orden,
-        abandono_alerta=abandono,
+        abandono_alerta=abandono or bool(obj.desertado),
         fecha_inicio=obj.fecha_inicio,
         fecha_ultimo_avance=obj.fecha_ultimo_avance,
         fecha_abandono=obj.fecha_abandono,
+        fecha_desercion=obj.fecha_desercion,
         fecha_conversion_miembro=obj.fecha_conversion_miembro,
         miembro_convertido_id=obj.miembro_convertido_id,
         tipo_miembro_destino=obj.tipo_miembro_destino,
         notas_generales=obj.notas_generales,
         activo=obj.activo,
+        desertado=bool(obj.desertado),
         contacto_nombre=obj.contacto_rel.nombre if obj.contacto_rel else None,
         contacto_telefono=obj.contacto_rel.telefono if obj.contacto_rel else None,
         pais_nombre=obj.pais_rel.nombre if obj.pais_rel else None,
@@ -144,7 +166,7 @@ async def _get_seguimiento(db: AsyncSession, seguimiento_id: int) -> Seguimiento
             selectinload(SeguimientoLey.miembro_contacto_rel),
             selectinload(SeguimientoLey.miembro_estudios_rel),
             selectinload(SeguimientoLey.miembro_convertido_rel),
-            selectinload(SeguimientoLey.historial),
+            selectinload(SeguimientoLey.historial).selectinload(SeguimientoLeyHistorial.maestro_rel),
         )
         .where(SeguimientoLey.id == seguimiento_id)
     )
@@ -170,7 +192,7 @@ async def listar(
             selectinload(SeguimientoLey.miembro_contacto_rel),
             selectinload(SeguimientoLey.miembro_estudios_rel),
             selectinload(SeguimientoLey.miembro_convertido_rel),
-            selectinload(SeguimientoLey.historial),
+            selectinload(SeguimientoLey.historial).selectinload(SeguimientoLeyHistorial.maestro_rel),
         )
         .order_by(SeguimientoLey.fecha_ultimo_avance.desc())
     )
@@ -241,7 +263,16 @@ async def crear(data: SeguimientoLeyCreate, db: AsyncSession = Depends(get_db)):
 @router.patch("/{seguimiento_id}", response_model=SeguimientoLeyOut)
 async def actualizar(seguimiento_id: int, data: SeguimientoLeyUpdate, db: AsyncSession = Depends(get_db)):
     obj = await _get_seguimiento(db, seguimiento_id)
-    for key, value in data.model_dump(exclude_unset=True).items():
+    cambios = data.model_dump(exclude_unset=True)
+    if "desertado" in cambios:
+        obj.desertado = bool(cambios["desertado"])
+        obj.fecha_desercion = datetime.utcnow() if obj.desertado else None
+        obj.abandono_alerta = obj.desertado or obj.abandono_alerta
+    for key, value in cambios.items():
+        if key == "desertado":
+            continue
+        if key == "fecha_desercion":
+            continue
         setattr(obj, key, value)
     await db.flush()
     return _enriquecer(await _get_seguimiento(db, seguimiento_id))
@@ -260,6 +291,8 @@ async def avanzar(seguimiento_id: int, data: SeguimientoLeyAvance, db: AsyncSess
     obj.fecha_ultimo_avance = now
     obj.abandono_alerta = False
     obj.fecha_abandono = None
+    obj.desertado = False
+    obj.fecha_desercion = None
 
     db.add(
         SeguimientoLeyHistorial(
@@ -267,13 +300,68 @@ async def avanzar(seguimiento_id: int, data: SeguimientoLeyAvance, db: AsyncSess
             etapa=etapa,
             etapa_orden=obj.etapa_actual_orden,
             notas=data.notas,
+            maestro_id=data.maestro_id,
+            calificacion_estrellas=data.calificacion_estrellas,
             fecha_evento=now,
         )
     )
 
+    if etapa == "Examen de Romanos":
+        examen = obj.examen or ExamenRomanos(seguimiento_id=obj.id)
+        examen.fecha = now.date()
+        examen.nota_oral = data.nota_oral
+        examen.nota_virtual = data.nota_virtual
+        examen.nota = (
+            ((data.nota_oral or 0) + (data.nota_virtual or 0)) / 2
+            if data.nota_oral is not None or data.nota_virtual is not None
+            else None
+        )
+        examen.evaluador_id = data.evaluador_id
+        examen.aprobado = data.aprobado
+        examen.observaciones = data.observaciones
+        db.add(examen)
+
+    if etapa == "Entrevista":
+        entrevista = obj.entrevista or Entrevista(seguimiento_id=obj.id)
+        entrevista.fecha = now.date()
+        entrevista.entrevistador_id = data.entrevistador_id
+        entrevista.resultado = data.resultado or "Pendiente"
+        entrevista.tipo_miembro_resultante = data.tipo_miembro_resultante
+        entrevista.observaciones = data.observaciones
+        db.add(entrevista)
+
     if etapa == "Miembro":
         contacto = obj.contacto_rel or await db.get(Contacto, obj.contacto_id)
         await _crear_miembro_desde_contacto(db, obj, contacto)
+
+    await db.flush()
+    return _enriquecer(await _get_seguimiento(db, seguimiento_id))
+
+
+@router.post("/{seguimiento_id}/retroceder", response_model=SeguimientoLeyOut)
+async def retroceder(seguimiento_id: int, db: AsyncSession = Depends(get_db)):
+    obj = await _get_seguimiento(db, seguimiento_id)
+
+    if obj.etapa_actual_orden <= 0:
+        raise HTTPException(400, "No se puede retroceder mas")
+
+    etapa_actual = obj.estado_actual
+    nueva_etapa = ETAPAS[obj.etapa_actual_orden - 1]
+    ahora = datetime.utcnow()
+
+    ultimo_historial = obj.historial[-1] if obj.historial else None
+    if ultimo_historial and ultimo_historial.etapa == etapa_actual:
+        await db.delete(ultimo_historial)
+
+    obj.estado_actual = nueva_etapa
+    obj.etapa_actual_orden = obj.etapa_actual_orden - 1
+    obj.fecha_ultimo_avance = ahora
+    obj.abandono_alerta = False
+    obj.fecha_abandono = None
+
+    if obj.miembro_convertido_id:
+        obj.miembro_convertido_id = None
+        obj.fecha_conversion_miembro = None
 
     await db.flush()
     return _enriquecer(await _get_seguimiento(db, seguimiento_id))

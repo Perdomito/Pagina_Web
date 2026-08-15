@@ -54,13 +54,26 @@ export default function SeguimientoLeyes() {
   const [busqueda, setBusqueda] = useState("");
   const [seleccionadoId, setSeleccionadoId] = useState(null);
   const [notaAvance, setNotaAvance] = useState("");
+  const [avanceForm, setAvanceForm] = useState({
+    maestro_id: "",
+    calificacion_estrellas: "",
+    nota_oral: "",
+    nota_virtual: "",
+    evaluador_id: "",
+    resultado: "",
+    entrevistador_id: "",
+    tipo_miembro_resultante: "Registrado",
+    aprobado: "",
+    observaciones: ""
+  });
   const [mostrarModal, setMostrarModal] = useState(false);
   const [guardandoDetalle, setGuardandoDetalle] = useState(false);
   const [formDetalle, setFormDetalle] = useState({
     miembro_contacto_id: "",
     miembro_estudios_id: "",
     tipo_miembro_destino: "Registrado",
-    notas_generales: ""
+    notas_generales: "",
+    desertado: false
   });
   const [formNuevo, setFormNuevo] = useState({
     contacto_id: "",
@@ -125,7 +138,8 @@ export default function SeguimientoLeyes() {
         miembro_contacto_id: seleccionado.miembro_contacto_id || "",
         miembro_estudios_id: seleccionado.miembro_estudios_id || "",
         tipo_miembro_destino: seleccionado.tipo_miembro_destino || "Registrado",
-        notas_generales: seleccionado.notas_generales || ""
+        notas_generales: seleccionado.notas_generales || "",
+        desertado: Boolean(seleccionado.desertado)
       });
     }
   }, [seleccionado]);
@@ -145,6 +159,35 @@ export default function SeguimientoLeyes() {
   const etapasRestantes = seleccionado
     ? etapas.filter((etapa) => etapa.orden > seleccionado.etapa_actual_orden)
     : [];
+  const etapaAnterior = seleccionado && seleccionado.etapa_actual_orden > 0
+    ? etapas.find((etapa) => etapa.orden === seleccionado.etapa_actual_orden - 1)
+    : null;
+
+  const retroceder = async () => {
+    if (!seleccionado || !etapaAnterior) return;
+    try {
+      await seguimientoLeyesService.retroceder(seleccionado.id);
+      toast.success(`${t("sl_retroceder")}: ${traducirEtapa(etapaAnterior.nombre)}`);
+      await cargarDatos();
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.detail || t("sl_errorActualizar"));
+    }
+  };
+
+  const cambiarDesertado = async () => {
+    if (!seleccionado) return;
+    try {
+      const actualizado = await seguimientoLeyesService.update(seleccionado.id, { desertado: !formDetalle.desertado });
+      setFormDetalle((prev) => ({ ...prev, desertado: actualizado.desertado }));
+      setProcesos((prev) => prev.map((item) => (item.id === actualizado.id ? actualizado : item)));
+      toast.success(actualizado.desertado ? "Marcado como desertó" : "Reactivado");
+      await cargarDatos();
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.detail || t("sl_errorActualizar"));
+    }
+  };
 
   const crearProceso = async (e) => {
     e.preventDefault();
@@ -188,11 +231,53 @@ export default function SeguimientoLeyes() {
   const avanzar = async (etapa) => {
     if (!seleccionado) return;
     try {
-      await seguimientoLeyesService.avanzar(seleccionado.id, {
+      const payload = {
         etapa: etapa.nombre,
-        notas: notaAvance || null
-      });
+        notas: notaAvance || null,
+        maestro_id: avanceForm.maestro_id || null,
+        calificacion_estrellas: avanceForm.calificacion_estrellas ? Number(avanceForm.calificacion_estrellas) : null,
+        nota_oral: avanceForm.nota_oral !== "" ? Number(avanceForm.nota_oral) : null,
+        nota_virtual: avanceForm.nota_virtual !== "" ? Number(avanceForm.nota_virtual) : null,
+        evaluador_id: avanceForm.evaluador_id || null,
+        resultado: avanceForm.resultado || null,
+        entrevistador_id: avanceForm.entrevistador_id || null,
+        tipo_miembro_resultante: avanceForm.tipo_miembro_resultante || null,
+        aprobado: avanceForm.aprobado === "" ? null : avanceForm.aprobado === "true",
+        observaciones: avanceForm.observaciones || null
+      };
+
+      if (etapa.nombre !== "Examen de Romanos") {
+        delete payload.nota_oral;
+        delete payload.nota_virtual;
+        delete payload.evaluador_id;
+        delete payload.aprobado;
+      }
+
+      if (etapa.nombre !== "Entrevista") {
+        delete payload.resultado;
+        delete payload.entrevistador_id;
+        delete payload.tipo_miembro_resultante;
+      }
+
+      if (!['Ley 1', 'Ley 2', 'Ley 3', 'Ley 4', 'Camino al Discipulo'].includes(etapa.nombre)) {
+        delete payload.maestro_id;
+        delete payload.calificacion_estrellas;
+      }
+
+      await seguimientoLeyesService.avanzar(seleccionado.id, payload);
       setNotaAvance("");
+      setAvanceForm({
+        maestro_id: "",
+        calificacion_estrellas: "",
+        nota_oral: "",
+        nota_virtual: "",
+        evaluador_id: "",
+        resultado: "",
+        entrevistador_id: "",
+        tipo_miembro_resultante: "Registrado",
+        aprobado: "",
+        observaciones: ""
+      });
       toast.success(`${t("sl_guardarAvance")}: ${traducirEtapa(etapa.nombre)}`);
       await cargarDatos();
     } catch (error) {
@@ -371,9 +456,93 @@ export default function SeguimientoLeyes() {
                   </button>
                 </div>
 
+                {etapaAnterior && (
+                  <div style={{ marginBottom: "18px" }}>
+                    <div style={{ fontWeight: 800, color: colors.primary, marginBottom: "8px" }}>{t("sl_retroceder")}</div>
+                    <button onClick={retroceder} style={{ border: "none", background: "#eef3fa", color: "#28415f", borderRadius: "999px", padding: "10px 16px", fontWeight: 700, cursor: "pointer" }}>
+                      {t("sl_retroceder")}: {traducirEtapa(etapaAnterior.nombre)}
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: "18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                  <div style={{ fontWeight: 800, color: colors.primary }}>{seleccionado.desertado ? "Desertó" : "Activo"}</div>
+                  <button onClick={cambiarDesertado} style={{ border: "none", background: seleccionado.desertado ? colors.success : "#eef3fa", color: seleccionado.desertado ? "white" : "#28415f", borderRadius: "999px", padding: "10px 16px", fontWeight: 700, cursor: "pointer" }}>
+                    {seleccionado.desertado ? "Reactivar" : "Marcar como desertó"}
+                  </button>
+                </div>
+
                 <div style={{ marginBottom: "18px" }}>
                   <div style={{ fontWeight: 800, color: colors.primary, marginBottom: "8px" }}>{t("sl_avanzarA")}</div>
-                  <textarea rows="2" value={notaAvance} onChange={(e) => setNotaAvance(e.target.value)} placeholder={t("sl_notasAvance")} style={{ ...inputStyle, resize: "vertical", marginBottom: "10px" }} />
+                  <textarea rows="2" value={notaAvance} onChange={(e) => setNotaAvance(e.target.value)} placeholder={t("sl_notasAvance")} style={{ ...inputStyle, resize: "vertical", marginBottom: "12px" }} />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", marginBottom: "12px" }}>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Maestro / encargado</label>
+                      <select value={avanceForm.maestro_id} onChange={(e) => setAvanceForm((prev) => ({ ...prev, maestro_id: e.target.value }))} style={inputStyle}>
+                        <option value="">-</option>
+                        {miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Calificación</label>
+                      <select value={avanceForm.calificacion_estrellas} onChange={(e) => setAvanceForm((prev) => ({ ...prev, calificacion_estrellas: e.target.value }))} style={inputStyle}>
+                        <option value="">-</option>
+                        {[1,2,3,4,5].map((valor) => <option key={valor} value={valor}>{'★'.repeat(valor)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Nota oral</label>
+                      <input type="number" min="0" max="100" step="0.1" value={avanceForm.nota_oral} onChange={(e) => setAvanceForm((prev) => ({ ...prev, nota_oral: e.target.value }))} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Nota virtual</label>
+                      <input type="number" min="0" max="100" step="0.1" value={avanceForm.nota_virtual} onChange={(e) => setAvanceForm((prev) => ({ ...prev, nota_virtual: e.target.value }))} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Encargado examen</label>
+                      <select value={avanceForm.evaluador_id} onChange={(e) => setAvanceForm((prev) => ({ ...prev, evaluador_id: e.target.value }))} style={inputStyle}>
+                        <option value="">-</option>
+                        {miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Resultado entrevista</label>
+                      <select value={avanceForm.resultado} onChange={(e) => setAvanceForm((prev) => ({ ...prev, resultado: e.target.value }))} style={inputStyle}>
+                        <option value="">-</option>
+                        <option value="Aprobado">Aprobado</option>
+                        <option value="No Aprobado">No Aprobado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Entrevistador</label>
+                      <select value={avanceForm.entrevistador_id} onChange={(e) => setAvanceForm((prev) => ({ ...prev, entrevistador_id: e.target.value }))} style={inputStyle}>
+                        <option value="">-</option>
+                        {miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Tipo de miembro</label>
+                      <select value={avanceForm.tipo_miembro_resultante} onChange={(e) => setAvanceForm((prev) => ({ ...prev, tipo_miembro_resultante: e.target.value }))} style={inputStyle}>
+                        <option value="Registrado">Registrado</option>
+                        <option value="Comprometido">Comprometido</option>
+                        <option value="Voluntario">Voluntario</option>
+                      </select>
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Aprobado</label>
+                      <select value={avanceForm.aprobado} onChange={(e) => setAvanceForm((prev) => ({ ...prev, aprobado: e.target.value }))} style={inputStyle}>
+                        <option value="">-</option>
+                        <option value="true">Sí</option>
+                        <option value="false">No</option>
+                      </select>
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={{ display: "block", marginBottom: "6px", fontWeight: 700, color: "#54657d" }}>Observaciones</label>
+                      <textarea rows="2" value={avanceForm.observaciones} onChange={(e) => setAvanceForm((prev) => ({ ...prev, observaciones: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} />
+                    </div>
+                  </div>
+
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     {etapasRestantes.map((etapa) => (
                       <button key={etapa.orden} onClick={() => avanzar(etapa)} style={{ border: "none", background: etapa.nombre === "Miembro" ? colors.success : colors.primaryLight, color: "white", borderRadius: "999px", padding: "10px 14px", fontWeight: 700, cursor: "pointer" }}>

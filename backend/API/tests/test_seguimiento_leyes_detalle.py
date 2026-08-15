@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models import (
     Contacto, Entrevista, ExamenRomanos, Miembro, Pais, SeguimientoLey,
+    SeguimientoLeyHistorial,
 )
 
 
@@ -106,6 +107,36 @@ async def test_la_entrevista_empieza_pendiente(seguimiento):
 
     obj = await _cargar(seguimiento)
     assert obj.entrevista.resultado == "Pendiente"
+
+
+@pytest.mark.asyncio
+async def test_retrocede_el_ultimo_paso_y_elimina_su_historial(cliente, datos_base):
+    datos_base.add(Pais(id=1, iso="HN", nombre="Honduras"))
+    datos_base.add_all([
+        Miembro(id="M1", nombre="Ana", tipo_miembro="Comprometido", pais_id=1),
+        Miembro(id="M2", nombre="Beto", tipo_miembro="Comprometido", pais_id=1),
+        Contacto(id=100, miembro_responsable="Ana", nombre="Dina", pais_id=1),
+    ])
+    datos_base.add(SeguimientoLey(
+        id=7, contacto_id=100, pais_id=1,
+        miembro_contacto_id="M1", miembro_estudios_id="M2",
+        estado_actual="Ley 1", etapa_actual_orden=4,
+    ))
+    datos_base.add(SeguimientoLeyHistorial(
+        id=1, seguimiento_id=7, etapa="Ley 1", etapa_orden=4,
+        notas="Se marcó la ley 1", fecha_evento="2024-01-01T00:00:00"
+    ))
+    await datos_base.commit()
+
+    response = await cliente.post("/seguimiento-leyes/7/retroceder")
+
+    assert response.status_code == 200
+    assert response.json()["estado_actual"] == "Examen de Romanos"
+    assert response.json()["etapa_actual_orden"] == 3
+    registros = (await datos_base.execute(
+        select(SeguimientoLeyHistorial).where(SeguimientoLeyHistorial.seguimiento_id == 7)
+    )).scalars().all()
+    assert registros == []
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,7 @@
 const seguimientoLeyes = {
   es: {
     sl_titulo: "Seguimiento de Leyes",
-    sl_subtitulo: "Proceso desde Romanos 8 hasta miembro",
+    sl_subtitulo: "Proceso para Potenciales",
     sl_nuevoProceso: "Nuevo proceso",
     sl_filtroTodos: "Todos",
     sl_filtroAlertas: "Solo alertas",
@@ -16,6 +16,7 @@ const seguimientoLeyes = {
     sl_detalle: "Historial individual",
     sl_historial: "Historial",
     sl_avanzarA: "Avanzar a",
+    sl_retroceder: "Retroceder",
     sl_alertaAbandono: "Abandonó",
     sl_diasInactivo: "{dias} días sin avanzar",
     sl_estadoActual: "Estado actual",
@@ -56,7 +57,7 @@ const seguimientoLeyes = {
   },
   en: {
     sl_titulo: "Laws Tracking",
-    sl_subtitulo: "Process from Romans 8 to member",
+    sl_subtitulo: "Process for Potential Members",
     sl_nuevoProceso: "New process",
     sl_filtroTodos: "All",
     sl_filtroAlertas: "Alerts only",
@@ -71,6 +72,7 @@ const seguimientoLeyes = {
     sl_detalle: "Individual history",
     sl_historial: "History",
     sl_avanzarA: "Advance to",
+    sl_retroceder: "Go back",
     sl_alertaAbandono: "Dropped off",
     sl_diasInactivo: "{dias} days without progress",
     sl_estadoActual: "Current status",

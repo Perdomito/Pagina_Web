@@ -231,9 +231,11 @@ async def startup():
                     estado_actual           VARCHAR(50) NOT NULL DEFAULT 'Contacto',
                     etapa_actual_orden      INTEGER NOT NULL DEFAULT 0,
                     abandono_alerta         BOOLEAN NOT NULL DEFAULT FALSE,
+                    desertado              BOOLEAN NOT NULL DEFAULT FALSE,
                     fecha_inicio            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     fecha_ultimo_avance     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     fecha_abandono          TIMESTAMP,
+                    fecha_desercion         TIMESTAMP,
                     fecha_conversion_miembro TIMESTAMP,
                     miembro_convertido_id   VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
                     tipo_miembro_destino    VARCHAR(50) NOT NULL DEFAULT 'Registrado',
@@ -249,12 +251,14 @@ async def startup():
             """))
             await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS public.seguimiento_leyes_historial (
-                    id              SERIAL PRIMARY KEY,
-                    seguimiento_id  INTEGER NOT NULL REFERENCES public.seguimiento_leyes(id) ON DELETE CASCADE,
-                    etapa           VARCHAR(50) NOT NULL,
-                    etapa_orden     INTEGER NOT NULL DEFAULT 0,
-                    notas           TEXT,
-                    fecha_evento    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    id                    SERIAL PRIMARY KEY,
+                    seguimiento_id        INTEGER NOT NULL REFERENCES public.seguimiento_leyes(id) ON DELETE CASCADE,
+                    etapa                 VARCHAR(50) NOT NULL,
+                    etapa_orden           INTEGER NOT NULL DEFAULT 0,
+                    notas                 TEXT,
+                    maestro_id            VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
+                    calificacion_estrellas INTEGER,
+                    fecha_evento          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """))
             await conn.execute(text("""
@@ -272,6 +276,8 @@ async def startup():
                                         REFERENCES public.seguimiento_leyes(id) ON DELETE CASCADE,
                     fecha               DATE,
                     nota                NUMERIC(5,2),
+                    nota_oral           NUMERIC(5,2),
+                    nota_virtual        NUMERIC(5,2),
                     nota_maxima         NUMERIC(5,2) DEFAULT 100,
                     aprobado            BOOLEAN,
                     evaluador_id        VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL,
