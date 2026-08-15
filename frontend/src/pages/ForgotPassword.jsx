@@ -56,10 +56,8 @@ export default function ForgotPassword() {
           <div style={{ background:"rgba(255,255,255,0.06)", borderRadius:"20px", padding:"36px", border:"1px solid rgba(255,255,255,0.12)", backdropFilter:"blur(10px)" }}>
             {!sent ? (
               <>
-                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"20px", fontWeight:"600", margin:"0 0 8px", textAlign:"center" }}>{tx("Recuperar contraseña", "Recover Password")}</h2>
-                <p style={{ color:"rgba(255,255,255,0.6)", fontSize:"13px", textAlign:"center", margin:"0 0 28px", lineHeight:"1.6" }}>
-                  {tx("Aquí no se manda ningún correo — le avisamos directo al administrador para que te ayude a restablecerla.", "No email is sent here — we notify the administrator directly so they can help you reset it.")}
-                </p>
+                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"20px", fontWeight:"600", margin:"0 0 8px", textAlign:"center" }}>{tx("¿Olvidaste tu contraseña?", "Forgot your password?")}</h2>                <p style={{ color:"rgba(255,255,255,0.6)", fontSize:"13px", textAlign:"center", margin:"0 0 28px", lineHeight:"1.6" }}>
+                {tx("Escribe tu correo y le avisaremos al administrador para que te ayude a recuperar el acceso.", "Enter your email and we'll let the administrator know so they can help you get back in.")}                </p>
 
                 <form onSubmit={handleSubmit}>
                   <div style={{ position:"relative", marginBottom:"20px" }}>
@@ -67,8 +65,7 @@ export default function ForgotPassword() {
                     <input type="email" placeholder={tx("Correo electrónico", "Email address")} value={email} onChange={e => setEmail(e.target.value)} className="fp-input" disabled={loading} />
                   </div>
                   <button type="submit" className="fp-btn" disabled={loading}>
-                    {loading ? tx('Enviando...', 'Sending...') : tx('Avisar al administrador', 'Notify Administrator')}
-                  </button>
+                  {loading ? tx('Enviando...', 'Sending...') : tx('Solicitar ayuda', 'Request Help')}                  </button>
                 </form>
               </>
             ) : (
