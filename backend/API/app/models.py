@@ -251,9 +251,11 @@ class SeguimientoLey(Base):
     estado_actual = Column(String(50), nullable=False, default="Contacto")
     etapa_actual_orden = Column(Integer, nullable=False, default=0)
     abandono_alerta = Column(Boolean, default=False, nullable=False)
+    desertado = Column(Boolean, default=False, nullable=False)
     fecha_inicio = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_ultimo_avance = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_abandono = Column(DateTime)
+    fecha_desercion = Column(DateTime)
     fecha_conversion_miembro = Column(DateTime)
     miembro_convertido_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
     tipo_miembro_destino = Column(String(50), default="Registrado", nullable=False)
@@ -289,9 +291,12 @@ class SeguimientoLeyHistorial(Base):
     etapa = Column(String(50), nullable=False)
     etapa_orden = Column(Integer, nullable=False, default=0)
     notas = Column(Text)
+    maestro_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
+    calificacion_estrellas = Column(Integer)
     fecha_evento = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     seguimiento_rel = relationship("SeguimientoLey", back_populates="historial")
+    maestro_rel = relationship("Miembro", foreign_keys=[maestro_id])
 
 
 # Las etapas Potencial, Ley 1-4 y Camino al Discipulo no tienen tabla propia: son
@@ -309,6 +314,8 @@ class ExamenRomanos(Base):
     )
     fecha = Column(Date)
     nota = Column(Numeric(5, 2))
+    nota_oral = Column(Numeric(5, 2))
+    nota_virtual = Column(Numeric(5, 2))
     nota_maxima = Column(Numeric(5, 2), default=100)
     aprobado = Column(Boolean)
     evaluador_id = Column(String(30), ForeignKey("miembros.id", ondelete="SET NULL"))
