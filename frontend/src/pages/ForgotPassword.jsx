@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEnvelope, FaArrowLeft, FaChurch } from "react-icons/fa";
+import { FaEnvelope, FaArrowLeft, FaChurch, FaCheckCircle } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import API from '../api/axios';
 import { useIdioma } from "../context/IdiomaContext";
@@ -22,12 +22,10 @@ export default function ForgotPassword() {
     setLoading(true);
     try {
       await API.post('/auth/forgot-password', { email });
-      setSent(true);
-      toast.success(tx("¡Instrucciones enviadas! Revisa tu correo.", "Instructions sent! Check your inbox."));
     } catch {
-      setSent(true);
-      toast.success(tx("Si el correo existe, recibirás instrucciones en breve.", "If the email exists, you will receive instructions shortly."));
+      // Por seguridad, mostramos el mismo mensaje aunque falle o el correo no exista.
     } finally {
+      setSent(true);
       setLoading(false);
     }
   };
@@ -58,9 +56,9 @@ export default function ForgotPassword() {
           <div style={{ background:"rgba(255,255,255,0.06)", borderRadius:"20px", padding:"36px", border:"1px solid rgba(255,255,255,0.12)", backdropFilter:"blur(10px)" }}>
             {!sent ? (
               <>
-                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"20px", fontWeight:"600", margin:"0 0 8px", textAlign:"center" }}>{tx("Restablecer contraseña", "Reset Password")}</h2>
+                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"20px", fontWeight:"600", margin:"0 0 8px", textAlign:"center" }}>{tx("Recuperar contraseña", "Recover Password")}</h2>
                 <p style={{ color:"rgba(255,255,255,0.6)", fontSize:"13px", textAlign:"center", margin:"0 0 28px", lineHeight:"1.6" }}>
-                  {tx("Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.", "Enter your email address and we'll send you instructions to reset your password.")}
+                  {tx("Aquí no se manda ningún correo — le avisamos directo al administrador para que te ayude a restablecerla.", "No email is sent here — we notify the administrator directly so they can help you reset it.")}
                 </p>
 
                 <form onSubmit={handleSubmit}>
@@ -69,16 +67,16 @@ export default function ForgotPassword() {
                     <input type="email" placeholder={tx("Correo electrónico", "Email address")} value={email} onChange={e => setEmail(e.target.value)} className="fp-input" disabled={loading} />
                   </div>
                   <button type="submit" className="fp-btn" disabled={loading}>
-                    {loading ? tx('Enviando...', 'Sending...') : tx('Enviar instrucciones', 'Send Reset Instructions')}
+                    {loading ? tx('Enviando...', 'Sending...') : tx('Avisar al administrador', 'Notify Administrator')}
                   </button>
                 </form>
               </>
             ) : (
               <div style={{ textAlign:"center", padding:"20px 0" }}>
-                <div style={{ fontSize:"48px", marginBottom:"16px" }}>📧</div>
-                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"18px", margin:"0 0 12px" }}>{tx("Revisa tu correo", "Check Your Email")}</h2>
+                <div style={{ fontSize:"48px", marginBottom:"16px", color: "#4CAF50" }}><FaCheckCircle /></div>
+                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"18px", margin:"0 0 12px" }}>{tx("Listo, ya se avisó", "Done, admin notified")}</h2>
                 <p style={{ color:"rgba(255,255,255,0.7)", fontSize:"13px", lineHeight:"1.7", margin:0 }}>
-                  {tx("Si existe una cuenta para", "If an account exists for")} <strong>{email}</strong>{tx(", recibirás instrucciones para restablecer tu contraseña en breve.", ", you will receive password reset instructions shortly.")}
+                  {tx("Si ese correo existe en el sistema, el administrador ya recibió una notificación y se pondrá en contacto contigo para ayudarte a restablecer tu contraseña.", "If that email exists in the system, the administrator already received a notification and will reach out to help you reset your password.")}
                 </p>
               </div>
             )}

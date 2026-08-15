@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import Usuario, Rol, Pais
-from app.schemas import LoginRequest, TokenResponse, UsuarioLoginOut
+from app.models import Usuario, Rol, Pais, Notificacion
+from app.schemas import LoginRequest, TokenResponse, UsuarioLoginOut, ForgotPasswordRequest
 from app.auth_middleware import create_access_token
 
 PERMISO_NAMES = {
@@ -17,6 +17,8 @@ PERMISO_NAMES = {
     7: "configuracion",
     8: "leyes",
 }
+
+ROL_ADMIN_ID = 1
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -61,6 +63,28 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         miembro_id=user.miembro_id,
     )
     return TokenResponse(token=token, usuario=usuario_out)
+
+
+@router.post("/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """
+    No mandamos correo real (no hay servicio de email configurado).
+    En vez de eso, avisamos al Administrador dentro de la app para que
+    contacte a la persona y le cambie la contrasena a mano.
+    Por seguridad, siempre respondemos igual exista o no ese correo.
+    """
+    result = await db.execute(select(Usuario).where(Usuario.email == data.email))
+    user = result.scalar_one_or_none()
+    if user:
+        db.add(
+            Notificacion(
+                mensaje=f"{user.nombre} ({user.email}) pidio recuperar su contrasena. Contactala para cambiarsela desde Configuracion.",
+                tipo="recuperar_password",
+                rol_destino_id=ROL_ADMIN_ID,
+            )
+        )
+        await db.flush()
+    return {"ok": True}
 
 
 from app.auth_middleware import get_current_user

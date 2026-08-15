@@ -11,6 +11,7 @@ from app.routers import (
     ciudades_mision, ingresos, miembros_info_adicional,
     saldos_caja_banco, traslados, auth, continentes,
     estudios_diarios, estadisticas, archivos, iglesias, seguimiento_leyes,
+    notificaciones,
 )
 
 _es_produccion = settings.ENVIRONMENT == "production"
@@ -283,6 +284,21 @@ async def startup():
                 CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_historial_seguimiento
                 ON public.seguimiento_leyes_historial (seguimiento_id, fecha_evento)
             """))
+            # Notificaciones simples por rol (ej. "alguien pidio recuperar su
+            # contrasena"). Tabla nueva, no existia antes.
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.notificaciones (
+                    id              SERIAL PRIMARY KEY,
+                    mensaje         TEXT NOT NULL,
+                    tipo            VARCHAR(30),
+                    rol_destino_id  INTEGER NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+                    leida           BOOLEAN NOT NULL DEFAULT FALSE,
+                    fecha           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_notificaciones_rol ON public.notificaciones (rol_destino_id, leida)
+            """))
             # Detalle estructurado de dos etapas del flujo. El resto (Potencial,
             # Ley 1-4, Camino al Discipulo) vive en el historial: no necesitan
             # campos propios y una tabla por etapa duplicaria el estado.
@@ -436,6 +452,7 @@ app.include_router(estadisticas.router, dependencies=_auth_requerida)
 app.include_router(archivos.router, dependencies=_auth_requerida)
 app.include_router(iglesias.router, dependencies=_auth_requerida)
 app.include_router(seguimiento_leyes.router, dependencies=_auth_requerida)
+app.include_router(notificaciones.router, dependencies=_auth_requerida)
 
 
 @app.get("/", tags=["Estado"])

@@ -39,7 +39,8 @@ export default function Home() {
   useEffect(() => {
     cargarPermisos();
     administracionService.getAllRoles().then(setRoles).catch(() => setRoles([]));
-    if (user?.rol_id === 2) {
+    // Notificaciones: Administrador (1) y Pastor (2)
+    if (user?.rol_id === 1 || user?.rol_id === 2) {
       cargarNotificaciones();
     }
   }, []);
