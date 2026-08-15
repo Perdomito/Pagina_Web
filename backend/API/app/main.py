@@ -249,6 +249,16 @@ async def startup():
             await conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_pais ON public.seguimiento_leyes (pais_id)
             """))
+            # Estas 3 columnas se agregaron despues de que la tabla ya existia
+            # en produccion, asi que el CREATE TABLE IF NOT EXISTS de arriba
+            # nunca las crea de verdad (la tabla ya existe, no hace nada).
+            # Hace falta agregarlas explicitamente asi:
+            await conn.execute(text("""
+                ALTER TABLE seguimiento_leyes ADD COLUMN IF NOT EXISTS desertado BOOLEAN NOT NULL DEFAULT FALSE
+            """))
+            await conn.execute(text("""
+                ALTER TABLE seguimiento_leyes ADD COLUMN IF NOT EXISTS fecha_desercion TIMESTAMP
+            """))
             await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS public.seguimiento_leyes_historial (
                     id                    SERIAL PRIMARY KEY,
@@ -260,6 +270,14 @@ async def startup():
                     calificacion_estrellas INTEGER,
                     fecha_evento          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
+            """))
+            # maestro_id y calificacion_estrellas: mismo caso, la tabla ya
+            # existia de antes con menos columnas.
+            await conn.execute(text("""
+                ALTER TABLE seguimiento_leyes_historial ADD COLUMN IF NOT EXISTS maestro_id VARCHAR(30) REFERENCES public.miembros(id) ON DELETE SET NULL
+            """))
+            await conn.execute(text("""
+                ALTER TABLE seguimiento_leyes_historial ADD COLUMN IF NOT EXISTS calificacion_estrellas INTEGER
             """))
             await conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_seguimiento_leyes_historial_seguimiento
