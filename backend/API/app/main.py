@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import traceback
+from app.config import settings
+from app.auth_middleware import get_current_user
 from app.routers import (
     paises, ciudades, miembros, contactos, reportes,
     cotizaciones, presupuestos, ejecuciones, gastos_reales,
@@ -11,18 +13,21 @@ from app.routers import (
     estudios_diarios, estadisticas, archivos, iglesias, seguimiento_leyes,
 )
 
+_es_produccion = settings.ENVIRONMENT == "production"
+
 app = FastAPI(
     title="GNIT API",
     description="API REST para la base de datos GNIT — gestión de miembros, reportes, presupuestos y más.",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _es_produccion else "/docs",
+    redoc_url=None if _es_produccion else "/redoc",
+    openapi_url=None if _es_produccion else "/openapi.json",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.allowed_origins_list,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -30,10 +35,12 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    # Se loguea el detalle en servidor, pero al cliente solo un mensaje generico
+    # para no filtrar internals de la BD ni trazas.
     traceback.print_exc()
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc), "type": type(exc).__name__},
+        content={"detail": "Error interno del servidor"},
     )
 
 
@@ -74,7 +81,7 @@ async def startup():
                 INSERT INTO permisos (id, nombre) VALUES
                     (1, 'Bible Studies'), (2, 'Reports'), (3, 'Members'),
                     (4, 'Contacts'), (5, 'Administration'), (6, 'Statistics'),
-                    (7, 'Settings')
+                    (7, 'Settings'), (8, 'Laws Tracking')
                 ON CONFLICT (id) DO NOTHING
             """))
 
@@ -375,32 +382,36 @@ async def startup():
     except Exception as e:
         logger.error(f"=== DB Connection FAILED: {e} ===")
 
-# Registrar todos los routers
-app.include_router(paises.router)
-app.include_router(ciudades.router)
-app.include_router(miembros.router)
-app.include_router(contactos.router)
-app.include_router(reportes.router)
-app.include_router(cotizaciones.router)
-app.include_router(presupuestos.router)
-app.include_router(ejecuciones.router)
-app.include_router(gastos_reales.router)
-app.include_router(estadisticas_paises.router)
-app.include_router(roles.router)
-app.include_router(configuracion.router)
-app.include_router(usuarios.router)
-app.include_router(ciudades_mision.router)
-app.include_router(ingresos.router)
-app.include_router(miembros_info_adicional.router)
-app.include_router(saldos_caja_banco.router)
-app.include_router(traslados.router)
+# Registrar todos los routers.
+# Todos exigen un token JWT valido (autenticacion) salvo auth: /auth/login debe
+# ser publico y /auth/mis-permisos ya se auto-protege con su propio Depends.
+_auth_requerida = [Depends(get_current_user)]
+
+app.include_router(paises.router, dependencies=_auth_requerida)
+app.include_router(ciudades.router, dependencies=_auth_requerida)
+app.include_router(miembros.router, dependencies=_auth_requerida)
+app.include_router(contactos.router, dependencies=_auth_requerida)
+app.include_router(reportes.router, dependencies=_auth_requerida)
+app.include_router(cotizaciones.router, dependencies=_auth_requerida)
+app.include_router(presupuestos.router, dependencies=_auth_requerida)
+app.include_router(ejecuciones.router, dependencies=_auth_requerida)
+app.include_router(gastos_reales.router, dependencies=_auth_requerida)
+app.include_router(estadisticas_paises.router, dependencies=_auth_requerida)
+app.include_router(roles.router, dependencies=_auth_requerida)
+app.include_router(configuracion.router, dependencies=_auth_requerida)
+app.include_router(usuarios.router, dependencies=_auth_requerida)
+app.include_router(ciudades_mision.router, dependencies=_auth_requerida)
+app.include_router(ingresos.router, dependencies=_auth_requerida)
+app.include_router(miembros_info_adicional.router, dependencies=_auth_requerida)
+app.include_router(saldos_caja_banco.router, dependencies=_auth_requerida)
+app.include_router(traslados.router, dependencies=_auth_requerida)
 app.include_router(auth.router)
-app.include_router(continentes.router)
-app.include_router(estudios_diarios.router)
-app.include_router(estadisticas.router)
-app.include_router(archivos.router)
-app.include_router(iglesias.router)
-app.include_router(seguimiento_leyes.router)
+app.include_router(continentes.router, dependencies=_auth_requerida)
+app.include_router(estudios_diarios.router, dependencies=_auth_requerida)
+app.include_router(estadisticas.router, dependencies=_auth_requerida)
+app.include_router(archivos.router, dependencies=_auth_requerida)
+app.include_router(iglesias.router, dependencies=_auth_requerida)
+app.include_router(seguimiento_leyes.router, dependencies=_auth_requerida)
 
 
 @app.get("/", tags=["Estado"])

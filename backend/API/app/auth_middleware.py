@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.config import settings
 from app.database import get_db
-from app.models import Usuario, Rol
+from app.models import Usuario
 
 security = HTTPBearer()
 
@@ -42,10 +42,3 @@ def create_access_token(user_id: str, rol_id: int, pais_id: int | None = None) -
         "exp": expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-
-
-async def get_user_permissions(user: Usuario, db: AsyncSession) -> list[int]:
-    result = await db.execute(
-        select(Rol.id, Rol.nombre).where(Rol.id == user.rol)
-    )
-    return result.scalar_one_or_none()

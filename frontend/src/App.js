@@ -61,7 +61,7 @@ function AppRoutes() {
         <Route path="/administracion" element={<PrivateRoute><Administracion /></PrivateRoute>} />
         <Route path="/configuracion" element={<PrivateRoute><Configuracion /></PrivateRoute>} />
         <Route path="/seguimiento-leyes" element={<PrivateRoute><SeguimientoLeyes /></PrivateRoute>} />
-        <Route path="/informe-regional" element={<InformeRegional />} />
+        <Route path="/informe-regional" element={<PrivateRoute><InformeRegional /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   );
