@@ -135,6 +135,25 @@ const ConfiguracionService = {
   eliminarPermisoUsuario: async (usuario_id, permiso_id) => {
     const response = await axios.delete(`/usuarios/${usuario_id}/permisos/${permiso_id}`);
     return response.data;
+  },
+
+  // Nota: el backend de esto ya no existe (se revirtió Google Sign-In).
+  // Se dejan estas funciones solo para que la pestaña "Solicitudes de
+  // acceso" en Configuracion.jsx no rompa el resto de la pantalla — el
+  // .catch(() => []) que ya tiene esa pantalla se encarga del resto.
+  getSolicitudesAcceso: async (estado) => {
+    const response = await axios.get('/solicitudes-acceso', { params: estado ? { estado } : {} });
+    return response.data;
+  },
+
+  aprobarSolicitud: async (id, datos) => {
+    const response = await axios.post(`/solicitudes-acceso/${id}/aprobar`, datos);
+    return response.data;
+  },
+
+  rechazarSolicitud: async (id, notas) => {
+    const response = await axios.post(`/solicitudes-acceso/${id}/rechazar`, { notas: notas || null });
+    return response.data;
   }
 };
 

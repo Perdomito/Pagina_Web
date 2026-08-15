@@ -308,11 +308,25 @@ class SeguimientoLeyUpdate(BaseModel):
     tipo_miembro_destino: Optional[str] = None
     notas_generales: Optional[str] = None
     activo: Optional[bool] = None
+    desertado: Optional[bool] = None
 
 
 class SeguimientoLeyAvance(BaseModel):
     etapa: str
     notas: Optional[str] = None
+    # Solo aplican a Ley 1-4 / Camino al Discipulo
+    maestro_id: Optional[str] = None
+    calificacion_estrellas: Optional[int] = None
+    # Solo aplican a la etapa "Examen de Romanos"
+    nota_oral: Optional[Decimal] = None
+    nota_virtual: Optional[Decimal] = None
+    evaluador_id: Optional[str] = None
+    aprobado: Optional[bool] = None
+    observaciones: Optional[str] = None
+    # Solo aplican a la etapa "Entrevista"
+    entrevistador_id: Optional[str] = None
+    resultado: Optional[str] = None
+    tipo_miembro_resultante: Optional[str] = None
 
 
 class SeguimientoLeyHistorialOut(BaseModel):
@@ -320,6 +334,9 @@ class SeguimientoLeyHistorialOut(BaseModel):
     etapa: str
     etapa_orden: int
     notas: Optional[str] = None
+    maestro_id: Optional[str] = None
+    maestro_nombre: Optional[str] = None
+    calificacion_estrellas: Optional[int] = None
     fecha_evento: datetime
     model_config = {"from_attributes": True}
 
@@ -336,11 +353,13 @@ class SeguimientoLeyOut(BaseModel):
     fecha_inicio: datetime
     fecha_ultimo_avance: datetime
     fecha_abandono: Optional[datetime] = None
+    fecha_desercion: Optional[datetime] = None
     fecha_conversion_miembro: Optional[datetime] = None
     miembro_convertido_id: Optional[str] = None
     tipo_miembro_destino: str
     notas_generales: Optional[str] = None
     activo: bool
+    desertado: bool = False
     contacto_nombre: Optional[str] = None
     contacto_telefono: Optional[str] = None
     pais_nombre: Optional[str] = None

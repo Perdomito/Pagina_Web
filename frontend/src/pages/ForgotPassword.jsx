@@ -71,10 +71,8 @@ export default function ForgotPassword() {
             ) : (
               <div style={{ textAlign:"center", padding:"20px 0" }}>
                 <div style={{ fontSize:"48px", marginBottom:"16px", color: "#4CAF50" }}><FaCheckCircle /></div>
-                <h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"18px", margin:"0 0 12px" }}>{tx("Listo, ya se avisó", "Done, admin notified")}</h2>
-                <p style={{ color:"rgba(255,255,255,0.7)", fontSize:"13px", lineHeight:"1.7", margin:0 }}>
-                  {tx("Si ese correo existe en el sistema, el administrador ya recibió una notificación y se pondrá en contacto contigo para ayudarte a restablecer tu contraseña.", "If that email exists in the system, the administrator already received a notification and will reach out to help you reset your password.")}
-                </p>
+<h2 style={{ color:"white", fontFamily:"'Cinzel',serif", fontSize:"18px", margin:"0 0 12px" }}>{tx("¡Solicitud enviada!", "Request Sent!")}</h2>                <p style={{ color:"rgba(255,255,255,0.7)", fontSize:"13px", lineHeight:"1.7", margin:0 }}>
+{tx("Si tu correo está registrado, el administrador ya fue notificado y se pondrá en contacto contigo pronto para ayudarte a recuperar tu contraseña.", "If your email is registered, the administrator has been notified and will reach out to you soon to help you recover your password.")}                </p>
               </div>
             )}
 
