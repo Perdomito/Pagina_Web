@@ -174,14 +174,14 @@ class Usuario(Base):
     intentos_fallidos = Column(Integer, nullable=False, default=0)
     bloqueado_hasta = Column(DateTime, nullable=True)
 
-    rol_rel = relationship("Rol", back_populates="usuarios")    
+    rol_rel = relationship("Rol", back_populates="usuarios")
     pais_rel = relationship("Pais")
     ciudad_rel = relationship("Ciudad")
     miembro_rel = relationship("Miembro", foreign_keys=[miembro_id], primaryjoin="Usuario.miembro_id == Miembro.id")
 
 
-    class Notificacion(Base):
-        __tablename__ = "notificaciones"
+class Notificacion(Base):
+    __tablename__ = "notificaciones"
 
     id = Column(Integer, primary_key=True)
     mensaje = Column(Text, nullable=False)
