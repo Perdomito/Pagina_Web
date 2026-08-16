@@ -144,6 +144,9 @@ async def startup():
             """))
             # Iglesia a la que pertenece el miembro (punto 13 del análisis: cantidad_miembros
             # de iglesias pasa de ser un número manual a poder calcularse desde miembros reales)
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS iglesia_id INTEGER REFERENCES iglesias(id) ON DELETE SET NULL
+            """))
             # Protección contra fuerza bruta en login: contador de intentos fallidos
             # y hasta cuándo queda bloqueada la cuenta si se pasa del límite
             await conn.execute(text("""
