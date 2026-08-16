@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,9 @@ ROL_ADMIN_ID = 1
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+MAX_INTENTOS_FALLIDOS = 5
+MINUTOS_BLOQUEO = 15
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
@@ -29,13 +33,29 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(401, "Email o contrasena incorrectos")
+
+    if user.bloqueado_hasta and user.bloqueado_hasta > datetime.utcnow():
+        minutos_restantes = int((user.bloqueado_hasta - datetime.utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(403, f"Cuenta bloqueada temporalmente. Intenta de nuevo en {minutos_restantes} minuto(s).")
+
     try:
         pwd_bytes = data.password.encode("utf-8")
         hash_bytes = user.password_hash.encode("utf-8")
-        if not _bcrypt.checkpw(pwd_bytes, hash_bytes):
-            raise HTTPException(401, "Email o contrasena incorrectos")
+        password_ok = _bcrypt.checkpw(pwd_bytes, hash_bytes)
     except Exception:
+        password_ok = False
+
+    if not password_ok:
+        user.intentos_fallidos = (user.intentos_fallidos or 0) + 1
+        if user.intentos_fallidos >= MAX_INTENTOS_FALLIDOS:
+            user.bloqueado_hasta = datetime.utcnow() + timedelta(minutes=MINUTOS_BLOQUEO)
+        await db.flush()
         raise HTTPException(401, "Email o contrasena incorrectos")
+
+    user.intentos_fallidos = 0
+    user.bloqueado_hasta = None
+    await db.flush()
+
     if not user.activo:
         raise HTTPException(403, "Usuario inactivo")
 
