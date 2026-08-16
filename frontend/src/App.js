@@ -10,6 +10,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
 import Miembros from './pages/Miembros';
 import Iglesias from './pages/Iglesias';
+import Historial from './pages/Historial';
 import EstudiosLista from './pages/EstudiosLista';
 import EstudiosBiblicos from './pages/EstudiosBiblicos';
 import Estadisticas from './pages/Estadisticas';
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/home" element={<PrivateRoute><Home /></PrivateRoute>} />
         <Route path="/miembros" element={<PrivateRoute><Miembros /></PrivateRoute>} />
         <Route path="/iglesias" element={<PrivateRoute><Iglesias /></PrivateRoute>} />
+        <Route path="/historial" element={<PrivateRoute><Historial /></PrivateRoute>} />
         <Route path="/estudios-biblicos" element={<PrivateRoute><EstudiosBiblicos /></PrivateRoute>} />
         <Route path="/estudios" element={<PrivateRoute><EstudiosLista /></PrivateRoute>} />
         <Route path="/estadisticas" element={<PrivateRoute><Estadisticas /></PrivateRoute>} />
@@ -61,7 +63,7 @@ function AppRoutes() {
         <Route path="/administracion" element={<PrivateRoute><Administracion /></PrivateRoute>} />
         <Route path="/configuracion" element={<PrivateRoute><Configuracion /></PrivateRoute>} />
         <Route path="/seguimiento-leyes" element={<PrivateRoute><SeguimientoLeyes /></PrivateRoute>} />
-        <Route path="/informe-regional" element={<PrivateRoute><InformeRegional /></PrivateRoute>} />
+        <Route path="/informe-regional" element={<InformeRegional />} />
       </Routes>
     </BrowserRouter>
   );

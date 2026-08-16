@@ -189,6 +189,18 @@ class Notificacion(Base):
     fecha = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class Auditoria(Base):
+    __tablename__ = "auditoria"
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(String(30), ForeignKey("usuarios.id", ondelete="SET NULL"))
+    usuario_nombre = Column(Text)  # copia fija, por si el usuario se borra despues
+    modulo = Column(String(30), nullable=False)  # 'usuarios' / 'miembros' / 'permisos'
+    accion = Column(String(20), nullable=False)  # 'crear' / 'editar' / 'eliminar'
+    descripcion = Column(Text, nullable=False)
+    fecha = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Miembro(Base):
     __tablename__ = "miembros"
 

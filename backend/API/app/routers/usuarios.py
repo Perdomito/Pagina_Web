@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import Usuario, UsuarioPermiso
+from app.models import Usuario, UsuarioPermiso, Auditoria
 from app.schemas import (
     UsuarioCreate, UsuarioUpdate, UsuarioOut,
     UsuarioPermisoCreate, UsuarioPermisoUpdate, UsuarioPermisoOut,
 )
+from app.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
@@ -21,11 +22,21 @@ def _hash_password(plain: str) -> str:
 
 
 async def _generar_usuario_id(db: AsyncSession) -> str:
-    # LIKE + filtro en Python en vez de regex SQL: el operador '~' es solo de
-    # Postgres y rompe cualquier motor de pruebas.
     result = await db.execute(select(Usuario.id).where(Usuario.id.like("U%")))
     numeros = [int(uid[1:]) for uid in result.scalars() if _ID_USUARIO.fullmatch(uid)]
     return f"U{max(numeros, default=0) + 1:03d}"
+
+
+def _registrar(db: AsyncSession, actor: Usuario, accion: str, descripcion: str):
+    db.add(
+        Auditoria(
+            usuario_id=actor.id,
+            usuario_nombre=actor.nombre,
+            modulo="usuarios",
+            accion=accion,
+            descripcion=descripcion,
+        )
+    )
 
 
 @router.get("", response_model=list[UsuarioOut])
@@ -49,7 +60,11 @@ async def obtener(id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=UsuarioOut, status_code=201)
-async def crear(data: UsuarioCreate, db: AsyncSession = Depends(get_db)):
+async def crear(
+    data: UsuarioCreate,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     rol = data.rol if data.rol is not None else data.rol_id
     if rol is None:
         raise HTTPException(422, "Se requiere 'rol' o 'rol_id'")
@@ -67,18 +82,25 @@ async def crear(data: UsuarioCreate, db: AsyncSession = Depends(get_db)):
     db.add(obj)
     await db.flush()
     await db.refresh(obj)
+
+    _registrar(db, actor, "crear", f"Creó al usuario {obj.nombre} ({obj.email})")
+    await db.flush()
     return obj
 
 
 @router.patch("/{id}", response_model=UsuarioOut)
-async def actualizar(id: str, data: UsuarioUpdate, db: AsyncSession = Depends(get_db)):
+async def actualizar(
+    id: str,
+    data: UsuarioUpdate,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     obj = await db.get(Usuario, id)
     if not obj:
         raise HTTPException(404, "Usuario no encontrado")
     update_data = data.model_dump(exclude_unset=True)
-    # El formulario de edicion manda password="" cuando no se quiere cambiar:
-    # tratarla como password nueva borraria la del usuario.
     password = update_data.pop("password", None)
+    cambio_password = bool(password)
     if password:
         update_data["password_hash"] = _hash_password(password)
     rol_id = update_data.pop("rol_id", None)
@@ -88,15 +110,26 @@ async def actualizar(id: str, data: UsuarioUpdate, db: AsyncSession = Depends(ge
         setattr(obj, k, v)
     await db.flush()
     await db.refresh(obj)
+
+    detalle = "Cambió la contraseña" if cambio_password else "Editó sus datos"
+    _registrar(db, actor, "editar", f"{detalle} de {obj.nombre} ({obj.email})")
+    await db.flush()
     return obj
 
 
 @router.delete("/{id}", status_code=204)
-async def eliminar(id: str, db: AsyncSession = Depends(get_db)):
+async def eliminar(
+    id: str,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     obj = await db.get(Usuario, id)
     if not obj:
         raise HTTPException(404, "Usuario no encontrado")
+    nombre, email = obj.nombre, obj.email
     await db.delete(obj)
+    _registrar(db, actor, "eliminar", f"Eliminó al usuario {nombre} ({email})")
+    await db.flush()
 
 
 @router.get("/{usuario_id}/permisos", response_model=list[UsuarioPermisoOut])
@@ -109,9 +142,12 @@ async def listar_permisos_usuario(usuario_id: str, db: AsyncSession = Depends(ge
 
 @router.post("/{usuario_id}/permisos", response_model=UsuarioPermisoOut, status_code=201)
 async def agregar_permiso_usuario(
-    usuario_id: str, data: UsuarioPermisoCreate, db: AsyncSession = Depends(get_db),
+    usuario_id: str, data: UsuarioPermisoCreate,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    if not await db.get(Usuario, usuario_id):
+    usuario = await db.get(Usuario, usuario_id)
+    if not usuario:
         raise HTTPException(404, "Usuario no encontrado")
     existing = await db.execute(
         select(UsuarioPermiso).where(
@@ -129,13 +165,18 @@ async def agregar_permiso_usuario(
     db.add(obj)
     await db.flush()
     await db.refresh(obj)
+
+    _registrar(db, actor, "editar", f"Personalizó el permiso {data.permiso_id} de {usuario.nombre}")
+    await db.flush()
     return obj
 
 
 @router.patch("/{usuario_id}/permisos/{permiso_id}", response_model=UsuarioPermisoOut)
 async def actualizar_permiso_usuario(
     usuario_id: str, permiso_id: int,
-    data: UsuarioPermisoUpdate, db: AsyncSession = Depends(get_db),
+    data: UsuarioPermisoUpdate,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(UsuarioPermiso).where(
@@ -145,8 +186,9 @@ async def actualizar_permiso_usuario(
     )
     obj = result.scalar_one_or_none()
     valores = data.model_dump(exclude_unset=True)
+    usuario = await db.get(Usuario, usuario_id)
     if not obj:
-        if not await db.get(Usuario, usuario_id):
+        if not usuario:
             raise HTTPException(404, "Usuario no encontrado")
         obj = UsuarioPermiso(
             usuario_id=usuario_id,
@@ -159,12 +201,18 @@ async def actualizar_permiso_usuario(
             setattr(obj, k, v)
     await db.flush()
     await db.refresh(obj)
+
+    nombre = usuario.nombre if usuario else usuario_id
+    _registrar(db, actor, "editar", f"Cambió el permiso {permiso_id} de {nombre} a {obj.tiene_acceso}")
+    await db.flush()
     return obj
 
 
 @router.delete("/{usuario_id}/permisos/{permiso_id}", status_code=204)
 async def eliminar_permiso_usuario(
-    usuario_id: str, permiso_id: int, db: AsyncSession = Depends(get_db),
+    usuario_id: str, permiso_id: int,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     obj = await db.execute(
         select(UsuarioPermiso).where(
@@ -176,3 +224,8 @@ async def eliminar_permiso_usuario(
     if not obj:
         raise HTTPException(404, "Permiso de usuario no encontrado")
     await db.delete(obj)
+
+    usuario = await db.get(Usuario, usuario_id)
+    nombre = usuario.nombre if usuario else usuario_id
+    _registrar(db, actor, "editar", f"Quitó la personalización del permiso {permiso_id} de {nombre}")
+    await db.flush()

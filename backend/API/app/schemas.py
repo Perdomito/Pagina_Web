@@ -1045,3 +1045,12 @@ class NotificacionOut(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: str
+
+class AuditoriaOut(BaseModel):
+    id: int
+    usuario_nombre: Optional[str] = None
+    modulo: str
+    accion: str
+    descripcion: str
+    fecha: datetime
+    model_config = {"from_attributes": True}

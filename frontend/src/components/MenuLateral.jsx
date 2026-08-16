@@ -8,6 +8,7 @@ import {
   FaAddressBook, 
   FaMoneyBillWave, 
   FaCog, 
+  FaHistory,
   FaChartLine, 
   FaHammer,
   FaRoute
@@ -15,7 +16,7 @@ import {
 import colors from '../utils/colors';
 import { useIdioma } from '../context/IdiomaContext';
 
-export default function MenuLateral({ isOpen, onClose, permisos = [] }) {
+export default function MenuLateral({ isOpen, onClose, permisos = [], esAdmin = false }) {
   const navigate = useNavigate();
 const { t, idioma } = useIdioma();
 const tx = (es, en) => (idioma === 'en' ? en : es); // bilingüe directo para textos sin clave en el diccionario central
@@ -80,6 +81,14 @@ const tx = (es, en) => (idioma === 'en' ? en : es); // bilingüe directo para te
   ];
 
   const modulosPermitidos = modulos.filter(mod => permisos.includes(mod.permiso));
+  if (esAdmin) {
+    modulosPermitidos.push({
+      titulo: tx('Historial', 'History'),
+      desc: tx('Quién hizo cada cambio', 'Who did each change'),
+      ruta: "/historial",
+      icon: <FaHistory size={20} />,
+    });
+  }
 
   const handleNavigation = (modulo) => {
     if (modulo.enConstruccion) {

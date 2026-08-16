@@ -2,10 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import Rol, RolPermiso, Permiso
+from app.models import Rol, RolPermiso, Permiso, Usuario, Auditoria
 from app.schemas import RolCreate, RolUpdate, RolOut, RolPermisoCreate, RolPermisoUpdate, RolPermisoOut
+from app.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/roles", tags=["Roles y Permisos"])
+
+
+def _registrar(db: AsyncSession, actor: Usuario, accion: str, descripcion: str):
+    db.add(
+        Auditoria(
+            usuario_id=actor.id,
+            usuario_nombre=actor.nombre,
+            modulo="permisos",
+            accion=accion,
+            descripcion=descripcion,
+        )
+    )
 
 
 @router.get("", response_model=list[RolOut])
@@ -70,8 +83,13 @@ async def listar_permisos(rol_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{rol_id}/permisos", response_model=RolPermisoOut, status_code=201)
-async def agregar_permiso(rol_id: int, data: RolPermisoCreate, db: AsyncSession = Depends(get_db)):
-    if not await db.get(Rol, rol_id):
+async def agregar_permiso(
+    rol_id: int, data: RolPermisoCreate,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rol = await db.get(Rol, rol_id)
+    if not rol:
         raise HTTPException(404, "Rol no encontrado")
     if await db.get(RolPermiso, (rol_id, data.permiso_id)):
         raise HTTPException(400, "El rol ya tiene ese permiso")
@@ -79,17 +97,26 @@ async def agregar_permiso(rol_id: int, data: RolPermisoCreate, db: AsyncSession 
     db.add(obj)
     await db.flush()
     await db.refresh(obj)
+
+    _registrar(db, actor, "editar", f"Agregó el permiso {data.permiso_id} al rol {rol.nombre} ({data.activo})")
+    await db.flush()
     return obj
 
+
 @router.patch("/{rol_id}/permisos/{permiso_id}", response_model=RolPermisoOut)
-async def actualizar_permiso(rol_id: int, permiso_id: int, data: RolPermisoUpdate, db: AsyncSession = Depends(get_db)):
+async def actualizar_permiso(
+    rol_id: int, permiso_id: int, data: RolPermisoUpdate,
+    actor: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     valores = data.model_dump(exclude_unset=True)
     activo = valores.get("activo")
     if activo is None:
         activo = valores.get("tiene_acceso")
+    rol = await db.get(Rol, rol_id)
     obj = await db.get(RolPermiso, (rol_id, permiso_id))
     if not obj:
-        if not await db.get(Rol, rol_id):
+        if not rol:
             raise HTTPException(404, "Rol no encontrado")
         obj = RolPermiso(
             rol_id=rol_id,
@@ -101,6 +128,10 @@ async def actualizar_permiso(rol_id: int, permiso_id: int, data: RolPermisoUpdat
         obj.activo = activo
     await db.flush()
     await db.refresh(obj)
+
+    nombre_rol = rol.nombre if rol else rol_id
+    _registrar(db, actor, "editar", f"Cambió el permiso {permiso_id} del rol {nombre_rol} a {obj.activo}")
+    await db.flush()
     return obj
 
 

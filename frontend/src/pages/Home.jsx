@@ -341,6 +341,7 @@ export default function Home() {
         isOpen={menuAbierto}
         onClose={() => setMenuAbierto(false)}
         permisos={permisosUsuario}
+        esAdmin={user?.rol_id === 1}
       />
 
       {/* ── HEADER ── */}
@@ -466,7 +467,13 @@ export default function Home() {
                     notificaciones.map(n => (
                       <div
                         key={n.id}
-                        onClick={() => marcarLeida(n.id)}
+                        onClick={() => {
+                          marcarLeida(n.id);
+                          if (n.tipo === "recuperar_password") {
+                            setMostrarNotif(false);
+                            navigate("/configuracion");
+                          }
+                        }}
                         style={{
                           padding: "12px 18px",
                           borderBottom: "1px solid #f5f5f5",

@@ -11,7 +11,7 @@ from app.routers import (
     ciudades_mision, ingresos, miembros_info_adicional,
     saldos_caja_banco, traslados, auth, continentes,
     estudios_diarios, estadisticas, archivos, iglesias, seguimiento_leyes,
-    notificaciones,
+    notificaciones, auditoria,
 )
 
 _es_produccion = settings.ENVIRONMENT == "production"
@@ -299,6 +299,22 @@ async def startup():
             await conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_notificaciones_rol ON public.notificaciones (rol_destino_id, leida)
             """))
+            # Historial de acciones (empezamos por Usuarios, Miembros y
+            # Permisos; se agregan mas modulos despues del 17).
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.auditoria (
+                    id              SERIAL PRIMARY KEY,
+                    usuario_id      VARCHAR(30) REFERENCES public.usuarios(id) ON DELETE SET NULL,
+                    usuario_nombre  TEXT,
+                    modulo          VARCHAR(30) NOT NULL,
+                    accion          VARCHAR(20) NOT NULL,
+                    descripcion     TEXT NOT NULL,
+                    fecha           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON public.auditoria (fecha DESC)
+            """))
             # Detalle estructurado de dos etapas del flujo. El resto (Potencial,
             # Ley 1-4, Camino al Discipulo) vive en el historial: no necesitan
             # campos propios y una tabla por etapa duplicaria el estado.
@@ -453,6 +469,7 @@ app.include_router(archivos.router, dependencies=_auth_requerida)
 app.include_router(iglesias.router, dependencies=_auth_requerida)
 app.include_router(seguimiento_leyes.router, dependencies=_auth_requerida)
 app.include_router(notificaciones.router, dependencies=_auth_requerida)
+app.include_router(auditoria.router, dependencies=_auth_requerida)
 
 
 @app.get("/", tags=["Estado"])
