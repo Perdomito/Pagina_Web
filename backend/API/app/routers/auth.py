@@ -49,7 +49,7 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         user.intentos_fallidos = (user.intentos_fallidos or 0) + 1
         if user.intentos_fallidos >= MAX_INTENTOS_FALLIDOS:
             user.bloqueado_hasta = datetime.utcnow() + timedelta(minutes=MINUTOS_BLOQUEO)
-        await db.flush()
+        await db.commit()
         raise HTTPException(401, "Email o contrasena incorrectos")
 
     user.intentos_fallidos = 0
