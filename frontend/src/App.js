@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IdiomaProvider, useIdioma } from './context/IdiomaContext';
 
+import AvisoModoEscritorio from './components/AvisoModoEscritorio';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
@@ -47,6 +48,7 @@ const PrivateRoute = ({ children }) => {
 function AppRoutes() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AvisoModoEscritorio />
       <Toaster position="top-right" />
       <Routes>
         <Route path="/" element={<Login />} />

@@ -358,12 +358,18 @@ export default function Login() {
         /* ── RESPONSIVE ── */
         @media (max-width: 768px) {
           .login-root { flex-direction: column; }
-          .login-left { width: 100%; min-height: 260px; padding: 32px 24px; }
-          .logo-wrap { width: 65%; max-width: 260px; }
-          .church-name { font-size: 22px; }
+          .login-left { width: 100%; min-height: 200px; padding: 24px 20px; }
+          .logo-wrap { width: 55%; max-width: 180px; margin-bottom: 16px; }
+          .church-logo { width: 100%; }
+          .church-name { font-size: 20px; }
+          .church-subtitle { font-size: 11px; margin-bottom: 20px; }
+          .divider-left { margin-bottom: 20px; }
           .verse { display: none; }
-          .login-right { width: 100%; padding: 36px 28px; }
+          .login-right { width: 100%; padding: 28px 24px; }
           .login-right::before { width: 100%; height: 4px; top: 0; left: 0; }
+          .form-greeting { font-size: 22px; }
+          .field-input { height: 46px; }
+          .btn-login { height: 46px; }
         }
       `}</style>
 
