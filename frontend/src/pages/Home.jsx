@@ -221,6 +221,7 @@ export default function Home() {
   return (
     <div style={{
       minHeight: "100vh",
+      overflowX: "hidden",
       background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`,
       padding: "20px",
       fontFamily: "'Lato', sans-serif"
@@ -345,10 +346,12 @@ export default function Home() {
       />
 
       {/* ── HEADER ── */}
-      <div style={{
+    <div style={{
         maxWidth: "1200px",
         margin: "0 auto 32px",
         display: "flex",
+        flexWrap: "wrap",
+        rowGap: "12px",
         justifyContent: "space-between",
         alignItems: "center",
         animation: "fadeIn 0.6s ease"
