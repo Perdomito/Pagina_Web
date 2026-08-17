@@ -24,15 +24,21 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+
   const login = async (email, password) => {
-    const response = await API.post('/auth/login', { email, password });
-    const { token, usuario } = response.data;
+    try {
+      const response = await API.post('/auth/login', { email, password });
+      const { token, usuario } = response.data;
 
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(usuario));
-    setUser(usuario);
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(usuario));
+      setUser(usuario);
 
-    return usuario;
+      return usuario;
+    } catch (error) {
+      const mensaje = error.response?.data?.detail || error.message;
+      throw new Error(mensaje);
+    }
   };
 
   const logout = () => {
