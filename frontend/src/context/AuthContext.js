@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
 
+ 
   const login = async (email, password) => {
     try {
       const response = await API.post('/auth/login', { email, password });
@@ -36,6 +37,25 @@ export const AuthProvider = ({ children }) => {
 
       return usuario;
     } catch (error) {
+      // Si nunca llegó una respuesta real del servidor (típico cuando el
+      // Space de Hugging Face estaba "dormido" y recién está arrancando),
+      // reintentamos una vez automáticamente antes de rendirnos.
+      if (!error.response) {
+        try {
+          const response = await API.post('/auth/login', { email, password });
+          const { token, usuario } = response.data;
+
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(usuario));
+          setUser(usuario);
+
+          return usuario;
+        } catch (segundoError) {
+          const mensaje = segundoError.response?.data?.detail || segundoError.message;
+          throw new Error(mensaje);
+        }
+      }
+
       const mensaje = error.response?.data?.detail || error.message;
       throw new Error(mensaje);
     }
