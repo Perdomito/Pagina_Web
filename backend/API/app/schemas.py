@@ -204,6 +204,9 @@ class MiembroBase(BaseModel):
     ministerio_of: Optional[str] = None
     avance_audio: Optional[str] = None
     iglesia_id: Optional[int] = None
+    celular: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    fecha_compromiso: Optional[date] = None
 
     @field_validator("pais_id", "ciudad_id", "edad", "iglesia_id", mode="before")
     @classmethod
@@ -230,6 +233,9 @@ class MiembroUpdate(BaseModel):
     ministerio_of: Optional[str] = None
     avance_audio: Optional[str] = None
     iglesia_id: Optional[int] = None
+    celular: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    fecha_compromiso: Optional[date] = None
 
     @field_validator("pais_id", "ciudad_id", "edad", "iglesia_id", mode="before")
     @classmethod

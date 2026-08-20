@@ -223,6 +223,9 @@ class Miembro(Base):
     ministerio_of = Column(Text, nullable=True)
     avance_audio = Column(Text, nullable=True)
     iglesia_id = Column(Integer, ForeignKey("iglesias.id", ondelete="SET NULL"), nullable=True)
+    celular = Column(String(30), nullable=True)
+    fecha_nacimiento = Column(Date, nullable=True)
+    fecha_compromiso = Column(Date, nullable=True)
 
     pais_rel = relationship("Pais", back_populates="miembros")
     ciudad_rel = relationship("Ciudad", back_populates="miembros")

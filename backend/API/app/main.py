@@ -155,6 +155,17 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMP
             """))
+            # Datos nuevos pedidos para migrar el Excel de Miembros Comprometidos:
+            # celular, fecha de nacimiento (reemplaza edad manual) y fecha de compromiso
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS celular VARCHAR(30)
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS fecha_nacimiento DATE
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS fecha_compromiso DATE
+            """))
             # Categoría real del gasto en Administración (Iglesia/Casa/Misión/Misioneros/General),
             # separada de tipo_gasto que ya tiene su propia lista fija de valores validados
             await conn.execute(text("""
