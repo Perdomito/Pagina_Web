@@ -147,6 +147,9 @@ export default function Miembros() {
     avance_audio: '',
     ministerio_of: '',
     iglesia_id: '',
+    celular: '',
+    fecha_nacimiento: '',
+    fecha_compromiso: '',
     // Extra (Jasen)
     nombre_padre: '',
     telefono_padre: '',
@@ -266,7 +269,10 @@ export default function Miembros() {
       iglesia_id: data.iglesia_id === '' || data.iglesia_id === null ? null : Number(data.iglesia_id),
       cargo_funcion: data.cargo_funcion || null,
       ministerio_of: data.ministerio_of || null,
-      avance_audio: data.avance_audio || null
+      avance_audio: data.avance_audio || null,
+      celular: data.celular || null,
+      fecha_nacimiento: data.fecha_nacimiento || null,
+      fecha_compromiso: data.fecha_compromiso || null
     };
   };
 
@@ -337,6 +343,9 @@ export default function Miembros() {
         avance_audio: miembro.avance_audio || '',
         ministerio_of: miembro.ministerio_of || '',
         iglesia_id: miembro.iglesia_id || '',
+        celular: miembro.celular || '',
+        fecha_nacimiento: miembro.fecha_nacimiento || '',
+        fecha_compromiso: miembro.fecha_compromiso || '',
         nombre_padre: miembro.nombre_padre || '',
         telefono_padre: miembro.telefono_padre || '',
         nombre_madre: miembro.nombre_madre || '',
@@ -678,8 +687,42 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                       <div>
-                        <label style={labelStyle}>{t('mi_edad')}</label>
+                        <label style={labelStyle}>{tx('Fecha de nacimiento', 'Date of birth')}</label>
+                        <input
+                          className="mbr-input"
+                          type="date"
+                          value={formData.fecha_nacimiento}
+                          onChange={(e) => {
+                            const valor = e.target.value;
+                            let edadCalculada = formData.edad;
+                            if (valor) {
+                              const nacimiento = new Date(valor);
+                              const hoy = new Date();
+                              let edad = hoy.getFullYear() - nacimiento.getFullYear();
+                              const aunNoCumple = (hoy.getMonth() < nacimiento.getMonth()) ||
+                                (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+                              if (aunNoCumple) edad -= 1;
+                              edadCalculada = edad;
+                            }
+                            setFormData(prev => ({ ...prev, fecha_nacimiento: valor, edad: edadCalculada }));
+                          }}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>{t('mi_edad')} <span style={{ fontWeight: 400, color: "#8a97b0" }}>({tx('automática si pones fecha de nacimiento', 'automatic if birth date is set')})</span></label>
                         <input className="mbr-input" type="number" value={formData.edad} onChange={set('edad')} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>{tx('Celular', 'Cell phone')}</label>
+                        <input className="mbr-input" type="tel" value={formData.celular} onChange={set('celular')} style={inputStyle} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                      <div>
+                        <label style={labelStyle}>{tx('Fecha de compromiso', 'Commitment date')}</label>
+                        <input className="mbr-input" type="date" value={formData.fecha_compromiso} onChange={set('fecha_compromiso')} style={inputStyle} />
                       </div>
                       <div>
                         <label style={labelStyle}>{t('mi_estadoCivil')}</label>
