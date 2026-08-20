@@ -428,11 +428,11 @@ export default function Miembros() {
 const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }));
 
 const exportarCSV = () => {
-  const encabezados = ['Nombre', 'Identidad', 'Pais', 'Ciudad', 'Fecha Nacimiento', 'Edad', 'Celular', 'Fecha Compromiso', 'Tipo Miembro', 'Estado Civil', 'Profesion', 'Cargo/Funcion', 'Ministerio OF', 'Evangelizado Por'];
+  const encabezados = ['ID', 'Nombre', 'Identidad', 'Pais', 'Ciudad', 'Fecha Nacimiento', 'Edad', 'Celular', 'Fecha Compromiso', 'Tipo Miembro', 'Estado Civil', 'Profesion', 'Cargo/Funcion', 'Ministerio OF', 'Evangelizado Por'];
   const filas = miembrosFiltrados.map(m => {
     const paisNombre = paisesMap.get(m.pais_id)?.nombre || m.pais || '';
     const campos = [
-      m.nombre, m.identidad, paisNombre, m.ciudad, m.fecha_nacimiento, m.edad,
+      m.id, m.nombre, m.identidad, paisNombre, m.ciudad, m.fecha_nacimiento, m.edad,
       m.celular, m.fecha_compromiso, m.tipo_miembro, m.estado_civil, m.profesion,
       m.cargo_funcion, m.ministerio_of, m.evangelizado_por
     ];
