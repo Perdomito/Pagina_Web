@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes, FaInfoCircle } from "react-icons/fa";
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaTimes, FaInfoCircle, FaFileExport } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import miembrosService from '../services/MiembrosService';
 import administracionService from '../services/AdministracionService';
@@ -426,6 +426,28 @@ export default function Miembros() {
   };
 
 const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }));
+
+const exportarCSV = () => {
+  const encabezados = ['Nombre', 'Identidad', 'Pais', 'Ciudad', 'Fecha Nacimiento', 'Edad', 'Celular', 'Fecha Compromiso', 'Tipo Miembro', 'Estado Civil', 'Profesion', 'Cargo/Funcion', 'Ministerio OF', 'Evangelizado Por'];
+  const filas = miembrosFiltrados.map(m => {
+    const paisNombre = paisesMap.get(m.pais_id)?.nombre || m.pais || '';
+    const campos = [
+      m.nombre, m.identidad, paisNombre, m.ciudad, m.fecha_nacimiento, m.edad,
+      m.celular, m.fecha_compromiso, m.tipo_miembro, m.estado_civil, m.profesion,
+      m.cargo_funcion, m.ministerio_of, m.evangelizado_por
+    ];
+    return campos.map(v => `"${(v ?? '').toString().replace(/"/g, '""')}"`).join(',');
+  });
+  const contenido = '\uFEFF' + [encabezados.join(','), ...filas].join('\n');
+  const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `miembros_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
   const tipoBadge = (tipo) => {
     const map = {
       Comprometido: '#4CAF50',
@@ -501,6 +523,12 @@ const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.
               style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(10px)", border: "none", borderRadius: "10px", padding: "12px 22px", color: "white", cursor: "pointer", fontWeight: "700", fontFamily: "'Lato', sans-serif", fontSize: "14px" }}
             >
               {tx('Iglesias', 'Churches')}
+            </button>
+            <button
+              onClick={exportarCSV}
+              style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(10px)", border: "none", borderRadius: "10px", padding: "12px 22px", color: "white", cursor: "pointer", fontWeight: "700", fontFamily: "'Lato', sans-serif", display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}
+            >
+              <FaFileExport /> {tx('Exportar', 'Export')}
             </button>
             <button
               onClick={() => abrirModal()}
