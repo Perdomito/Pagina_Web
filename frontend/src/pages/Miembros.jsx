@@ -359,6 +359,15 @@ export default function Miembros() {
         pasaporte: miembro.pasaporte || '',
         fecha_matrimonio: miembro.fecha_matrimonio || '',
         fecha_divorcio: miembro.fecha_divorcio || '',
+        edad: miembro.fecha_nacimiento ? (() => {
+          const nacimiento = new Date(miembro.fecha_nacimiento);
+          const hoy = new Date();
+          let edad = hoy.getFullYear() - nacimiento.getFullYear();
+          const aunNoCumple = (hoy.getMonth() < nacimiento.getMonth()) ||
+            (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+          if (aunNoCumple) edad -= 1;
+          return edad;
+        })() : (miembro.edad || ''),
         nombre_padre: miembro.nombre_padre || '',
         telefono_padre: miembro.telefono_padre || '',
         nombre_madre: miembro.nombre_madre || '',
@@ -827,6 +836,8 @@ const exportarCSV = () => {
                           <select className="mbr-input" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #a5d6a7" }}>
                             <option value="">{t('mi_seleccionarMinisterio')}</option>
                             <option value="N/A">N/A</option>
+                            <option value="Business Mission">Business Mission</option>
+                            <option value="Departamento de Misión Olivet">Departamento de Misión Olivet</option>
                             <option value="Olivet Academy">Olivet Academy</option>
                             <option value="Olivet Leadership Institute">Olivet Leadership Institute</option>
                             <option value="Jubilee World">Jubilee World</option>
@@ -887,6 +898,8 @@ const exportarCSV = () => {
                           <select className="mbr-input" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #ffcc80" }}>
                             <option value="">{t('mi_seleccionarMinisterio')}</option>
                             <option value="N/A">N/A</option>
+                            <option value="Business Mission">Business Mission</option>
+                            <option value="Departamento de Misión Olivet">Departamento de Misión Olivet</option>
                             <option value="Olivet Academy">Olivet Academy</option>
                             <option value="Olivet Leadership Institute">Olivet Leadership Institute</option>
                             <option value="Jubilee World">Jubilee World</option>
