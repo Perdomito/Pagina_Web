@@ -836,24 +836,24 @@ const exportarCSV = () => {
                           <select className="mbr-input" value={formData.ministerio_of} onChange={set('ministerio_of')} style={{ ...inputStyle, border: "1.5px solid #a5d6a7" }}>
                             <option value="">{t('mi_seleccionarMinisterio')}</option>
                             <option value="N/A">N/A</option>
-                            <option value="Business Mission">Business Mission</option>
-                            <option value="Departamento de Misión Olivet">Departamento de Misión Olivet</option>
-                            <option value="Olivet Academy">Olivet Academy</option>
-                            <option value="Olivet Leadership Institute">Olivet Leadership Institute</option>
-                            <option value="Jubilee World">Jubilee World</option>
-                            <option value="Faith & Family Foundation">Faith &amp; Family Foundation</option>
-                            <option value="Elim Center">Elim Center</option>
-                            <option value="Youth Evangelical Fellowship">Youth Evangelical Fellowship</option>
-                            <option value="Apostolos Missions International">Apostolos Missions International</option>
-                            <option value="Young Disciples International">Young Disciples International</option>
-                            <option value="Saint Luke Society">Saint Luke Society</option>
-                            <option value="Gospel & Information Technology">Gospel &amp; Information Technology</option>
-                            <option value="Creatio International">Creatio International</option>
-                            <option value="Olivet Teen Mission">Olivet Teen Mission</option>
-                            <option value="Veritas Society">Veritas Society</option>
-                            <option value="Barnabas Relief">Barnabas Relief</option>
-                            <option value="Nehemiah Project">Nehemiah Project</option>
-                            <option value="Holy Bible Society">Holy Bible Society</option>
+                            <option value="Business Mission">BM (Business Mission)</option>
+                            <option value="Departamento de Misión Olivet">DOM (Departamento de Misión Olivet)</option>
+                            <option value="Olivet Academy">OLA (Olivet Academy)</option>
+                            <option value="Olivet Leadership Institute">OLI (Olivet Leadership Institute)</option>
+                            <option value="Jubilee World">JUBILEE (Jubilee World)</option>
+                            <option value="Faith & Family Foundation">F&amp;F (Faith &amp; Family Foundation)</option>
+                            <option value="Elim Center">ELIM (Elim Center)</option>
+                            <option value="Youth Evangelical Fellowship">YEF (Youth Evangelical Fellowship)</option>
+                            <option value="Apostolos Missions International">AM (Apostolos Missions International)</option>
+                            <option value="Young Disciples International">YD (Young Disciples International)</option>
+                            <option value="Saint Luke Society">SLS (Saint Luke Society)</option>
+                            <option value="Gospel & Information Technology">GNIT (Gospel &amp; Information Technology)</option>
+                            <option value="Creatio International">CREATIO (Creatio International)</option>
+                            <option value="Olivet Teen Mission">OTM (Olivet Teen Mission)</option>
+                            <option value="Veritas Society">VERITAS (Veritas Society)</option>
+                            <option value="Barnabas Relief">BR (Barnabas Relief)</option>
+                            <option value="Nehemiah Project">NEHEMIAS (Nehemiah Project)</option>
+                            <option value="Holy Bible Society">HBS (Holy Bible Society)</option>
                           </select>
                         </div>
                       </div>
