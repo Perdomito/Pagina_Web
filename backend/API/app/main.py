@@ -166,6 +166,22 @@ async def startup():
             await conn.execute(text("""
                 ALTER TABLE miembros ADD COLUMN IF NOT EXISTS fecha_compromiso DATE
             """))
+            # Datos nuevos del Excel de Sudamérica
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS pasaporte VARCHAR(30)
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS fecha_matrimonio DATE
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros ADD COLUMN IF NOT EXISTS fecha_divorcio DATE
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros_info_adicional ADD COLUMN IF NOT EXISTS contacto_emergencia_nombre TEXT
+            """))
+            await conn.execute(text("""
+                ALTER TABLE miembros_info_adicional ADD COLUMN IF NOT EXISTS contacto_emergencia_parentesco VARCHAR(50)
+            """))
             # Categoría real del gasto en Administración (Iglesia/Casa/Misión/Misioneros/General),
             # separada de tipo_gasto que ya tiene su propia lista fija de valores validados
             await conn.execute(text("""

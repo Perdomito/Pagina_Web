@@ -119,7 +119,9 @@ export default function Miembros() {
     nombre_madre: '',
     telefono_madre: '',
     tipo_sangre: '',
-    correo_electronico: ''
+    correo_electronico: '',
+    contacto_emergencia_nombre: '',
+    contacto_emergencia_parentesco: ''
   });
 
   const infoFormVacio = {
@@ -128,7 +130,9 @@ export default function Miembros() {
     nombre_madre: '',
     telefono_madre: '',
     tipo_sangre: '',
-    correo_electronico: ''
+    correo_electronico: '',
+    contacto_emergencia_nombre: '',
+    contacto_emergencia_parentesco: ''
   };
 
   const emptyForm = {
@@ -150,7 +154,10 @@ export default function Miembros() {
     celular: '',
     fecha_nacimiento: '',
     fecha_compromiso: '',
-    // Extra (Jasen)
+    pasaporte: '',
+    fecha_matrimonio: '',
+    fecha_divorcio: '',
+
     nombre_padre: '',
     telefono_padre: '',
     nombre_madre: '',
@@ -272,7 +279,10 @@ export default function Miembros() {
       avance_audio: data.avance_audio || null,
       celular: data.celular || null,
       fecha_nacimiento: data.fecha_nacimiento || null,
-      fecha_compromiso: data.fecha_compromiso || null
+      fecha_compromiso: data.fecha_compromiso || null,
+      pasaporte: data.pasaporte || null,
+      fecha_matrimonio: data.fecha_matrimonio || null,
+      fecha_divorcio: data.fecha_divorcio || null
     };
   };
 
@@ -346,6 +356,9 @@ export default function Miembros() {
         celular: miembro.celular || '',
         fecha_nacimiento: miembro.fecha_nacimiento || '',
         fecha_compromiso: miembro.fecha_compromiso || '',
+        pasaporte: miembro.pasaporte || '',
+        fecha_matrimonio: miembro.fecha_matrimonio || '',
+        fecha_divorcio: miembro.fecha_divorcio || '',
         nombre_padre: miembro.nombre_padre || '',
         telefono_padre: miembro.telefono_padre || '',
         nombre_madre: miembro.nombre_madre || '',
@@ -378,6 +391,8 @@ export default function Miembros() {
         setInfoAdicional(data);
         setInfoFormData({
           nombre_padre: data.nombre_padre || '',
+          contacto_emergencia_nombre: data.contacto_emergencia_nombre || '',
+          contacto_emergencia_parentesco: data.contacto_emergencia_parentesco || '',
           telefono_padre: data.telefono_padre || '',
           nombre_madre: data.nombre_madre || '',
           telefono_madre: data.telefono_madre || '',
@@ -745,6 +760,10 @@ const exportarCSV = () => {
                         <label style={labelStyle}>{tx('Celular', 'Cell phone')}</label>
                         <input className="mbr-input" type="tel" value={formData.celular} onChange={set('celular')} style={inputStyle} />
                       </div>
+                      <div>
+                        <label style={labelStyle}>{tx('Pasaporte', 'Passport')}</label>
+                        <input className="mbr-input" type="text" value={formData.pasaporte} onChange={set('pasaporte')} style={inputStyle} />
+                      </div>
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
@@ -767,6 +786,21 @@ const exportarCSV = () => {
                         <input className="mbr-input" type="text" value={formData.profesion} onChange={set('profesion')} style={inputStyle} placeholder={t('mi_profesionPlaceholder')} />
                       </div>
                     </div>
+
+                    {(formData.estado_civil === 'Married' || formData.estado_civil === 'Divorced') && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                        <div>
+                          <label style={labelStyle}>{tx('Fecha de matrimonio', 'Marriage date')}</label>
+                          <input className="mbr-input" type="date" value={formData.fecha_matrimonio} onChange={set('fecha_matrimonio')} style={inputStyle} />
+                        </div>
+                        {formData.estado_civil === 'Divorced' && (
+                          <div>
+                            <label style={labelStyle}>{tx('Fecha de divorcio', 'Divorce date')}</label>
+                            <input className="mbr-input" type="date" value={formData.fecha_divorcio} onChange={set('fecha_divorcio')} style={inputStyle} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div style={{ marginBottom: "16px" }}>
                       <label style={labelStyle}>{t('mi_evangelizadoPor')}</label>
@@ -954,9 +988,8 @@ const exportarCSV = () => {
                       <input className="mbr-input" type="tel" value={infoFormData.telefono_madre} onChange={(e) => setInfoFormData({...infoFormData, telefono_madre: e.target.value})} style={inputStyle} />
                     </div>
                   </div>
-
                   <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>{t('mi_saludContacto')}</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
                     <div>
                       <label style={labelStyle}>{t('mi_tipoSangre')}</label>
                       <select value={infoFormData.tipo_sangre} onChange={(e) => setInfoFormData({...infoFormData, tipo_sangre: e.target.value})} style={inputStyle} className="mbr-input">
@@ -969,6 +1002,18 @@ const exportarCSV = () => {
                     <div>
                       <label style={labelStyle}>{t('mi_email')}</label>
                       <input className="mbr-input" type="email" value={infoFormData.correo_electronico} onChange={(e) => setInfoFormData({...infoFormData, correo_electronico: e.target.value})} style={inputStyle} placeholder={t('mi_emailPlaceholder')} />
+                    </div>
+                  </div>
+
+                  <p style={{ ...labelStyle, color: PRIMARY, fontSize: "14px", marginBottom: "12px" }}>{tx('Contacto de emergencia', 'Emergency contact')}</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={labelStyle}>{tx('Nombre', 'Name')}</label>
+                      <input className="mbr-input" type="text" value={infoFormData.contacto_emergencia_nombre} onChange={(e) => setInfoFormData({...infoFormData, contacto_emergencia_nombre: e.target.value})} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>{tx('Parentesco', 'Relationship')}</label>
+                      <input className="mbr-input" type="text" value={infoFormData.contacto_emergencia_parentesco} onChange={(e) => setInfoFormData({...infoFormData, contacto_emergencia_parentesco: e.target.value})} style={inputStyle} placeholder={tx('ej. Madre, Hermano, Tío', 'e.g. Mother, Brother, Uncle')} />
                     </div>
                   </div>
                 </div>

@@ -207,6 +207,9 @@ class MiembroBase(BaseModel):
     celular: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     fecha_compromiso: Optional[date] = None
+    pasaporte: Optional[str] = None
+    fecha_matrimonio: Optional[date] = None
+    fecha_divorcio: Optional[date] = None
 
     @field_validator("pais_id", "ciudad_id", "edad", "iglesia_id", mode="before")
     @classmethod
@@ -236,6 +239,9 @@ class MiembroUpdate(BaseModel):
     celular: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     fecha_compromiso: Optional[date] = None
+    pasaporte: Optional[str] = None
+    fecha_matrimonio: Optional[date] = None
+    fecha_divorcio: Optional[date] = None
 
     @field_validator("pais_id", "ciudad_id", "edad", "iglesia_id", mode="before")
     @classmethod
@@ -793,6 +799,8 @@ class MiembroInfoAdicionalBase(BaseModel):
     telefono_madre: Optional[str] = None
     tipo_sangre: Optional[str] = None
     correo_electronico: Optional[str] = None
+    contacto_emergencia_nombre: Optional[str] = None
+    contacto_emergencia_parentesco: Optional[str] = None
 
 class MiembroInfoAdicionalCreate(MiembroInfoAdicionalBase):
     pass
@@ -804,6 +812,8 @@ class MiembroInfoAdicionalUpdate(BaseModel):
     telefono_madre: Optional[str] = None
     tipo_sangre: Optional[str] = None
     correo_electronico: Optional[str] = None
+    contacto_emergencia_nombre: Optional[str] = None
+    contacto_emergencia_parentesco: Optional[str] = None
 
 class MiembroInfoAdicionalOut(MiembroInfoAdicionalBase):
     fecha_creacion: datetime

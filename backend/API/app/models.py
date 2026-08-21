@@ -226,6 +226,9 @@ class Miembro(Base):
     celular = Column(String(30), nullable=True)
     fecha_nacimiento = Column(Date, nullable=True)
     fecha_compromiso = Column(Date, nullable=True)
+    pasaporte = Column(String(30), nullable=True)
+    fecha_matrimonio = Column(Date, nullable=True)
+    fecha_divorcio = Column(Date, nullable=True)
 
     pais_rel = relationship("Pais", back_populates="miembros")
     ciudad_rel = relationship("Ciudad", back_populates="miembros")
@@ -549,6 +552,8 @@ class MiembroInfoAdicional(Base):
     telefono_madre = Column(String(30))
     tipo_sangre = Column(String(5))
     correo_electronico = Column(String(255))
+    contacto_emergencia_nombre = Column(Text, nullable=True)
+    contacto_emergencia_parentesco = Column(String(50), nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, nullable=False)
 
