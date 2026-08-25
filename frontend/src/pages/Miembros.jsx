@@ -98,6 +98,7 @@ export default function Miembros() {
   const tx = (es, en) => (idioma === 'en' ? en : es); // texto bilingüe directo, para textos nuevos aún no agregados al diccionario del traductor
   const [miembros, setMiembros] = useState([]);
   const [paises, setPaises] = useState([]);
+  const [todasIglesias, setTodasIglesias] = useState([]);
   const [filtro, setFiltro] = useState("");
   const [loading, setLoading] = useState(true);
   const [mostrarModal, setMostrarModal] = useState(false);
@@ -175,12 +176,14 @@ export default function Miembros() {
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      const [miembrosData, paisesData] = await Promise.all([
+      const [miembrosData, paisesData, iglesiasData] = await Promise.all([
         miembrosService.getAll(),
-        administracionService.getAllPaises()
+        administracionService.getAllPaises(),
+        administracionService.getIglesias()
       ]);
       setMiembros(miembrosData);
       setPaises(paisesData);
+      setTodasIglesias(iglesiasData || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error(t('mi_errorCargarDatos'));
@@ -240,6 +243,12 @@ export default function Miembros() {
     paises.forEach(p => m.set(p.id, p));
     return m;
   }, [paises]);
+
+  const iglesiasMap = useMemo(() => {
+    const m = new Map();
+    todasIglesias.forEach(ig => m.set(ig.id, ig));
+    return m;
+  }, [todasIglesias]);
 
   // Filtrar por país del usuario si no es admin
   const miembrosPorPais = (user?.rol_id === 1 || !user?.pais_id) 
@@ -597,8 +606,7 @@ const exportarCSV = () => {
                       { key: "Name", label: t('mi_colNombre') },
                       { key: "ID", label: t('mi_colId') },
                       { key: "Country", label: t('mi_colPais') },
-                      { key: "City", label: t('mi_colCiudad') },
-                      { key: "Age", label: t('mi_colEdad') },
+                      { key: "Church", label: tx('Iglesia', 'Church') },
                       { key: "Type", label: t('mi_colTipo') },
                       { key: "Actions", label: t('mi_colAcciones') }
                     ].map(col => (
@@ -611,7 +619,7 @@ const exportarCSV = () => {
                 <tbody>
                   {miembrosFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ padding: "40px", textAlign: "center", color: "#8a97b0", fontFamily: "'Lato', sans-serif" }}>
+                      <td colSpan="6" style={{ padding: "40px", textAlign: "center", color: "#8a97b0", fontFamily: "'Lato', sans-serif" }}>
                         {t('mi_sinMiembros')}
                       </td>
                     </tr>
@@ -621,8 +629,7 @@ const exportarCSV = () => {
                         <td style={{ padding: "14px 16px", fontWeight: "600", color: "#1a2d5a", fontFamily: "'Lato', sans-serif" }}>{miembro.nombre}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85", fontSize: "13px" }}>{miembro.identidad}</td>
                         <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{paisesMap.get(miembro.pais_id)?.nombre || paisesMap.get(miembro.pais_id)?.iso || '-'}</td>
-                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.ciudad}</td>
-                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{miembro.edad}</td>
+                        <td style={{ padding: "14px 16px", color: "#5a6a85" }}>{iglesiasMap.get(miembro.iglesia_id)?.nombre || '-'}</td>
                         <td style={{ padding: "14px 16px" }}>
                           <span style={{ background: tipoBadge(miembro.tipo_miembro), color: "white", padding: "4px 12px", borderRadius: "20px", fontSize: "13px", fontWeight: "700", letterSpacing: "0.5px" }}>
                             {tv(miembro.tipo_miembro)}
