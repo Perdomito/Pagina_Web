@@ -832,6 +832,7 @@ const eliminarPais = async (continenteId, paisId) => {
   const esPastor = !esAdmin && roles.find(r => r.id === user?.rol_id)?.nombre?.toLowerCase() === 'pastor';
   // Admin ve todo, Pastor ve toda su región, cualquier otro rol ve solo su propio país.
   const puedeVerVariosPaises = esAdmin || esPastor;
+  const puedeEliminarPais = esAdmin;
   
   const diasDelMes = mesSeleccionado ? obtenerDiasDelMes(mesSeleccionado, añoActual) : [];
 
@@ -1280,7 +1281,7 @@ const eliminarPais = async (continenteId, paisId) => {
                   border: esSuPais ? "2px solid #134069" : undefined,
                 }}
               >
-                {puedeVerVariosPaises && (
+                {puedeEliminarPais && (
                   <button
                     className="card-delete-btn no-print"
                     onClick={(e) => {
