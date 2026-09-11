@@ -472,7 +472,7 @@ export default function Contactos() {
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
           <div style={{ background: "white", borderRadius: "12px", padding: "30px", width: "90%", maxWidth: "500px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h2 style={{ margin: 0 }}>{contactoEditando ? 'Edit Contact' : 'New Contact'}</h2>
+              <h2 style={{ margin: 0 }}>{contactoEditando ? tx('Editar Contacto', 'Edit Contact') : tx('Nuevo Contacto', 'New Contact')}</h2>
               <button onClick={cerrarModal} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer" }}>
                 <FaTimes />
               </button>
@@ -480,17 +480,17 @@ export default function Contactos() {
 
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: "15px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Name *</label>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>{tx('Nombre', 'Name')} *</label>
                 <input type="text" required value={formData.nombre} onChange={(e) => setFormData({...formData, nombre: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
               </div>
 
               <div style={{ marginBottom: "15px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Responsible Member *</label>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>{tx('Misionero Responsable', 'Responsible Member')} *</label>
                 <select required value={formData.miembro_responsable_id} onChange={(e) => {
                   const miembro = miembros.find(m => m.id === e.target.value);
                   setFormData({...formData, miembro_responsable_id: e.target.value, miembro_responsable: miembro?.nombre || ''});
                 }} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }}>
-                  <option value="">Select...</option>
+                  <option value="">{tx('Seleccionar...', 'Select...')}</option>
                   {miembros.map(m => (
                     <option key={m.id} value={m.id}>{m.nombre}</option>
                   ))}
@@ -498,14 +498,14 @@ export default function Contactos() {
               </div>
 
               <div style={{ marginBottom: "15px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Phone</label>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>{tx('Teléfono', 'Phone')}</label>
                 <input type="text" value={formData.telefono} onChange={(e) => setFormData({...formData, telefono: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }} />
               </div>
 
               <div style={{ marginBottom: "15px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Country</label>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>{tx('País', 'Country')}</label>
                 <select value={formData.pais_id} onChange={(e) => setFormData({...formData, pais_id: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px" }}>
-                  <option value="">Select country...</option>
+                  <option value="">{tx('Seleccionar país...', 'Select country...')}</option>
                   {paises.map(pais => (
                     <option key={pais.id} value={pais.id}>{pais.nombre}</option>
                   ))}
@@ -513,16 +513,16 @@ export default function Contactos() {
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>Notes</label>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600" }}>{tx('Notas', 'Notes')}</label>
                 <textarea value={formData.notas} onChange={(e) => setFormData({...formData, notas: e.target.value})} style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "6px", minHeight: "80px" }} />
               </div>
 
               <div style={{ display: "flex", gap: "10px" }}>
                 <button type="submit" style={{ flex: 1, padding: "12px", background: "#4CAF50", color: "white", border: "none", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}>
-                  {contactoEditando ? 'Update' : 'Create'}
+                  {contactoEditando ? tx('Actualizar', 'Update') : tx('Crear', 'Create')}
                 </button>
                 <button type="button" onClick={cerrarModal} style={{ flex: 1, padding: "12px", background: "#999", color: "white", border: "none", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}>
-                  Cancel
+                  {tx('Cancelar', 'Cancel')}
                 </button>
               </div>
             </form>
